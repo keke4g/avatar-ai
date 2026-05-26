@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/* =========================
+AURORA BORDER
+========================= */
+
+.aurora-border {
+
+  background:
+    linear-gradient(
+      130deg,
+      #ff0080,
+      #7928ca,
+      #0070f3,
+      #00dfd8,
+      #00c853,
+      #ffea00,
+      #ff6d00,
+      #ff0080
+    );
+
+  background-size:
+    400% 400%;
+
+  animation:
+    auroraMove 10s ease infinite;
+
+  filter:
+    blur(18px);
+
+  opacity:
+    0.85;
+
+  border-radius:
+    42px;
+
+}
+
+@keyframes auroraMove {
+
+  0% {
+
+    background-position:
+      0% 50%;
+
+  }
+
+  25% {
+
+    background-position:
+      100% 50%;
+
+  }
+
+  50% {
+
+    background-position:
+      100% 100%;
+
+  }
+
+  75% {
+
+    background-position:
+      0% 100%;
+
+  }
+
+  100% {
+
+    background-position:
+      0% 50%;
+
+  }
+
+}
+
+body {
+
+  margin: 0;
+
+  padding: 0;
+
+  overflow-x: hidden;
+
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
+
+}
