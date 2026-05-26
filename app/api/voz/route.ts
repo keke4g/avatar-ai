@@ -10,13 +10,23 @@ export async function POST(
     const body =
       await req.json();
 
-    const texto =
+    let texto =
       body.texto;
+
+    // =======================
+    // LIMITAR TEXTO
+    // =======================
+
+    texto =
+      texto
+        .split(".")
+        .slice(0, 3)
+        .join(".");
 
     const response =
       await fetch(
 
-        "https://api.cartesia.ai/tts/bytes",
+        "https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL",
 
         {
 
@@ -24,48 +34,38 @@ export async function POST(
 
           headers: {
 
+            Accept:
+              "audio/mpeg",
+
             "Content-Type":
               "application/json",
 
-            "X-API-Key":
+            "xi-api-key":
               process.env
-                .CARTESIA_API_KEY || "",
-
-            "Cartesia-Version":
-              "2024-06-10",
+                .ELEVENLABS_API_KEY || "",
 
           },
 
           body: JSON.stringify({
 
+            text: texto,
+
             model_id:
-              "sonic-multilingual",
+              "eleven_multilingual_v2",
 
-            transcript:
-              texto,
+            voice_settings: {
 
-            voice: {
+              stability:
+                0.45,
 
-              mode: "id",
+              similarity_boost:
+                0.8,
 
-              id:
-                "156fb8d2-335b-4950-9cb3-a2d33befec77",
+              style:
+                0.3,
 
-            },
-
-            language:
-              "es",
-
-            output_format: {
-
-              container:
-                "mp3",
-
-              encoding:
-                "mp3",
-
-              sample_rate:
-                44100,
+              use_speaker_boost:
+                true,
 
             },
 
@@ -77,17 +77,17 @@ export async function POST(
 
     if (!response.ok) {
 
-      const error =
+      const errorText =
         await response.text();
 
       console.log(
-        "CARTESIA ERROR:",
-        error
+        "ELEVEN ERROR:",
+        errorText
       );
 
       return new Response(
 
-        error,
+        errorText,
 
         {
 
