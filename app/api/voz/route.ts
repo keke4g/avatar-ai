@@ -1,50 +1,125 @@
-import { ElevenLabsClient } from "elevenlabs";
+export const runtime =
+  "nodejs";
 
-const elevenlabs = new ElevenLabsClient({
-  apiKey: process.env.ELEVENLABS_API_KEY,
-});
-
-export async function POST(req: Request) {
+export async function POST(
+  req: Request
+) {
 
   try {
 
-    const body = await req.json();
+    const body =
+      await req.json();
 
-    const texto = body.texto;
+    const texto =
+      body.texto;
 
-    const audio =
-      await elevenlabs.textToSpeech.convert(
+    const response =
+      await fetch(
 
-        "EXAVITQu4vr4xnSDxMaL",
+        "https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL",
 
         {
-          text: texto,
-          model_id: "eleven_multilingual_v2",
+
+          method: "POST",
+
+          headers: {
+
+            Accept:
+              "audio/mpeg",
+
+            "Content-Type":
+              "application/json",
+
+            "xi-api-key":
+              process.env
+                .ELEVENLABS_API_KEY || "",
+
+          },
+
+          body: JSON.stringify({
+
+            text: texto,
+
+            model_id:
+              "eleven_multilingual_v2",
+
+            voice_settings: {
+
+              stability:
+                0.45,
+
+              similarity_boost:
+                0.75,
+
+            },
+
+          }),
+
         }
 
       );
 
-    const chunks = [];
+    // DEBUG ERROR
 
-    for await (const chunk of audio) {
-      chunks.push(chunk);
+    if (!response.ok) {
+
+      const errorText =
+        await response.text();
+
+      console.log(
+        "ELEVEN ERROR:",
+        errorText
+      );
+
+      return new Response(
+
+        errorText,
+
+        {
+
+          status: 500,
+
+        }
+
+      );
+
     }
 
-    const audioBuffer = Buffer.concat(chunks);
+    const audioBuffer =
+      await response.arrayBuffer();
 
-    return new Response(audioBuffer, {
-      headers: {
-        "Content-Type": "audio/mpeg",
-      },
-    });
+    return new Response(
+
+      audioBuffer,
+
+      {
+
+        headers: {
+
+          "Content-Type":
+            "audio/mpeg",
+
+        },
+
+      }
+
+    );
 
   } catch (error) {
 
     console.log(error);
 
-    return Response.json({
-      error: "Error con ElevenLabs",
-    });
+    return new Response(
+
+      "Error de voz",
+
+      {
+
+        status: 500,
+
+      }
+
+    );
 
   }
 
