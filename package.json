@@ -12,6 +12,7 @@
     "@google/genai": "^2.6.0",
     "@langchain/core": "^1.1.48",
     "ai": "^6.0.191",
+    "cartesia": "^1.0.0",
     "cosine-similarity": "^1.0.1",
     "elevenlabs": "^1.59.0",
     "groq-sdk": "^1.2.0",

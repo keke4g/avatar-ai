@@ -16,7 +16,7 @@ export async function POST(
     const response =
       await fetch(
 
-        "https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL",
+        "https://api.cartesia.ai/tts/bytes",
 
         {
 
@@ -24,32 +24,48 @@ export async function POST(
 
           headers: {
 
-            Accept:
-              "audio/mpeg",
-
             "Content-Type":
               "application/json",
 
-            "xi-api-key":
+            "X-API-Key":
               process.env
-                .ELEVENLABS_API_KEY || "",
+                .CARTESIA_API_KEY || "",
+
+            "Cartesia-Version":
+              "2024-06-10",
 
           },
 
           body: JSON.stringify({
 
-            text: texto,
-
             model_id:
-              "eleven_multilingual_v2",
+              "sonic-multilingual",
 
-            voice_settings: {
+            transcript:
+              texto,
 
-              stability:
-                0.45,
+            voice: {
 
-              similarity_boost:
-                0.75,
+              mode: "id",
+
+              id:
+                "156fb8d2-335b-4950-9cb3-a2d33befec77",
+
+            },
+
+            language:
+              "es",
+
+            output_format: {
+
+              container:
+                "mp3",
+
+              encoding:
+                "mp3",
+
+              sample_rate:
+                44100,
 
             },
 
@@ -59,21 +75,19 @@ export async function POST(
 
       );
 
-    // DEBUG ERROR
-
     if (!response.ok) {
 
-      const errorText =
+      const error =
         await response.text();
 
       console.log(
-        "ELEVEN ERROR:",
-        errorText
+        "CARTESIA ERROR:",
+        error
       );
 
       return new Response(
 
-        errorText,
+        error,
 
         {
 
