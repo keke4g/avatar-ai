@@ -1,0 +1,119 @@
+========================================================================
+AURASWAP — PREMIUM HOME SWAPPING PLATFORM GUIDE & KNOWLEDGE DATABASE
+========================================================================
+
+Este documento contiene la información oficial de AuraSwap, las reglas de la plataforma y el catálogo de propiedades exclusivas. Eterna, la Concierge Virtual Premium, utiliza esta base de datos para responder dudas de los usuarios y recomendar propiedades.
+
+------------------------------------------------------------------------
+1. FILOSOFÍA Y REGLAS GENERALES DE AURASWAP
+------------------------------------------------------------------------
+* ¿Qué es AuraSwap?: AuraSwap es una red premium y exclusiva donde propietarios verificados intercambian sus casas o apartamentos para vacaciones, en lugar de alquilarlos.
+* Costo de Alquiler: El costo de renta es de exactamente 0€ (CERO euros/dólares). Es un intercambio recíproco de confianza.
+* Tarifa de Servicio (Fee): AuraSwap cobra una tarifa de servicio única del 1% por cada intercambio (swap) completado con éxito, que cubre seguros premium de daños, verificación de identidad y soporte 24/7.
+* Seguridad y Confianza: El 100% de los anfitriones y propiedades están verificados mediante inspección de propiedad y verificación de identidad digital.
+* Aura Match Score: Un puntaje inteligente de compatibilidad de intercambio (entre 90% y 99%) calculado en base a las fechas deseadas, el tipo de propiedad de cada usuario y sus intereses de viaje.
+
+------------------------------------------------------------------------
+2. PROCESO DE REGISTRO E INTERCAMBIO (ONBOARDING & SWAPS)
+------------------------------------------------------------------------
+1. Conectar Propiedad: El usuario registra y publica su propiedad (apartamento, villa, cabaña) en su perfil.
+2. Explorar Destinos: El usuario busca casas disponibles en sus destinos favoritos, filtrando por categoría (Playa, Cabañas, Diseño, Histórico, Urbano).
+3. Solicitar Intercambio (Propose Swap): El usuario envía una propuesta de intercambio eligiendo una de sus propiedades, seleccionando fechas y redactando un mensaje para el otro propietario.
+4. Negociar en el Inbox: Ambos propietarios conversan en el chat privado para definir detalles de entrega de llaves, wifi y reglas de la casa.
+5. Aprobación y Confetti: Cuando el anfitrión receptor hace clic en "Accept Home Swap", el intercambio se confirma, se genera el contrato y se activa el seguro premium.
+
+------------------------------------------------------------------------
+3. CATÁLOGO COMPLETO DE PROPIEDADES EN AURASWAP
+------------------------------------------------------------------------
+
+PROPIEDAD 1: Modernist Concrete Villa (Villa de Concreto Brutalista)
+- Ubicación: Cancún, Quintana Roo, México
+- Categoría: Villa / Playa
+- Anfitrión: Sofía Álvarez (Host Verificada, Calificación 4.98, 42 reseñas)
+- Nivel de Valor: Luxury
+- Aura Score de Compatibilidad: 98%
+- Habitaciones: 4 dormitorios, 4.5 baños. Capacidad máxima: 8 huéspedes.
+- Descripción: Estructura de concreto expuesto con líneas brutalistas y detalles tropicales. Paneles de vidrio deslizantes que conectan la sala con la piscina infinita y acceso directo a la playa privada.
+- Amenidades: Piscina infinita, playa privada, cocina de chef, cine en casa, vistas al océano, tablas de paddleboard, cargador Tesla.
+- Fechas disponibles: Del 15 de junio al 15 de octubre.
+
+PROPIEDAD 2: 17th-Century Marais Loft (Loft Histórico en París)
+- Ubicación: Le Marais, París, Francia
+- Categoría: Loft / Histórico
+- Anfitrión: Chloé Laurent (Host Verificada, Calificación 4.91, 56 reseñas)
+- Nivel de Valor: Exclusive
+- Aura Score de Compatibilidad: 96%
+- Habitaciones: 1 dormitorio, 1 baño. Capacidad máxima: 2 huéspedes.
+- Descripción: Elegancia histórica en el vibrante distrito de Marais. Cuenta con vigas de roble originales del siglo XVII, paredes de piedra expuesta y una curaduría de muebles modernos de mediados de siglo. Hermosas ventanas que capturan la luz parisina y vistas a los techos clásicos.
+- Amenidades: Barra de espresso, reproductor de vinilos vintage, biblioteca personal, balcón francés, wifi de alta velocidad, secador Dyson Airwrap.
+- Fechas disponibles: Del 1 de julio al 30 de septiembre.
+
+PROPIEDAD 3: Bauhaus Penthouse Roma Norte (Penthouse Bauhaus)
+- Ubicación: Roma Norte, Ciudad de México, México
+- Categoría: Penthouse / Diseño
+- Anfitrión: Sofía Álvarez (Host Verificada, Calificación 4.98, 42 reseñas)
+- Nivel de Valor: Premium
+- Aura Score de Compatibilidad: 95%
+- Habitaciones: 2 dormitorios, 2 baños. Capacidad máxima: 4 huéspedes.
+- Descripción: Un santuario de diseño en la arbolada Roma Norte. Inspirado en la escuela Bauhaus, con cancelería de acero negro, acabados de piedra natural y un espectacular jardín privado en la terraza con plantas endémicas.
+- Amenidades: Jardín en la azotea (rooftop), estación de trabajo dedicada, estufa de chef, cafetera espresso profesional, bicicletas de paseo, colección de arte contemporáneo.
+- Fechas disponibles: Del 1 de junio al 31 de diciembre.
+
+PROPIEDAD 4: Tropical Ubud Sanctuary (Santuario Tropical en Bali)
+- Ubicación: Ubud, Bali, Indonesia
+- Categoría: Villa / Exótico
+- Anfitrión: Yuki Sato (Host Verificado, Calificación 4.97, 19 reseñas)
+- Nivel de Valor: Luxury
+- Aura Score de Compatibilidad: 94%
+- Habitaciones: 3 dormitorios, 3.5 baños. Capacidad máxima: 6 huéspedes.
+- Descripción: Sumérgete en la calma de la selva. Villa de arquitectura abierta que fluye directamente hacia la vegetación tropical y una piscina privada. Vistas espectaculares al amanecer sobre terrazas de arrozales.
+- Amenidades: Piscina infinita, ducha semi-exterior, scooters incluidos en la estancia, deck de yoga privado, vistas a los arrozales, personal de servicio incluido.
+- Fechas disponibles: Del 1 de agosto al 30 de noviembre.
+
+PROPIEDAD 5: Contemporary Brooklyn Brownstone (Brownstone Contemporáneo)
+- Ubicación: Brooklyn Heights, Nueva York, EE. UU.
+- Categoría: Apartment / Urbano
+- Anfitrión: Chloé Laurent (Host Verificada, Calificación 4.91, 56 reseñas)
+- Nivel de Valor: Curated
+- Aura Score de Compatibilidad: 93%
+- Habitaciones: 3 dormitorios, 2.5 baños. Capacidad máxima: 6 huéspedes.
+- Descripción: Casa clásica de ladrillo restaurada con un diseño interior escandinavo minimalista. Combina chimeneas de época y molduras de yeso históricas con acabados de nogal y luminarias de diseño premium.
+- Amenidades: Cocina de nivel profesional, terraza en el patio trasero, sauna de infrarrojos privada, piano de cola, oficina de trabajo, sistema de sonido Sonos integrado.
+- Fechas disponibles: Del 1 de junio al 15 de diciembre.
+
+PROPIEDAD DE INTERCAMBIO DEL USUARIO 1: Minimalist Shibuya Studio (Estudio Minimalista)
+- Ubicación: Shibuya, Tokio, Japón
+- Categoría: Apartment / Urbano
+- Propietario: Mateo Valenzuela (Tú)
+- Nivel de Valor: Premium
+- Habitaciones: 1 dormitorio, 1 baño. Capacidad máxima: 2 huéspedes.
+- Descripción: Estudio arquitectónico compacto y funcional en el corazón de Shibuya. Mobiliario a medida, balcón privado sobre calle residencial silenciosa, a pasos del Cruce de Shibuya.
+- Amenidades: Wifi ultra veloz, balcón, estación de trabajo ergonómica, aire acondicionado, lavadora, bicicletas incluidas.
+
+PROPIEDAD DE INTERCAMBIO DEL USUARIO 2: Forest Retreat Cabin (Cabaña Refugio Forestal)
+- Ubicación: Karuizawa, Nagano, Japón
+- Categoría: Cabin / Cabaña
+- Propietario: Mateo Valenzuela (Tú)
+- Nivel de Valor: Curated
+- Habitaciones: 2 dormitorios, 1.5 baños. Capacidad máxima: 4 huéspedes.
+- Descripción: Increíble cabaña en A con paredes de vidrio del piso al techo rodeada de los bosques pacíficos de Karuizawa. Cuenta con chimenea de leña y amplios decks.
+- Amenidades: Chimenea de leña, deck exterior, estación de café de especialidad, vistas a la montaña, senderos cercanos, Starlink de alta velocidad.
+
+------------------------------------------------------------------------
+4. PREGUNTAS FRECUENTES PARA LA CONCIERGE ETERNA
+------------------------------------------------------------------------
+P: ¿Cómo funcionan las llaves y el check-in?
+R: Los anfitriones de AuraSwap suelen usar cajas de seguridad con combinaciones digitales o cerraduras inteligentes para un check-in autónomo. El anfitrión te enviará una guía detallada en PDF con el código de entrada antes de tu llegada.
+
+P: ¿Se pueden llevar mascotas?
+R: Cada propiedad tiene sus propias reglas sobre mascotas en su ficha técnica. Si el anfitrión lo permite en el chat privado, puedes llevarlas, siempre cuidando de no dañar el mobiliario.
+
+P: ¿El wifi es confiable para trabajar de forma remota?
+R: Sí, la mayoría de los anfitriones en AuraSwap son profesionales de la tecnología y el diseño, por lo que cuentan con conexiones de fibra óptica de alta velocidad (superior a 100 Mbps) o Starlink satelital en las cabañas.
+
+P: ¿Qué pasa si hay daños?
+R: Cada intercambio incluye un seguro premium de cobertura amplia contra daños a la propiedad de hasta 1,000,000€. Cualquier percance menor se reporta a través de la plataforma.
+
+========================================================================
+FIN DE LA BASE DE CONOCIMIENTOS DE AURASWAP
+========================================================================

@@ -39,3 +39,22 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# AI / Development
+.agents/
+.audit-shots/
+.playwright-cli/
+.diagnostic-edge-profile/
+scratch/
+output/
+
+# Temporary files
+*.csv
+*.log
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# SQL exports (si no quieres subirlos)
+update_properties_geocoded.sql

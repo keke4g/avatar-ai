@@ -1,0 +1,1865 @@
+"use client";
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSwap } from '../../../lib/context/SwapContext';
+import { useTranslation } from '../../../lib/context/LanguageContext';
+import { useRouter } from 'next/navigation';
+import { 
+  Star, ShieldCheck, Heart, Share, Calendar, MapPin, Sparkles, AlertCircle,
+  BedDouble, Bath, Users, ArrowRight, 
+  Wifi, Waves, Coffee, Monitor, Wind, Key, Flame, Compass, MessageSquareCode
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import confetti from 'canvas-confetti';
+import { LeadType, Property, PropertyOffering, PropertyOfferingMode } from '../../../lib/types';
+import { MOCK_USERS } from '../../../lib/mockData';
+import { getActiveOfferings, getOfferingsByMode } from '../../../lib/propertyOfferings';
+import { useLiveContext } from '../../../lib/context/LiveContext';
+
+interface PropertyDetailsClientProps {
+  id: string;
+}
+
+// Map of amenity names to icons
+const AMENITY_ICONS: Record<string, any> = {
+  'Wifi': Wifi,
+  'Workstation': Monitor,
+  'Air Conditioning': Wind,
+  'Washing Machine': Key,
+  'Bicycles': Compass,
+  'Balcony': Coffee,
+  'Fireplace': Flame,
+  'Outdoor Deck': Coffee,
+  'Coffee Station': Coffee,
+  'Mountain View': Compass,
+  'Hiking Trails': Compass,
+  'High-Speed Starlink': Wifi,
+  'Infinity Pool': Waves,
+  'Private Beach': Waves,
+  'Chef Kitchen': Coffee,
+  'Home Theater': Monitor,
+  'Ocean Views': Waves,
+  'Paddleboards': Waves,
+  'Tesla Charger': Key,
+  'Espresso Bar': Coffee,
+  'Vintage Record Player': Monitor,
+  'Library': Key,
+  'French Balcony': Coffee,
+  'Dyson Airwrap': Wind,
+  'Rooftop Garden': Coffee,
+  'Dedicated Workspace': Monitor,
+  'Chef Stove': Coffee,
+  'Espresso Maker': Coffee,
+  'Art Collection': Key,
+  'Semi-Outdoor Shower': Waves,
+  'Scooters Included': Compass,
+  'Yoga Deck': Compass,
+  'Rice Terrace Views': Compass,
+  'Fully Staffed': Users,
+  'Professional Grade Range': Coffee,
+  'Backyard Deck': Coffee,
+  'Infrared Sauna': Waves,
+  'Piano': Monitor,
+  'Office Workspace': Monitor,
+  'Sonos System': Monitor
+};
+
+const OFFERING_BADGE_ORDER: PropertyOfferingMode[] = ['SWAP', 'SHORT_RENT', 'MONTHLY_RENT', 'SALE'];
+
+const OFFERING_BADGE_META: Record<PropertyOfferingMode, { label: string; className: string }> = {
+  SWAP: {
+    label: 'Intercambio',
+    className: 'border-brand-accent/25 bg-brand-accent/5 text-brand-accent',
+  },
+  SHORT_RENT: {
+    label: 'Renta temporal',
+    className: 'border-emerald-200/80 bg-emerald-50/70 text-emerald-700',
+  },
+  MONTHLY_RENT: {
+    label: 'Renta mensual',
+    className: 'border-sky-200/80 bg-sky-50/70 text-sky-700',
+  },
+  SALE: {
+    label: 'Venta',
+    className: 'border-amber-200/80 bg-amber-50/70 text-amber-700',
+  },
+};
+
+export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps) {
+  const router = useRouter();
+  const { properties, myProperties, requestSwap, favorites, toggleFavorite, currentUser, swaps, reviews, users, createLead } = useSwap();
+  const { t, language } = useTranslation();
+  const { setActiveProperty, clearActiveProperty } = useLiveContext();
+
+  // Find property dynamically
+  const property = properties.find((p) => p.id === id);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const detailsMapRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const detailsMarkerRef = useRef<any>(null);
+  const [detailsLeafletLoaded, setDetailsLeafletLoaded] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!property || property.latitude === null || property.longitude === null) return;
+
+    const loadLeaflet = async () => {
+      if (!document.getElementById('leaflet-css-cdn')) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        link.id = 'leaflet-css-cdn';
+        document.head.appendChild(link);
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((window as any).L) {
+        setDetailsLeafletLoaded(true);
+        return;
+      }
+
+      return new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.id = 'leaflet-js-cdn';
+        script.onload = () => {
+          setDetailsLeafletLoaded(true);
+          resolve();
+        };
+        script.onerror = () => reject(new Error('Failed to load Leaflet'));
+        document.head.appendChild(script);
+      });
+    };
+
+    loadLeaflet().catch(err => console.error('[Details Leaflet Load Error]:', err));
+  }, [property]);
+
+  useEffect(() => {
+    if (!detailsLeafletLoaded || !property || property.latitude === null || property.longitude === null) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const L = (window as any).L;
+    if (!L) return;
+
+    const container = document.getElementById('property-details-map');
+    if (!container) return;
+
+    try {
+      if (!detailsMapRef.current) {
+        const map = L.map('property-details-map', {
+          zoomControl: true,
+          scrollWheelZoom: false,
+          attributionControl: false
+        }).setView([property.latitude, property.longitude], 14);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19,
+        }).addTo(map);
+
+        const customIcon = L.divIcon({
+          className: 'custom-leaflet-marker-selected',
+          html: `<div class="bg-brand-black text-white px-2 py-0.5 rounded-full border border-brand-black font-black text-[9px] shadow-premium">📍</div>`
+        });
+
+        const marker = L.marker([property.latitude, property.longitude], { icon: customIcon }).addTo(map);
+
+        detailsMapRef.current = map;
+        detailsMarkerRef.current = marker;
+      } else {
+        const map = detailsMapRef.current;
+        const marker = detailsMarkerRef.current;
+        map.setView([property.latitude, property.longitude], 14);
+        if (marker) {
+          marker.setLatLng([property.latitude, property.longitude]);
+        }
+      }
+
+      setTimeout(() => {
+        if (detailsMapRef.current) {
+          detailsMapRef.current.invalidateSize();
+        }
+      }, 150);
+    } catch (e) {
+      console.error('[Details Map Init Error]:', e);
+    }
+
+    return () => {
+      if (detailsMapRef.current) {
+        try {
+          detailsMapRef.current.remove();
+        } catch {}
+        detailsMapRef.current = null;
+        detailsMarkerRef.current = null;
+      }
+    };
+  }, [detailsLeafletLoaded, property]);
+
+  useEffect(() => {
+    if (property) {
+      setActiveProperty(property);
+    }
+    return () => {
+      clearActiveProperty();
+    };
+  }, [property, setActiveProperty, clearActiveProperty]);
+
+  const activeOfferingModes = useMemo(() => {
+    if (!property) return [];
+    const activeModes = new Set(getActiveOfferings(property).map((offering) => offering.mode));
+    return OFFERING_BADGE_ORDER.filter((mode) => activeModes.has(mode));
+  }, [property]);
+
+  const hasSwapOffering = activeOfferingModes.includes('SWAP');
+  const hasRentOffering = activeOfferingModes.includes('SHORT_RENT') || activeOfferingModes.includes('MONTHLY_RENT');
+  const hasSaleOffering = activeOfferingModes.includes('SALE');
+
+  const activeRentOffering = useMemo(() => {
+    if (!property) return null;
+    return getOfferingsByMode(property, 'SHORT_RENT', { activeOnly: true })[0] ||
+      getOfferingsByMode(property, 'MONTHLY_RENT', { activeOnly: true })[0] ||
+      null;
+  }, [property]);
+
+  const activeSaleOffering = useMemo(() => {
+    if (!property) return null;
+    return getOfferingsByMode(property, 'SALE', { activeOnly: true })[0] || null;
+  }, [property]);
+
+  const hostReviews = useMemo(() => {
+    if (!reviews || !property) return [];
+    return reviews.filter(r => r.reviewedUserId === property.hostId);
+  }, [reviews, property?.hostId]);
+
+  const hostCompletedSwapsCount = useMemo(() => {
+    if (!swaps || !property) return 0;
+    return swaps.filter(s => 
+      s.status === 'COMPLETED' && 
+      (s.senderId === property.hostId || s.receiverId === property.hostId)
+    ).length;
+  }, [swaps, property?.hostId]);
+
+  const dynamicRating = useMemo(() => {
+    if (!property) return 5;
+    if (hostReviews.length === 0) return property.hostRating;
+    return (hostReviews.reduce((sum, r) => sum + r.rating, 0) / hostReviews.length);
+  }, [hostReviews, property]);
+
+  const dynamicReviewsCount = useMemo(() => {
+    if (!property) return 0;
+    return hostReviews.length > 0 ? hostReviews.length : property.hostReviewsCount;
+  }, [hostReviews, property]);
+
+  const combinedReviews = useMemo(() => {
+    if (!property) return [];
+    const mock = (property.reviews || []).map(r => ({
+      id: r.id,
+      authorName: r.authorName,
+      authorAvatar: r.authorAvatar,
+      rating: r.rating,
+      date: r.date,
+      comment: r.comment,
+      isVerified: false
+    }));
+
+    const verified = hostReviews.map(r => {
+      const reviewer = users.find(u => u.id === r.reviewerId) || MOCK_USERS.find(u => u.id === r.reviewerId);
+      return {
+        id: r.id,
+        authorName: reviewer?.name || (language === 'es' ? 'Otro anfitrión' : 'Other host'),
+        authorAvatar: reviewer?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+        rating: r.rating,
+        date: new Date(r.createdAt).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }),
+        comment: r.comment,
+        isVerified: true
+      };
+    });
+
+    return [...verified, ...mock];
+  }, [hostReviews, property, users, language]);
+
+  // Dynamic image error tracker for multi-photo grids
+  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
+
+  const handleImageError = (index: number) => {
+    setFailedImages(prev => ({ ...prev, [index]: true }));
+  };
+
+  const getImageUrl = (index: number) => {
+    if (!property) return '';
+    const fallbackUrls = [
+      'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80'
+    ];
+    if (failedImages[index] || !property.images || !property.images[index]) {
+      return fallbackUrls[index % fallbackUrls.length];
+    }
+    return property.images[index];
+  };
+
+  // Form states
+  const [modalOpen, setModalOpen] = useState(false);
+  const [leadModalOpen, setLeadModalOpen] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<PropertyOfferingMode | null>(null);
+
+  // Set default selected mode when activeOfferings load
+  useEffect(() => {
+    if (activeOfferingModes.length > 0) {
+      if (activeOfferingModes.includes('SWAP')) {
+        setSelectedMode('SWAP');
+      } else {
+        setSelectedMode(activeOfferingModes[0]);
+      }
+    }
+  }, [activeOfferingModes]);
+  const [leadSuccessOpen, setLeadSuccessOpen] = useState(false);
+  const [selectedLeadOffering, setSelectedLeadOffering] = useState<PropertyOffering | null>(null);
+  const [leadMessage, setLeadMessage] = useState('');
+  const [isSubmittingLead, setIsSubmittingLead] = useState(false);
+  const [leadError, setLeadError] = useState('');
+  const [selectedMyPropId, setSelectedMyPropId] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const numNights = useMemo(() => {
+    if (!startDate || !endDate) return 0;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  }, [startDate, endDate]);
+  const [swapMessage, setSwapMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+
+  // Calendar active month view state (defaults to September 2026 for initial view matches)
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(() => {
+    return new Date(2026, 8, 1); // 0-indexed month: 8 is September
+  });
+
+  const calendarYear = currentCalendarDate.getFullYear();
+  const calendarMonth = currentCalendarDate.getMonth(); // 0 to 11
+
+  const isSelfProperty = useMemo(() => {
+    return property && currentUser && property.hostId === currentUser.id;
+  }, [property, currentUser]);
+
+  // Booked ranges calculations
+  const bookedRanges = useMemo(() => {
+    if (!property || !swaps) return [];
+    return swaps
+      .filter(s => 
+        (s.senderPropertyId === property.id || s.receiverPropertyId === property.id) &&
+        ['APPROVED', 'CONFIRMED', 'ACTIVE'].includes(s.status)
+      )
+      .map(s => ({ start: s.startDate, end: s.endDate }));
+  }, [property, swaps]);
+
+  const hasOverlap = useMemo(() => {
+    if (!startDate || !endDate) return false;
+    
+    // 1. Check overlap on target property
+    const targetOverlap = bookedRanges.some(b => 
+      (startDate >= b.start && startDate <= b.end) ||
+      (endDate >= b.start && endDate <= b.end) ||
+      (startDate <= b.start && endDate >= b.end)
+    );
+    if (targetOverlap) return true;
+
+    // 2. Check overlap on user's selected property
+    if (selectedMyPropId) {
+      const myBooked = swaps
+        .filter(s => 
+          (s.senderPropertyId === selectedMyPropId || s.receiverPropertyId === selectedMyPropId) &&
+          ['APPROVED', 'CONFIRMED', 'ACTIVE'].includes(s.status)
+        )
+        .map(s => ({ start: s.startDate, end: s.endDate }));
+      
+      const myOverlap = myBooked.some(b => 
+        (startDate >= b.start && startDate <= b.end) ||
+        (endDate >= b.start && endDate <= b.end) ||
+        (startDate <= b.start && endDate >= b.end)
+      );
+      return myOverlap;
+    }
+
+    return false;
+  }, [startDate, endDate, bookedRanges, selectedMyPropId, swaps]);
+
+  // Day generator for standard 6-row month grid (42 slots)
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(calendarYear, calendarMonth, 1);
+    const startDayOfWeek = firstDay.getDay();
+    const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+    const daysInPrevMonth = new Date(calendarYear, calendarMonth, 0).getDate();
+
+    const days: Array<{ date: Date; type: 'prev' | 'current' | 'next'; key: string }> = [];
+
+    // Fill previous month days (to start grid on Sunday)
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const dayVal = daysInPrevMonth - i;
+      const prevDate = new Date(calendarYear, calendarMonth - 1, dayVal);
+      days.push({
+        date: prevDate,
+        type: 'prev',
+        key: `prev-${dayVal}`,
+      });
+    }
+
+    // Fill current month days
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currDate = new Date(calendarYear, calendarMonth, day);
+      days.push({
+        date: currDate,
+        type: 'current',
+        key: `curr-${day}`,
+      });
+    }
+
+    // Fill next month days to complete 6-row grid (42 elements)
+    const remainingSlots = 42 - days.length;
+    for (let day = 1; day <= remainingSlots; day++) {
+      const nextDate = new Date(calendarYear, calendarMonth + 1, day);
+      days.push({
+        date: nextDate,
+        type: 'next',
+        key: `next-${day}`,
+      });
+    }
+
+    return days;
+  }, [calendarYear, calendarMonth]);
+
+  const handlePrevMonth = () => {
+    setCurrentCalendarDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentCalendarDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const handleDateClick = (clickedDate: Date) => {
+    const clickedStr = clickedDate.toISOString().split('T')[0];
+
+    // If clicked date is occupied or out of available bounds, do nothing
+    const isOccupied = bookedRanges.some(b => clickedStr >= b.start && clickedStr <= b.end);
+    const isWithinBounds = property ? (clickedStr >= property.availableStart && clickedStr <= property.availableEnd) : false;
+    if (isOccupied || !isWithinBounds) return;
+
+    if (!startDate || (startDate && endDate)) {
+      setStartDate(clickedStr);
+      setEndDate('');
+    } else {
+      if (clickedStr < startDate) {
+        setStartDate(clickedStr);
+        setEndDate('');
+      } else {
+        // Enforce no blocked days in between
+        let temp = new Date(startDate);
+        const limit = new Date(clickedDate);
+        let hasBlockedInBetween = false;
+
+        while (temp <= limit) {
+          const tempStr = temp.toISOString().split('T')[0];
+          const occupied = bookedRanges.some(b => tempStr >= b.start && tempStr <= b.end);
+          const within = property ? (tempStr >= property.availableStart && tempStr <= property.availableEnd) : false;
+          if (occupied || !within) {
+            hasBlockedInBetween = true;
+            break;
+          }
+          temp.setDate(temp.getDate() + 1);
+        }
+
+        if (hasBlockedInBetween) {
+          setStartDate(clickedStr);
+          setEndDate('');
+        } else {
+          setEndDate(clickedStr);
+        }
+      }
+    }
+  };
+
+  // Instant Validation status
+  const rangeStatus = useMemo(() => {
+    if (!startDate || !endDate) return null;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (start > end) return 'invalid';
+
+    let occupiedCount = 0;
+    let outOfBoundsCount = 0;
+    let totalDays = 0;
+
+    let current = new Date(start);
+    while (current <= end) {
+      totalDays++;
+      const currentStr = current.toISOString().split('T')[0];
+      const isOccupied = bookedRanges.some(b => currentStr >= b.start && currentStr <= b.end);
+      const isWithinBounds = property ? (currentStr >= property.availableStart && currentStr <= property.availableEnd) : false;
+
+      if (isOccupied) occupiedCount++;
+      if (!isWithinBounds) outOfBoundsCount++;
+      
+      current.setDate(current.getDate() + 1);
+    }
+
+    if (occupiedCount === 0 && outOfBoundsCount === 0) {
+      return 'available';
+    } else if (occupiedCount > 0 && occupiedCount < totalDays) {
+      return 'partial';
+    } else {
+      return 'unavailable';
+    }
+  }, [startDate, endDate, bookedRanges, property]);
+
+  // Pre-select user's first property in the swap request form
+  React.useEffect(() => {
+    if (myProperties.length > 0) {
+      setSelectedMyPropId(myProperties[0].id);
+    }
+  }, [myProperties]);
+
+  // If properties are still empty (initializing), render a loading skeleton
+  if (properties.length === 0) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-20 flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-2 border-brand-gray-200 border-t-brand-black animate-spin" />
+          <span className="text-[10px] uppercase font-black tracking-widest text-brand-gray-400">Loading premium spaces...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // If not found in reactive list, render beautiful 404 Space not found layout
+  if (!property) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-20 text-center flex flex-col items-center justify-center min-h-[400px]">
+        <h2 className="text-2xl font-extrabold text-brand-black mb-3">Space not found</h2>
+        <p className="text-brand-gray-500 mb-6 max-w-md leading-relaxed font-semibold">
+          The property you are looking for does not exist in our verified network or has been un-published by its host.
+        </p>
+        <button 
+          onClick={() => router.push('/explore')} 
+          className="px-6 py-3 bg-brand-black text-white hover:bg-brand-gray-800 rounded-full text-xs font-bold shadow-sm transition-all cursor-pointer"
+        >
+          Return to Explore
+        </button>
+      </div>
+    );
+  }
+
+  const isFavorited = favorites.includes(property.id);
+
+  const handleFavorite = () => {
+    toggleFavorite(property.id);
+  };
+
+  const handleRequestSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMyPropId) return;
+
+    setIsSubmitting(true);
+    
+    // Simulate API delay
+    setTimeout(() => {
+      // Trigger global state swap request
+      requestSwap({
+        senderPropertyId: selectedMyPropId,
+        receiverId: property.hostId,
+        receiverPropertyId: property.id,
+        startDate,
+        endDate,
+        message: swapMessage,
+      });
+
+      setIsSubmitting(false);
+      setModalOpen(false);
+      setSuccessOpen(true);
+
+      // Fire a premium startup confetti show
+      confetti({
+        particleCount: 140,
+        spread: 80,
+        origin: { y: 0.6 }
+      });
+    }, 1000);
+  };
+
+  const openLeadModal = (offering: PropertyOffering | null) => {
+    if (!offering) return;
+    setSelectedLeadOffering(offering);
+    setLeadMessage('');
+    setLeadError('');
+    setLeadModalOpen(true);
+  };
+
+  const handleLeadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!property || !selectedLeadOffering || !leadMessage.trim()) return;
+
+    setIsSubmittingLead(true);
+    setLeadError('');
+
+    try {
+      await createLead({
+        propertyId: property.id,
+        offeringId: selectedLeadOffering.id,
+        leadType: selectedLeadOffering.mode as LeadType,
+        message: leadMessage.trim(),
+      });
+
+      setLeadModalOpen(false);
+      setLeadSuccessOpen(true);
+      setLeadMessage('');
+      setSelectedLeadOffering(null);
+    } catch (err) {
+      console.error('[PropertyDetails] Lead submission failed:', err);
+      setLeadError(
+        currentUser
+          ? (language === 'es' ? 'No pudimos enviar tu solicitud. Intenta de nuevo.' : 'We could not send your request. Please try again.')
+          : (language === 'es' ? 'Inicia sesión para enviar una solicitud.' : 'Please sign in to send a request.')
+      );
+    } finally {
+      setIsSubmittingLead(false);
+    }
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto px-6 sm:px-12 md:px-24">
+      
+      {/* 1. Sub-Header: Title & Sharing Controls */}
+      <div className="flex flex-col gap-2 mb-6">
+        <div className="flex items-center gap-2">
+          <span className="bg-brand-accent/10 text-brand-accent text-[10px] font-extrabold tracking-widest uppercase px-2.5 py-1 rounded-md">
+            {t('details.swapTier', { tier: t(`valueRatings.${property.valueRating}`).startsWith('valueRatings.') ? property.valueRating : t(`valueRatings.${property.valueRating}`) })}
+          </span>
+          <span className="bg-brand-black text-white text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-md">
+            {t('details.matchScore', { score: property.auraScore })}
+          </span>
+        </div>
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-brand-black">
+            {t(`properties.${property.id}.title`).startsWith('properties.') ? property.title : t(`properties.${property.id}.title`)}
+          </h1>
+          
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <button className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-full border border-brand-gray-200 hover:border-brand-black text-xs font-bold text-brand-gray-500 hover:text-brand-black transition-colors cursor-pointer h-9">
+              <Share className="w-3.5 h-3.5 shrink-0" />
+              <span>{t('details.share')}</span>
+            </button>
+            <button 
+              onClick={handleFavorite}
+              className={`flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-full border text-xs transition-all cursor-pointer h-9 ${
+                isFavorited 
+                  ? 'bg-brand-rose/5 border-brand-rose text-brand-rose font-bold'
+                  : 'border-brand-gray-200 hover:border-brand-black text-brand-gray-500 hover:text-brand-black font-bold'
+              }`}
+            >
+              <Heart className={`w-3.5 h-3.5 shrink-0 ${isFavorited ? 'fill-brand-rose' : ''}`} />
+              <span>{isFavorited ? t('details.saved') : t('details.save')}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 text-xs sm:text-sm text-brand-gray-500 font-medium mt-1">
+          <div className="flex items-center gap-1.5">
+            <Star className="w-3.5 h-3.5 fill-brand-black text-brand-black" />
+            <span className="text-brand-black font-semibold">{dynamicRating.toFixed(1)}</span>
+            <span className="text-brand-gray-300">•</span>
+            <span className="underline">{dynamicReviewsCount} {t('details.reviews')}</span>
+          </div>
+          <span className="hidden sm:inline text-brand-gray-300">•</span>
+          <div className="flex items-center gap-1.5">
+            <MapPin className="w-3.5 h-3.5 text-brand-gray-400" />
+            <span>{property.location}, {property.country}</span>
+          </div>
+        </div>
+
+        {activeOfferingModes.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            <span className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400">
+              Disponible como
+            </span>
+            {activeOfferingModes.map((mode) => {
+              const meta = OFFERING_BADGE_META[mode];
+              return (
+                <span
+                  key={mode}
+                  className={`inline-flex h-7 items-center rounded-full border px-3 text-[10px] font-extrabold leading-none tracking-wide shadow-sm ${meta.className}`}
+                >
+                  {meta.label}
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 2. Premium Image Grid (Apple/Airbnb Inspired) */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 rounded-2xl overflow-hidden shadow-premium mb-10">
+        {/* Left main large image */}
+        <div className="md:col-span-2 aspect-[4/3] md:aspect-square relative overflow-hidden bg-brand-gray-100">
+          <img
+            src={getImageUrl(0)}
+            alt={property.title}
+            onError={() => handleImageError(0)}
+            className="w-full h-full object-cover hover:scale-[1.02] transition-transform duration-500 ease-out"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+        
+        {/* Right sub-images grid */}
+        <div className="hidden md:grid md:col-span-2 grid-cols-2 gap-3">
+          {Array.from({ length: 4 }).map((_, idx) => {
+            const index = idx + 1;
+            const hasImage = property.images && property.images[index];
+            if (!hasImage && index >= property.images.length) {
+              return (
+                <div key={`fallback-${index}`} className="aspect-square bg-brand-gray-100 flex items-center justify-center border border-brand-gray-200/50">
+                  <Compass className="w-8 h-8 text-brand-gray-300 animate-pulse" />
+                </div>
+              );
+            }
+            return (
+              <div key={index} className="aspect-square relative overflow-hidden bg-brand-gray-100">
+                <img
+                  src={getImageUrl(index)}
+                  alt={`${property.title} gallery ${index}`}
+                  onError={() => handleImageError(index)}
+                  className="w-full h-full object-cover hover:scale-[1.03] transition-transform duration-500 ease-out"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 3. Main Split-Pane Content */}
+      <div className="flex flex-col lg:flex-row gap-12 items-start">
+        
+        {/* Left Column: Specifications & Descriptions */}
+        <div className="flex-1 flex flex-col gap-8 w-full">
+          
+          {/* Host profile card banner */}
+          <div className="flex items-center justify-between border-b border-brand-gray-200/80 pb-6">
+            <div>
+              <h2 className="text-xl font-bold text-brand-black tracking-tight flex items-center gap-1.5">
+                <span>{language === 'es' ? `Anfitrión: ${property.hostName}` : `Hosted by ${property.hostName}`}</span>
+                {property.hostVerified && (
+                  <ShieldCheck className="w-5 h-5 text-brand-accent fill-brand-accent/10" />
+                )}
+              </h2>
+              <p className="text-xs text-brand-gray-500 font-medium mt-1">
+                {t('details.responseRate')}
+              </p>
+            </div>
+            
+            <img
+              src={property.hostAvatar}
+              alt={property.hostName}
+              className="w-12 h-12 rounded-full object-cover border border-brand-gray-200 shadow-sm"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+
+          {/* Core specs highlights */}
+          <div className="grid grid-cols-3 gap-4 border-b border-brand-gray-200/80 pb-6">
+            <div className="flex flex-col gap-1 items-start">
+              <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
+                <Users className="w-4 h-4 text-brand-gray-500" />
+                <span>{t('details.guests')}</span>
+              </div>
+              <span className="text-xs text-brand-gray-500">{t('details.maxGuests', { count: property.maxGuests })}</span>
+            </div>
+
+            <div className="flex flex-col gap-1 items-start">
+              <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
+                <BedDouble className="w-4 h-4 text-brand-gray-500" />
+                <span>{t('details.bedrooms')}</span>
+              </div>
+              <span className="text-xs text-brand-gray-500">{t('details.bedroomCount', { count: property.bedrooms })}</span>
+            </div>
+
+            <div className="flex flex-col gap-1 items-start">
+              <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
+                <Bath className="w-4 h-4 text-brand-gray-500" />
+                <span>{t('details.bathrooms')}</span>
+              </div>
+              <span className="text-xs text-brand-gray-500">{t('details.bathroomCount', { count: property.bathrooms })}</span>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="border-b border-brand-gray-200/80 pb-6">
+            <h3 className="text-base font-bold text-brand-black mb-3">{t('details.aboutSpace')}</h3>
+            <p className="text-sm text-brand-gray-500 leading-relaxed whitespace-pre-line font-normal font-semibold">
+              {t(`properties.${property.id}.description`).startsWith('properties.') ? property.description : t(`properties.${property.id}.description`)}
+            </p>
+          </div>
+
+          {/* Amenities grid */}
+          <div className="border-b border-brand-gray-200/80 pb-6">
+            <h3 className="text-base font-bold text-brand-black mb-4">{t('details.whatOffers')}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {property.amenities.map((amenity) => {
+                const Icon = AMENITY_ICONS[amenity] || Compass;
+                const translatedAmenity = t(`amenities.${amenity}`);
+                const displayAmenity = translatedAmenity.startsWith('amenities.') ? amenity : translatedAmenity;
+                return (
+                  <div key={amenity} className="flex items-center gap-3 text-sm text-brand-gray-500 font-semibold">
+                    <Icon className="w-4 h-4 text-brand-black shrink-0" />
+                    <span>{displayAmenity}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* House Rules */}
+          {property.rules && property.rules.length > 0 && (
+            <div className="border-b border-brand-gray-200/80 pb-6">
+              <h3 className="text-base font-bold text-brand-black mb-3">{t('details.houseRules')}</h3>
+              <ul className="list-disc list-inside text-sm text-brand-gray-500 flex flex-col gap-2 font-semibold leading-relaxed">
+                {property.rules.map((rule, idx) => {
+                  const translatedRule = t(`properties.${property.id}.rules.${idx}`);
+                  const displayRule = translatedRule.startsWith('properties.') ? rule : translatedRule;
+                  return <li key={idx}>{displayRule}</li>;
+                })}
+              </ul>
+            </div>
+          )}
+
+          {/* Ubicación y Mapa */}
+          {property.latitude !== null && property.longitude !== null && (
+            <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
+              <h3 className="text-base font-bold text-brand-black">{language === 'es' ? 'Ubicación' : 'Location'}</h3>
+              {property.formattedAddress && (
+                <p className="text-xs text-brand-gray-500 font-semibold flex items-center gap-1.5">
+                  📍 {property.formattedAddress}
+                </p>
+              )}
+              
+              {/* Dynamic Leaflet Map Container */}
+              <div 
+                id="property-details-map" 
+                className="w-full h-64 rounded-3xl border border-brand-gray-200/60 overflow-hidden shadow-sm relative z-0 bg-[#e4e4e7]"
+              />
+
+              {/* Navigation Action Buttons */}
+              <div className="flex flex-wrap gap-2 mt-1">
+                <a 
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${property.latitude},${property.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200 rounded-xl text-xs font-bold text-brand-black flex items-center gap-1.5 transition-colors shadow-xs active:scale-95 duration-200"
+                >
+                  🗺️ {language === 'es' ? 'Cómo llegar' : 'Get Directions'}
+                </a>
+                <a 
+                  href={`https://www.google.com/maps/search/?api=1&query=${property.latitude},${property.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200 rounded-xl text-xs font-bold text-brand-black flex items-center gap-1.5 transition-colors shadow-xs active:scale-95 duration-200"
+                >
+                  🔍 {language === 'es' ? 'Ver en Google Maps' : 'View on Google Maps'}
+                </a>
+                <a 
+                  href={`https://waze.com/ul?ll=${property.latitude},${property.longitude}&navigate=yes`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200 rounded-xl text-xs font-bold text-brand-black flex items-center gap-1.5 transition-colors shadow-xs active:scale-95 duration-200"
+                >
+                  🚗 {language === 'es' ? 'Abrir en Waze' : 'Open in Waze'}
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Guest Reviews Section */}
+          <div>
+            <h3 className="text-base font-bold text-brand-black mb-4">
+              {t('details.guestReviews', { count: dynamicReviewsCount })}
+            </h3>
+            {combinedReviews && combinedReviews.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {combinedReviews.map((rev) => (
+                  <div key={rev.id} className="p-5 bg-white border border-brand-gray-200/60 rounded-2xl shadow-premium hover:shadow-floating transition-all duration-300 flex flex-col justify-between gap-3 relative overflow-hidden">
+                    <div>
+                      <div className="flex items-center gap-3 mb-3">
+                        <img
+                          src={rev.authorAvatar}
+                          alt={rev.authorName}
+                          className="w-10 h-10 rounded-full object-cover border border-white shadow-sm ring-2 ring-brand-gray-100"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                        <div>
+                          <h4 className="text-xs font-bold text-brand-black flex items-center gap-1.5">
+                            {rev.authorName}
+                          </h4>
+                          <p className="text-[10px] text-brand-gray-400 font-semibold">{rev.date}</p>
+                        </div>
+                        <div className="ml-auto flex items-center gap-0.5 text-amber-500">
+                          {Array.from({ length: rev.rating }).map((_, i) => (
+                            <Star key={i} className="w-3.5 h-3.5 fill-current" />
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-xs text-brand-gray-600 leading-relaxed font-semibold italic">
+                        &ldquo;{rev.isVerified ? rev.comment : (t(`properties.${property.id}.reviews.${rev.id}`).startsWith('properties.') ? rev.comment : t(`properties.${property.id}.reviews.${rev.id}`))}&rdquo;
+                      </p>
+                    </div>
+
+                    {rev.isVerified && (
+                      <div className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/40 w-fit self-end mt-2">
+                        <ShieldCheck className="w-3 h-3" />
+                        <span>{language === 'es' ? 'Verificado' : 'Verified'}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 text-center bg-brand-gray-50/50 border border-brand-gray-100 rounded-2xl text-xs text-brand-gray-400 font-semibold">
+                {t('details.noReviews')}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Column: Sticky Hybrid Booking / Swap / Purchase widget */}
+        <div className="w-full lg:w-96 lg:sticky lg:top-28 shrink-0">
+          <div className="w-full bg-white rounded-3xl border border-brand-gray-200/60 p-6 shadow-floating overflow-hidden">
+            
+            {/* Segmented Mode Control if 2 or more offerings are active */}
+            {activeOfferingModes.length >= 2 && (
+              <div className="flex bg-brand-gray-100 p-1 rounded-2xl mb-5 border border-brand-gray-200/40 relative">
+                {activeOfferingModes.map((mode) => {
+                  const isActive = selectedMode === mode;
+                  let label = '';
+                  if (mode === 'SWAP') label = 'Swap 🔄';
+                  else if (mode === 'SHORT_RENT') label = language === 'es' ? 'Temp 🏡' : 'Short 🏡';
+                  else if (mode === 'MONTHLY_RENT') label = language === 'es' ? 'Mes 📅' : 'Monthly 📅';
+                  else if (mode === 'SALE') label = language === 'es' ? 'Venta 💰' : 'Sale 💰';
+
+                  return (
+                    <button
+                      key={mode}
+                      onClick={() => setSelectedMode(mode)}
+                      className={`flex-1 py-2 text-center text-[10px] font-black rounded-xl transition-all duration-200 cursor-pointer relative z-10 select-none ${
+                        isActive 
+                          ? 'bg-white text-brand-black shadow-sm'
+                          : 'text-brand-gray-500 hover:text-brand-black'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* EXPERIENCE 1: SWAP */}
+            {selectedMode === 'SWAP' && (
+              <div className="flex flex-col gap-4">
+                {/* Highlight recommended Swap tag if multiple modes are available */}
+                {activeOfferingModes.length >= 2 && (
+                  <div className="bg-gradient-to-r from-emerald-500/10 to-brand-accent/10 border border-emerald-500/20 rounded-2xl p-3 flex items-start gap-2 shadow-xs">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5 animate-pulse" />
+                    <div>
+                      <h4 className="text-[10px] font-black uppercase text-emerald-800 tracking-wider">AuraSwap Recomendado</h4>
+                      <p className="text-[9px] text-brand-gray-600 leading-normal mt-0.5 font-semibold">
+                        Ahorra costes y viaja sin pagar renta. Intercambia directamente tu hogar con este anfitrión.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between border-b border-brand-gray-100 pb-4 mb-1">
+                  <div>
+                    <span className="text-2xl font-black text-brand-black">{t('details.directSwap')}</span>
+                    <p className="text-[10px] text-brand-gray-500 font-bold uppercase tracking-wider mt-0.5">{t('details.rentFreeExchange')}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-brand-accent bg-brand-accent/5 px-2.5 py-1 rounded-full">
+                      {t('details.matchScore', { score: property.auraScore }).split(' ')[0]} Match
+                    </span>
+                  </div>
+                </div>
+
+                {/* Selected Dates Display */}
+                <div className="grid grid-cols-2 gap-3 mb-1">
+                  <div className="bg-brand-gray-50 p-3 rounded-2xl border border-brand-gray-200/50 flex flex-col gap-0.5 animate-in fade-in">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-brand-gray-400">{t('details.checkIn')}</span>
+                    <span className="text-xs font-extrabold text-brand-black">
+                      {startDate ? startDate : (language === 'es' ? 'Seleccionar' : 'Select')}
+                    </span>
+                  </div>
+                  <div className="bg-brand-gray-50 p-3 rounded-2xl border border-brand-gray-200/50 flex flex-col gap-0.5 animate-in fade-in">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-brand-gray-400">{t('details.checkOut')}</span>
+                    <span className="text-xs font-extrabold text-brand-black">
+                      {endDate ? endDate : (language === 'es' ? 'Seleccionar' : 'Select')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Inline Calendar */}
+                <div className="border border-brand-gray-200 rounded-2xl p-4 bg-white shadow-xs animate-in fade-in">
+                  {/* Month navigation header */}
+                  <div className="flex items-center justify-between mb-4 px-1">
+                    <button 
+                      type="button"
+                      onClick={handlePrevMonth}
+                      className="p-1.5 hover:bg-brand-gray-50 rounded-lg border border-brand-gray-200 text-brand-gray-600 hover:text-brand-black transition-colors cursor-pointer"
+                    >
+                      <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                    </button>
+                    
+                    <span className="text-xs font-extrabold text-brand-black select-none">
+                      {language === 'es' 
+                        ? `${['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][calendarMonth]} ${calendarYear}`
+                        : `${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][calendarMonth]} ${calendarYear}`}
+                    </span>
+                    
+                    <button 
+                      type="button"
+                      onClick={handleNextMonth}
+                      className="p-1.5 hover:bg-brand-gray-50 rounded-lg border border-brand-gray-200 text-brand-gray-600 hover:text-brand-black transition-colors cursor-pointer"
+                    >
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Days of week header */}
+                  <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                    {(language === 'es' ? ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'] : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']).map((dayName) => (
+                      <span key={dayName} className="text-[9px] font-bold uppercase tracking-wider text-brand-gray-400 select-none">
+                        {dayName}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Days grid */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {calendarDays.map((day) => {
+                      const dayStr = day.date.toISOString().split('T')[0];
+                      const isSelectedStart = startDate === dayStr;
+                      const isSelectedEnd = endDate === dayStr;
+                      const isSelected = isSelectedStart || isSelectedEnd;
+                      const isInRange = startDate && endDate && dayStr > startDate && dayStr < endDate;
+
+                      const isOccupied = bookedRanges.some(b => dayStr >= b.start && dayStr <= b.end);
+                      const isWithinBounds = property ? (dayStr >= property.availableStart && dayStr <= property.availableEnd) : false;
+                      const isAvailable = isWithinBounds && !isOccupied;
+
+                      let dayClass = 'relative text-center aspect-square flex items-center justify-center text-xs font-semibold select-none transition-all duration-150 ';
+                      
+                      if (day.type !== 'current') {
+                        dayClass += 'opacity-25 ';
+                      }
+
+                      if (isSelected) {
+                        dayClass += 'bg-brand-accent text-white font-extrabold shadow-sm rounded-full cursor-pointer scale-105 z-10 ';
+                      } else if (isInRange) {
+                        dayClass += 'bg-brand-accent/15 text-brand-black cursor-pointer rounded-none ';
+                      } else if (isOccupied) {
+                        dayClass += 'text-red-500 line-through cursor-not-allowed ';
+                      } else if (!isWithinBounds) {
+                        dayClass += 'text-brand-gray-300 bg-brand-gray-50/20 cursor-not-allowed ';
+                      } else {
+                        dayClass += 'text-brand-black hover:bg-brand-gray-100 hover:text-brand-black cursor-pointer rounded-full ';
+                      }
+
+                      let tooltipText = '';
+                      if (isOccupied) {
+                        tooltipText = language === 'es' ? 'Fecha reservada (No disponible)' : 'Reserved date (Unavailable)';
+                      } else if (!isWithinBounds) {
+                        tooltipText = language === 'es' ? 'Fuera de disponibilidad' : 'Outside available window';
+                      } else if (isAvailable) {
+                        tooltipText = language === 'es' ? 'Fecha disponible' : 'Available date';
+                      }
+
+                      return (
+                        <div
+                          key={day.key}
+                          onClick={() => (isAvailable ? handleDateClick(day.date) : null)}
+                          className={dayClass}
+                          title={tooltipText}
+                        >
+                          <span className="relative z-10">{day.date.getDate()}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Overlap Status Indicators */}
+                {startDate && endDate && (
+                  <div className="mt-1 transition-all">
+                    {rangeStatus === 'available' && (
+                      <div className="bg-emerald-50 text-emerald-700 border border-emerald-200/50 rounded-2xl p-3 flex items-center gap-2 text-xs font-bold shadow-xs animate-in fade-in">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                        <span>{language === 'es' ? '✓ Fechas disponibles para swap recíproco' : '✓ Dates fully available for reciprocal swap'}</span>
+                      </div>
+                    )}
+                    {rangeStatus === 'partial' && (
+                      <div className="bg-amber-50 text-amber-700 border border-amber-200/50 rounded-2xl p-3 flex items-center gap-2 text-xs font-bold shadow-xs animate-in fade-in">
+                        <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                        <span>{language === 'es' ? '⚠ Parcialmente ocupado. Selecciona otras fechas.' : '⚠ Partially occupied. Please choose other dates.'}</span>
+                      </div>
+                    )}
+                    {rangeStatus === 'unavailable' && (
+                      <div className="bg-rose-50 text-rose-700 border border-rose-200/50 rounded-2xl p-3 flex items-center gap-2 text-xs font-bold shadow-xs animate-in fade-in">
+                        <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                        <span>{language === 'es' ? '✗ Fechas no disponibles en este periodo' : '✗ Dates not available in this period'}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Service Fee Info */}
+                <div className="flex flex-col gap-3 pt-2 text-xs">
+                  <div className="bg-brand-gray-50/90 rounded-2xl p-3 border border-brand-gray-200/40 text-[9px] leading-relaxed text-brand-gray-500 font-semibold flex items-start gap-2 shadow-innerScale">
+                    <span className="text-brand-accent text-xs">ℹ</span>
+                    <p>
+                      {language === 'es' 
+                        ? "Etapa Exploratoria: No se solicitan datos de pago en esta fase. Los costes detallados son estimaciones aplicables únicamente si ambos propietarios confirman el swap de mutuo acuerdo."
+                        : "Exploratory Stage: No payment details are requested in this phase. Detailed fees are estimates applicable only if both owners mutually confirm the swap."}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-brand-gray-500">
+                      <span>{t('details.rentCharge')}</span>
+                      <span className="line-through font-semibold text-brand-black">0,00 €</span>
+                    </div>
+                    <div className="flex items-center justify-between text-brand-gray-500">
+                      <span>{language === 'es' ? 'Tarifa de verificación (Estimada)' : 'Verification fee (Estimated)'}</span>
+                      <span className="font-bold text-brand-accent">{t('details.serviceFeeDesc')}</span>
+                    </div>
+                    <div className="border-t border-brand-gray-100 my-1" />
+                    <div className="flex items-center justify-between font-bold text-brand-black text-sm">
+                      <span>{language === 'es' ? 'Comisión Total Estimada' : 'Total Estimated Fee'}</span>
+                      <span>29 €</span>
+                    </div>
+                  </div>
+                </div>
+
+                {isSelfProperty ? (
+                  <div className="mt-3 p-4 bg-brand-accent/5 border border-brand-accent/20 rounded-2xl flex flex-col gap-2 shadow-sm text-xs leading-relaxed text-brand-black animate-in fade-in">
+                    <div className="flex items-center gap-1.5 font-bold text-brand-accent uppercase tracking-wider text-[10px]">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>{language === 'es' ? 'Tu Anuncio' : 'Your Listing'}</span>
+                    </div>
+                    <p className="text-brand-gray-500 font-medium leading-relaxed">
+                      {t('details.selfSwapWarning')}
+                    </p>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => setModalOpen(true)}
+                    disabled={rangeStatus !== 'available'}
+                    className={`w-full py-4 rounded-2xl text-sm font-bold shadow-md transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer mt-2 ${
+                      rangeStatus !== 'available'
+                        ? 'bg-brand-gray-200 text-brand-gray-400 cursor-not-allowed shadow-none'
+                        : 'bg-brand-accent hover:bg-brand-accent/90 text-white hover:scale-[1.01]'
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>
+                      {!startDate || !endDate 
+                        ? (language === 'es' ? 'Selecciona fechas' : 'Select dates') 
+                        : (language === 'es' ? 'Proponer intercambio' : t('details.requestSwapBtn'))}
+                    </span>
+                  </button>
+                )}
+
+                <span className="text-[10px] text-brand-gray-500 text-center block leading-relaxed font-semibold px-2">
+                  {language === 'es' 
+                    ? "Explorarás la compatibilidad del intercambio antes de cualquier confirmación. No existe ningún cargo ni compromiso en esta etapa."
+                    : "You will explore swap compatibility before any confirmation. There is no charge or commitment at this stage."}
+                </span>
+              </div>
+            )}
+
+            {/* EXPERIENCE 2: SHORT_RENT (Airbnb/Wander premium style) */}
+            {selectedMode === 'SHORT_RENT' && activeRentOffering && (
+              <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+                <div className="flex items-baseline justify-between border-b border-brand-gray-100 pb-4 mb-1">
+                  <div>
+                    <span className="text-2xl font-black text-brand-black">${activeRentOffering.priceAmount || 150}</span>
+                    <span className="text-xs text-brand-gray-500 font-semibold"> / {language === 'es' ? 'noche' : 'night'}</span>
+                  </div>
+                  <div className="text-right flex items-center gap-1">
+                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                    <span className="text-xs font-bold text-brand-black">{dynamicRating.toFixed(2)}</span>
+                    <span className="text-[10px] text-brand-gray-400 font-semibold">({dynamicReviewsCount})</span>
+                  </div>
+                </div>
+
+                {/* Selected Dates Display */}
+                <div className="grid grid-cols-2 gap-3 mb-1">
+                  <div className="bg-brand-gray-50 p-3 rounded-2xl border border-brand-gray-200/50 flex flex-col gap-0.5 animate-in fade-in">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-brand-gray-400">{t('details.checkIn')}</span>
+                    <span className="text-xs font-extrabold text-brand-black">
+                      {startDate ? startDate : (language === 'es' ? 'Seleccionar' : 'Select')}
+                    </span>
+                  </div>
+                  <div className="bg-brand-gray-50 p-3 rounded-2xl border border-brand-gray-200/50 flex flex-col gap-0.5 animate-in fade-in">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-brand-gray-400">{t('details.checkOut')}</span>
+                    <span className="text-xs font-extrabold text-brand-black">
+                      {endDate ? endDate : (language === 'es' ? 'Seleccionar' : 'Select')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Inline Calendar */}
+                <div className="border border-brand-gray-200 rounded-2xl p-4 bg-white shadow-xs animate-in fade-in">
+                  {/* Month navigation header */}
+                  <div className="flex items-center justify-between mb-4 px-1">
+                    <button 
+                      type="button"
+                      onClick={handlePrevMonth}
+                      className="p-1.5 hover:bg-brand-gray-50 rounded-lg border border-brand-gray-200 text-brand-gray-600 hover:text-brand-black transition-colors cursor-pointer"
+                    >
+                      <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                    </button>
+                    
+                    <span className="text-xs font-extrabold text-brand-black select-none">
+                      {language === 'es' 
+                        ? `${['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][calendarMonth]} ${calendarYear}`
+                        : `${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][calendarMonth]} ${calendarYear}`}
+                    </span>
+                    
+                    <button 
+                      type="button"
+                      onClick={handleNextMonth}
+                      className="p-1.5 hover:bg-brand-gray-50 rounded-lg border border-brand-gray-200 text-brand-gray-600 hover:text-brand-black transition-colors cursor-pointer"
+                    >
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Days of week header */}
+                  <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                    {(language === 'es' ? ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'] : ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']).map((dayName) => (
+                      <span key={dayName} className="text-[9px] font-bold uppercase tracking-wider text-brand-gray-400 select-none">
+                        {dayName}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Days grid */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {calendarDays.map((day) => {
+                      const dayStr = day.date.toISOString().split('T')[0];
+                      const isSelectedStart = startDate === dayStr;
+                      const isSelectedEnd = endDate === dayStr;
+                      const isSelected = isSelectedStart || isSelectedEnd;
+                      const isInRange = startDate && endDate && dayStr > startDate && dayStr < endDate;
+
+                      const isOccupied = bookedRanges.some(b => dayStr >= b.start && dayStr <= b.end);
+                      const isWithinBounds = property ? (dayStr >= property.availableStart && dayStr <= property.availableEnd) : false;
+                      const isAvailable = isWithinBounds && !isOccupied;
+
+                      let dayClass = 'relative text-center aspect-square flex items-center justify-center text-xs font-semibold select-none transition-all duration-150 ';
+                      
+                      if (day.type !== 'current') {
+                        dayClass += 'opacity-25 ';
+                      }
+
+                      if (isSelected) {
+                        dayClass += 'bg-brand-accent text-white font-extrabold shadow-sm rounded-full cursor-pointer scale-105 z-10 ';
+                      } else if (isInRange) {
+                        dayClass += 'bg-brand-accent/15 text-brand-black cursor-pointer rounded-none ';
+                      } else if (isOccupied) {
+                        dayClass += 'text-red-500 line-through cursor-not-allowed ';
+                      } else if (!isWithinBounds) {
+                        dayClass += 'text-brand-gray-300 bg-brand-gray-50/20 cursor-not-allowed ';
+                      } else {
+                        dayClass += 'text-brand-black hover:bg-brand-gray-100 hover:text-brand-black cursor-pointer rounded-full ';
+                      }
+
+                      return (
+                        <div
+                          key={day.key}
+                          onClick={() => (isAvailable ? handleDateClick(day.date) : null)}
+                          className={dayClass}
+                        >
+                          <span className="relative z-10">{day.date.getDate()}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Specifications List */}
+                <div className="bg-brand-gray-50 rounded-2xl p-3 border border-brand-gray-200/40 text-[10px] leading-relaxed text-brand-gray-600 font-semibold flex flex-col gap-1.5">
+                  <div className="flex justify-between">
+                    <span>{language === 'es' ? 'Estancia mínima:' : 'Minimum stay:'}</span>
+                    <span className="text-brand-black font-bold">{activeRentOffering.minNights || 2} {language === 'es' ? 'noches' : 'nights'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>{language === 'es' ? 'Depósito reembolsable:' : 'Refundable deposit:'}</span>
+                    <span className="text-brand-black font-bold">${activeRentOffering.securityDepositAmount || 300} USD</span>
+                  </div>
+                </div>
+
+                {/* Calculation Summary */}
+                {startDate && endDate && (
+                  <div className="flex flex-col gap-2 pt-2 border-t border-brand-gray-100 text-xs">
+                    <div className="flex justify-between text-brand-gray-500">
+                      <span>${activeRentOffering.priceAmount || 150} x {numNights} {language === 'es' ? 'noches' : 'nights'}</span>
+                      <span className="font-semibold text-brand-black">${(activeRentOffering.priceAmount || 150) * numNights} USD</span>
+                    </div>
+                    {activeRentOffering.metadata?.weeklyPrice && numNights >= 7 && (
+                      <div className="flex justify-between text-emerald-600 font-semibold text-[10px]">
+                        <span>{language === 'es' ? '¡Descuento semanal aplicado!' : 'Weekly discount applied!'}</span>
+                        <span>-${Math.floor(((activeRentOffering.priceAmount || 150) * numNights) - (Number(activeRentOffering.metadata.weeklyPrice) * (numNights / 7)))} USD</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-brand-gray-500">
+                      <span>{language === 'es' ? 'Depósito de garantía' : 'Security deposit'}</span>
+                      <span className="font-semibold text-brand-black">${activeRentOffering.securityDepositAmount || 300} USD</span>
+                    </div>
+                    <div className="flex justify-between text-brand-gray-500">
+                      <span>{language === 'es' ? 'Tarifa de limpieza / Servicio' : 'Cleaning / Service Fee'}</span>
+                      <span className="font-semibold text-brand-black">$50 USD</span>
+                    </div>
+                    <div className="border-t border-brand-gray-100 my-1" />
+                    <div className="flex items-center justify-between font-bold text-brand-black text-sm">
+                      <span>{language === 'es' ? 'Total estimado' : 'Estimated Total'}</span>
+                      <span>${((activeRentOffering.priceAmount || 150) * numNights) + (activeRentOffering.securityDepositAmount || 300) + 50} USD</span>
+                    </div>
+                  </div>
+                )}
+
+                {isSelfProperty ? (
+                  <div className="mt-3 p-4 bg-brand-accent/5 border border-brand-accent/20 rounded-2xl text-xs font-semibold text-brand-black">
+                    {language === 'es' ? 'Esta es tu propiedad listada.' : 'This is your own listed property.'}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const msg = startDate && endDate 
+                        ? (language === 'es' 
+                            ? `Hola, me interesa rentar tu propiedad temporalmente del ${startDate} al ${endDate}.`
+                            : `Hello, I'm interested in renting your property from ${startDate} to ${endDate}.`)
+                        : '';
+                      setSelectedLeadOffering(activeRentOffering);
+                      setLeadMessage(msg);
+                      setLeadModalOpen(true);
+                    }}
+                    className="w-full py-4 rounded-2xl bg-brand-black hover:bg-brand-black/90 text-white text-sm font-bold shadow-md transition-all active:scale-95 cursor-pointer mt-2"
+                  >
+                    <span>{language === 'es' ? 'Reservar estadía' : 'Book stay'}</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* EXPERIENCE 3: MONTHLY_RENT (Airbnb/Wander premium style) */}
+            {selectedMode === 'MONTHLY_RENT' && activeRentOffering && (
+              <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+                <div className="flex items-baseline justify-between border-b border-brand-gray-100 pb-4 mb-1">
+                  <div>
+                    <span className="text-2xl font-black text-brand-black">${activeRentOffering.priceAmount || 2500}</span>
+                    <span className="text-xs text-brand-gray-500 font-semibold"> / {language === 'es' ? 'mes' : 'month'}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-black uppercase text-sky-600 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100">
+                      {language === 'es' ? 'Renta Larga' : 'Long-Term'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-brand-gray-50 rounded-2xl p-4 border border-brand-gray-200/40 text-xs leading-relaxed text-brand-gray-600 font-semibold flex flex-col gap-3">
+                  <div className="flex justify-between border-b border-brand-gray-200 pb-2">
+                    <span>{language === 'es' ? 'Depósito reembolsable:' : 'Security deposit:'}</span>
+                    <span className="text-brand-black font-extrabold">${activeRentOffering.securityDepositAmount || 2000} USD</span>
+                  </div>
+                  <div className="flex justify-between border-b border-brand-gray-200 pb-2">
+                    <span>{language === 'es' ? 'Periodo mínimo:' : 'Minimum contract:'}</span>
+                    <span className="text-brand-black font-extrabold">30 {language === 'es' ? 'días' : 'days'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>{language === 'es' ? 'Firma de Contrato:' : 'Formal Contract:'}</span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${activeRentOffering.metadata?.requiresContract !== false ? 'bg-amber-50 border border-amber-200 text-amber-700' : 'bg-emerald-50 border border-emerald-200 text-emerald-700'}`}>
+                      {activeRentOffering.metadata?.requiresContract !== false 
+                        ? (language === 'es' ? 'Requerido' : 'Required') 
+                        : (language === 'es' ? 'No requerido' : 'Not required')}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-2 border-t border-brand-gray-100 text-xs">
+                  <div className="flex justify-between text-brand-gray-500">
+                    <span>{language === 'es' ? 'Primer mes de renta' : 'First month rent'}</span>
+                    <span className="font-semibold text-brand-black">${activeRentOffering.priceAmount || 2500} USD</span>
+                  </div>
+                  <div className="flex justify-between text-brand-gray-500">
+                    <span>{language === 'es' ? 'Depósito de garantía' : 'Security deposit'}</span>
+                    <span className="font-semibold text-brand-black">${activeRentOffering.securityDepositAmount || 2000} USD</span>
+                  </div>
+                  <div className="border-t border-brand-gray-100 my-1" />
+                  <div className="flex items-center justify-between font-bold text-brand-black text-sm">
+                    <span>{language === 'es' ? 'Total debido al firmar' : 'Total due at signing'}</span>
+                    <span>${(activeRentOffering.priceAmount || 2500) + (activeRentOffering.securityDepositAmount || 2000)} USD</span>
+                  </div>
+                </div>
+
+                {isSelfProperty ? (
+                  <div className="mt-3 p-4 bg-brand-accent/5 border border-brand-accent/20 rounded-2xl text-xs font-semibold text-brand-black">
+                    {language === 'es' ? 'Esta es tu propiedad listada.' : 'This is your own listed property.'}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const msg = language === 'es' 
+                        ? `Hola, me interesa rentar tu propiedad por base mensual. Quisiera más información sobre los términos del contrato.`
+                        : `Hello, I'm interested in renting your property on a monthly basis. I'd like more information about the contract terms.`;
+                      setSelectedLeadOffering(activeRentOffering);
+                      setLeadMessage(msg);
+                      setLeadModalOpen(true);
+                    }}
+                    className="w-full py-4 rounded-2xl bg-brand-black hover:bg-brand-black/90 text-white text-sm font-bold shadow-md transition-all active:scale-95 cursor-pointer mt-2"
+                  >
+                    <span>{language === 'es' ? 'Solicitar arrendamiento' : 'Apply for lease'}</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* EXPERIENCE 4: SALE (Sotheby's / Pacaso luxury style) */}
+            {selectedMode === 'SALE' && activeSaleOffering && (
+              <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+                <div className="border-b border-brand-gray-100 pb-4 mb-1">
+                  <span className="text-[10px] font-black uppercase text-amber-600 bg-amber-50 border border-amber-100 px-3 py-1 rounded-full tracking-wider inline-block">
+                    {language === 'es' ? 'Propiedad en Venta' : 'Property For Sale'}
+                  </span>
+                  <div className="flex items-baseline gap-1 mt-2.5">
+                    <span className="text-3xl font-black text-brand-black tracking-tight">
+                      {activeSaleOffering.currency || 'USD'} ${(activeSaleOffering.priceAmount || 450000).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-brand-gray-500 font-semibold mt-1">
+                    {language === 'es' ? 'Listado inmobiliario premium de propiedad verificada.' : 'Premium verified real estate listing.'}
+                  </p>
+                </div>
+
+                <div className="bg-gradient-to-br from-amber-50/20 to-brand-gray-50 border border-amber-200/40 rounded-2xl p-4 text-xs leading-relaxed text-brand-gray-600 font-semibold flex flex-col gap-3">
+                  <div className="flex items-center gap-2 text-brand-black font-extrabold text-[10px] uppercase tracking-wider text-amber-700">
+                    <span>🛡</span>
+                    <span>{language === 'es' ? 'Transacción Segura Incluida' : 'Secure Transaction Included'}</span>
+                  </div>
+                  <p className="text-[10px] text-brand-gray-500 leading-normal font-medium">
+                    {language === 'es'
+                      ? 'Nuestros asesores gestionan el contrato de compraventa y los fondos de garantía en fideicomiso (Escrow) para tu tranquilidad.'
+                      : 'Our advisors manage the purchase contract and escrow safety deposit accounts for your absolute peace of mind.'}
+                  </p>
+                  <div className="border-t border-brand-gray-200/60 my-1" />
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span>{language === 'es' ? 'Acepta ofertas de compra:' : 'Accepts buying offers:'}</span>
+                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-black">
+                      {activeSaleOffering.acceptsOffers !== false ? (language === 'es' ? 'SÍ' : 'YES') : (language === 'es' ? 'SÓLO LISTADO' : 'ONLY LISTING')}
+                    </span>
+                  </div>
+                </div>
+
+                {isSelfProperty ? (
+                  <div className="mt-3 p-4 bg-brand-accent/5 border border-brand-accent/20 rounded-2xl text-xs font-semibold text-brand-black">
+                    {language === 'es' ? 'Esta es tu propiedad listada.' : 'This is your own listed property.'}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2.5 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const msg = language === 'es' 
+                          ? `Hola, estoy interesado en adquirir esta propiedad. Me gustaría recibir los documentos del listado y programar una llamada de información.`
+                          : `Hello, I'm interested in buying this property. I'd like to receive the listing documents and schedule an informational call.`;
+                        setSelectedLeadOffering(activeSaleOffering);
+                        setLeadMessage(msg);
+                        setLeadModalOpen(true);
+                      }}
+                      className="w-full py-3.5 rounded-2xl bg-brand-black hover:bg-brand-black/90 text-white text-xs font-black tracking-wider uppercase transition-all duration-200 hover:scale-[1.01] active:scale-95 shadow-md cursor-pointer"
+                    >
+                      {language === 'es' ? 'Contactar Asesor / Comprar' : 'Contact Advisor / Purchase'}
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const msg = language === 'es' 
+                          ? `Hola, me gustaría agendar una visita virtual o presencial para conocer los detalles físicos de la propiedad en venta.`
+                          : `Hello, I'd like to schedule a virtual or in-person tour to view the property's physical details.`;
+                        setSelectedLeadOffering(activeSaleOffering);
+                        setLeadMessage(msg);
+                        setLeadModalOpen(true);
+                      }}
+                      className="w-full py-3 rounded-2xl border border-amber-500/50 hover:bg-amber-500/5 text-amber-700 text-xs font-extrabold transition-all duration-200 cursor-pointer"
+                    >
+                      {language === 'es' ? 'Solicitar Visita / Tour Privado' : 'Request Tour / Private View'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Elegant Interactive Swap Request Modal Sheet */}
+      <AnimatePresence>
+        {modalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+          >
+            <div
+              className="absolute inset-0 bg-brand-black/45 backdrop-blur-sm"
+              onClick={() => setModalOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="relative z-10 w-full max-w-xl bg-white rounded-3xl p-6 shadow-floating border border-brand-gray-200/60 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <form onSubmit={handleRequestSubmit}>
+                <div className="flex flex-col gap-6">
+                  
+                  {/* Modal Header */}
+                  <div className="flex items-center justify-between border-b border-brand-gray-100 pb-3">
+                    <div>
+                      <h3 className="text-lg font-bold text-brand-black">{t('details.modalTitle')}</h3>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">{t('details.modalSubtitle', { location: property.location })}</p>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setModalOpen(false)}
+                      className="text-xs text-brand-gray-500 hover:text-brand-black font-semibold cursor-pointer"
+                    >
+                      {t('details.cancel')}
+                    </button>
+                  </div>
+
+                  {/* Property Selector Grid */}
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider">{t('details.selectPropLabel')}</label>
+                    
+                    {myProperties.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {myProperties.map((myProp) => {
+                          const isSelected = selectedMyPropId === myProp.id;
+                          return (
+                            <button
+                              key={myProp.id}
+                              type="button"
+                              onClick={() => setSelectedMyPropId(myProp.id)}
+                              className={`p-3 rounded-2xl border text-left flex gap-3 transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'border-brand-accent bg-brand-accent/5 ring-1 ring-brand-accent shadow-sm'
+                                  : 'border-brand-gray-200 hover:border-brand-black bg-white'
+                              }`}
+                            >
+                              <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-brand-gray-100">
+                                <img
+                                  src={((url) => {
+                                    if (!url) return '';
+                                    if (myProp.metadata?.imagesMetadata?.[url]?.thumbnailUrl) {
+                                      return myProp.metadata.imagesMetadata[url].thumbnailUrl;
+                                    }
+                                    if (url.includes('property-images/') && !url.includes('-thumb.webp') && url.endsWith('.webp')) {
+                                      return url.replace(/\.webp$/, '-thumb.webp');
+                                    }
+                                    return url;
+                                  })(myProp.images[0])}
+                                  alt={myProp.title}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                              </div>
+                              <div className="overflow-hidden">
+                                <p className="text-xs font-bold text-brand-black truncate">{myProp.title}</p>
+                                <p className="text-[10px] text-brand-gray-500 truncate mt-0.5">{myProp.location}</p>
+                                <p className="text-[9px] text-brand-accent font-bold mt-1 uppercase tracking-wider">{myProp.type}</p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center p-4 bg-brand-gray-50 border border-dashed border-brand-gray-200 rounded-2xl text-xs text-brand-gray-500 font-semibold">
+                        {t('details.noPropListed')}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Selected Dates Display (Reused from property sheet) */}
+                  <div className="flex flex-col gap-2 animate-in fade-in">
+                    <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider">
+                      {language === 'es' ? 'Fechas Seleccionadas' : 'Selected Dates'}
+                    </label>
+                    <div className="bg-brand-gray-50 p-4 rounded-2xl border border-brand-gray-200/50 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-5 h-5 text-brand-accent shrink-0" />
+                        <div>
+                          <span className="text-[10px] font-bold text-brand-gray-400 uppercase tracking-wider block leading-none mb-1">
+                            {language === 'es' ? 'Fechas del intercambio' : 'Exchange Dates'}
+                          </span>
+                          <span className="text-xs font-extrabold text-brand-black">
+                            {startDate} {language === 'es' ? 'al' : 'to'} {endDate}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200/40 px-2 py-0.5 rounded-md">
+                        {language === 'es' ? 'Fechas Fijas' : 'Fixed Dates'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {hasOverlap && (
+                    <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs font-semibold flex items-center gap-2 mt-1">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{t('details.datesOverlapWarning')}</span>
+                    </div>
+                  )}
+
+                  {/* Personalized Message */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider">{t('details.writeNote', { host: property.hostName })}</label>
+                    <textarea
+                      placeholder={t('details.writeNotePlaceholder', { host: property.hostName })}
+                      value={swapMessage}
+                      onChange={(e) => setSwapMessage(e.target.value)}
+                      required
+                      className="w-full h-24 p-3.5 bg-brand-gray-50 border border-brand-gray-200 rounded-xl text-xs font-medium outline-none focus:border-brand-accent transition-colors resize-none leading-relaxed text-brand-black"
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <div className="flex items-center justify-between border-t border-brand-gray-100 pt-4 mt-2">
+                    <span className="text-[10px] text-brand-gray-500">{t('details.serviceFee')}: 29 €</span>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting || !selectedMyPropId || !swapMessage.trim() || hasOverlap}
+                      className={`px-6 py-3 rounded-xl text-xs font-bold text-white shadow-md transition-all cursor-pointer ${
+                        isSubmitting || !selectedMyPropId || !swapMessage.trim() || hasOverlap
+                          ? 'bg-brand-gray-200 text-brand-gray-400 cursor-not-allowed'
+                          : 'bg-brand-accent hover:bg-brand-accent/90 active:scale-95'
+                      }`}
+                    >
+                      {isSubmitting ? t('details.sendingRequestBtn') : t('details.sendRequestBtn')}
+                    </button>
+                  </div>
+
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 5. Lead capture modal for rent and sale offerings */}
+      <AnimatePresence>
+        {leadModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-brand-black/45 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <div
+              className="absolute inset-0"
+              onClick={() => setLeadModalOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.94, y: 18 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.94, y: 18 }}
+              className="relative z-10 w-full max-w-md bg-white rounded-3xl p-7 shadow-floating border border-brand-gray-200/60"
+            >
+              <form onSubmit={handleLeadSubmit} className="flex flex-col gap-5">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-full bg-brand-accent/10 text-brand-accent flex items-center justify-center shrink-0">
+                    <MessageSquareCode className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-extrabold text-brand-black leading-tight">
+                      {selectedLeadOffering?.mode === 'SALE'
+                        ? (language === 'es' ? 'Solicitar información' : 'Request information')
+                        : (language === 'es' ? 'Consultar disponibilidad' : 'Check availability')}
+                    </h3>
+                    <p className="text-xs text-brand-gray-500 leading-relaxed font-semibold mt-1">
+                      {language === 'es'
+                        ? 'Comparte tu intención. El anfitrión recibirá esta solicitud como lead, sin abrir conversación todavía.'
+                        : 'Share your intent. The host will receive this as a lead, without opening a conversation yet.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400">
+                    {language === 'es' ? 'Mensaje' : 'Message'}
+                  </label>
+                  <textarea
+                    value={leadMessage}
+                    onChange={(e) => setLeadMessage(e.target.value)}
+                    required
+                    placeholder={
+                      selectedLeadOffering?.mode === 'SALE'
+                        ? (language === 'es' ? 'Hola, me gustaría recibir más información sobre esta propiedad.' : 'Hi, I would like to receive more information about this property.')
+                        : (language === 'es' ? 'Hola, me gustaría consultar disponibilidad para esta propiedad.' : 'Hi, I would like to check availability for this property.')
+                    }
+                    className="w-full h-28 p-3.5 bg-brand-gray-50 border border-brand-gray-200 rounded-2xl text-sm font-medium outline-none focus:border-brand-accent transition-colors resize-none leading-relaxed text-brand-black"
+                  />
+                </div>
+
+                {leadError && (
+                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-2xl text-xs font-bold text-rose-600">
+                    {leadError}
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLeadModalOpen(false)}
+                    className="sm:w-1/3 py-3 border border-brand-gray-200 hover:border-brand-black text-brand-black rounded-2xl text-xs font-bold transition-all cursor-pointer"
+                  >
+                    {language === 'es' ? 'Cancelar' : 'Cancel'}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingLead || !leadMessage.trim()}
+                    className={`sm:flex-1 py-3 rounded-2xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
+                      isSubmittingLead || !leadMessage.trim()
+                        ? 'bg-brand-gray-200 text-brand-gray-400 cursor-not-allowed'
+                        : 'bg-brand-black hover:bg-brand-gray-800 text-white'
+                    }`}
+                  >
+                    {isSubmittingLead
+                      ? (language === 'es' ? 'Enviando...' : 'Sending...')
+                      : (language === 'es' ? 'Enviar solicitud' : 'Send request')}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 6. Lead confirmation modal */}
+      <AnimatePresence>
+        {leadSuccessOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-brand-black/55 backdrop-blur-md flex items-center justify-center p-4"
+          >
+            <div
+              className="absolute inset-0"
+              onClick={() => setLeadSuccessOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, y: 24 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 24 }}
+              className="relative z-10 w-full max-w-sm bg-white rounded-3xl p-8 shadow-floating border border-brand-gray-200/50 text-center flex flex-col items-center"
+            >
+              <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-6">
+                <ShieldCheck className="w-7 h-7" />
+              </div>
+
+              <h3 className="text-lg font-extrabold text-brand-black mb-2">
+                {language === 'es' ? 'Solicitud enviada' : 'Request sent'}
+              </h3>
+              <p className="text-xs text-brand-gray-500 leading-relaxed mb-6 font-semibold">
+                {language === 'es'
+                  ? 'Tu intención quedó registrada. El propietario podrá revisarla desde su panel de leads recibidos.'
+                  : 'Your intent has been recorded. The owner can review it from their received leads panel.'}
+              </p>
+
+              <button
+                onClick={() => setLeadSuccessOpen(false)}
+                className="w-full py-3 bg-brand-black hover:bg-brand-gray-800 text-white rounded-2xl text-xs font-bold shadow-sm transition-all cursor-pointer"
+              >
+                {language === 'es' ? 'Entendido' : 'Got it'}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 7. Success Dialog Popup */}
+      <AnimatePresence>
+        {successOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-brand-black/55 backdrop-blur-md flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 30 }}
+              className="w-full max-w-sm bg-white rounded-3xl p-8 shadow-floating border border-brand-gray-200/50 text-center flex flex-col items-center"
+            >
+              <div className="w-14 h-14 rounded-full bg-brand-accent/10 text-brand-accent flex items-center justify-center mb-6">
+                <MessageSquareCode className="w-7 h-7" />
+              </div>
+
+              <h3 className="text-lg font-extrabold text-brand-black mb-2">{t('details.successTitle')}</h3>
+              
+              <p className="text-xs text-brand-gray-500 leading-relaxed mb-6">
+                {t('details.successDesc', { host: property.hostName })}
+              </p>
+
+              <div className="flex flex-col gap-2 w-full">
+                <button
+                  onClick={() => {
+                    setSuccessOpen(false);
+                    router.push('/messages');
+                  }}
+                  className="w-full py-3 bg-brand-accent hover:bg-brand-accent/90 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer"
+                >
+                  {t('details.goChatBtn')}
+                </button>
+                <button
+                  onClick={() => {
+                    setSuccessOpen(false);
+                    router.push('/dashboard');
+                  }}
+                  className="w-full py-3 border border-brand-gray-200 hover:border-brand-black text-brand-black rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                >
+                  {t('details.goDashBtn')}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+    </div>
+  );
+}

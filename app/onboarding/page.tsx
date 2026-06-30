@@ -1,0 +1,419 @@
+"use client";
+
+import React, { useState } from 'react';
+import { useSwap } from '../../lib/context/SwapContext';
+import { useTranslation } from '../../lib/context/LanguageContext';
+import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Sparkles, Compass, ShieldCheck, FileText, Check, ArrowRight, ArrowLeft, 
+  Upload, File, CheckCircle2, User, HelpCircle, MapPin
+} from 'lucide-react';
+import confetti from 'canvas-confetti';
+
+type StepType = 1 | 2 | 3;
+
+export default function OnboardingPage() {
+  const router = useRouter();
+  const { t, language } = useTranslation();
+  const { currentUser, completeOnboardingMock } = useSwap();
+
+  // Active Wizard Step
+  const [step, setStep] = useState<StepType>(1);
+
+  // STEP 1 FIELDS: Destinations
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  
+  // STEP 2 FIELDS: KYC Upload
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [fileUploaded, setFileUploaded] = useState(false);
+  const [fileName, setFileName] = useState('');
+
+  // STEP 3 FIELDS: Bio & Avatar
+  const [bio, setBio] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+
+  // Pre-configured Unsplash portraits for quick avatar selection
+  const curatedAvatars = [
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=150&q=80',
+    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80'
+  ];
+
+  // Curated target cities options
+  const targetCities = [
+    { id: 'Kyoto', name: 'Kyoto, Japan', img: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=300&q=80' },
+    { id: 'Tuscany', name: 'Tuscany, Italy', img: 'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&w=300&q=80' },
+    { id: 'Paris', name: 'Paris, France', img: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=300&q=80' },
+    { id: 'Cancun', name: 'Cancún, Mexico', img: 'https://images.unsplash.com/photo-1552074284-5e88ef1aef18?auto=format&fit=crop&w=300&q=80' },
+    { id: 'CDMX', name: 'CDMX, Mexico', img: 'https://images.unsplash.com/photo-1585464231875-d9ef1f5ad396?auto=format&fit=crop&w=300&q=80' },
+    { id: 'Tokyo', name: 'Tokyo, Japan', img: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=300&q=80' }
+  ];
+
+  const handleToggleCity = (cityId: string) => {
+    setSelectedCities(prev =>
+      prev.includes(cityId) ? prev.filter(c => c !== cityId) : [...prev, cityId]
+    );
+  };
+
+  const handleSimulateKycUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    const file = files[0];
+    setFileName(file.name);
+    setUploading(true);
+    setUploadProgress(0);
+
+    const interval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setUploading(false);
+          setFileUploaded(true);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 120);
+  };
+
+  const handleFinishOnboarding = () => {
+    // 1. Save data mock-reactively in SwapContext
+    completeOnboardingMock(selectedCities, bio, avatarUrl);
+
+    // 2. Play beautiful confetti fireworks
+    confetti({
+      particleCount: 180,
+      spread: 80,
+      origin: { y: 0.6 }
+    });
+
+    // 3. Forwards user to dashboard
+    router.push('/dashboard');
+  };
+
+  // Redirect to login if user is completely logged out (route protection simulation)
+  if (!currentUser) {
+    if (typeof window !== 'undefined') {
+      router.push('/login');
+    }
+    return null;
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto px-6 py-12 min-h-[85vh] flex flex-col justify-center select-none relative">
+      
+      {/* Ambient background glows */}
+      <div className="absolute top-10 right-10 w-80 h-80 rounded-full bg-brand-accent/5 filter blur-3xl pointer-events-none -z-10" />
+      <div className="absolute bottom-10 left-10 w-80 h-80 rounded-full bg-brand-rose/5 filter blur-3xl pointer-events-none -z-10" />
+
+      {/* Progress Wizard Steps Head */}
+      <div className="flex items-center justify-between mb-8 max-w-md mx-auto w-full">
+        <div className="flex flex-col items-center gap-1.5 relative z-10">
+          <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-xs font-black transition-all ${
+            step >= 1 ? 'bg-brand-black text-white border-brand-black shadow-premium' : 'bg-white border-brand-gray-300 text-brand-gray-400'
+          }`}>
+            {step > 1 ? <Check className="w-4 h-4 stroke-[3]" /> : '1'}
+          </div>
+          <span className="text-[8px] font-black uppercase tracking-wider text-brand-gray-400">{t('onboarding.step1Title') || 'Destinos'}</span>
+        </div>
+
+        <div className="flex-1 h-0.5 bg-brand-gray-200 mx-2 relative -top-3">
+          <motion.div 
+            className="h-full bg-brand-black" 
+            initial={{ width: '0%' }}
+            animate={{ width: step > 1 ? '100%' : '0%' }}
+          />
+        </div>
+
+        <div className="flex flex-col items-center gap-1.5 relative z-10">
+          <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-xs font-black transition-all ${
+            step >= 2 ? 'bg-brand-black text-white border-brand-black shadow-premium' : 'bg-white border-brand-gray-300 text-brand-gray-400'
+          }`}>
+            {step > 2 ? <Check className="w-4 h-4 stroke-[3]" /> : '2'}
+          </div>
+          <span className="text-[8px] font-black uppercase tracking-wider text-brand-gray-400">{t('onboarding.step2Title') || 'KYC'}</span>
+        </div>
+
+        <div className="flex-1 h-0.5 bg-brand-gray-200 mx-2 relative -top-3">
+          <motion.div 
+            className="h-full bg-brand-black" 
+            initial={{ width: '0%' }}
+            animate={{ width: step > 2 ? '100%' : '0%' }}
+          />
+        </div>
+
+        <div className="flex flex-col items-center gap-1.5 relative z-10">
+          <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-xs font-black transition-all ${
+            step === 3 ? 'bg-brand-black text-white border-brand-black shadow-premium' : 'bg-white border-brand-gray-300 text-brand-gray-400'
+          }`}>
+            3
+          </div>
+          <span className="text-[8px] font-black uppercase tracking-wider text-brand-gray-400">{t('onboarding.step3Title') || 'Perfil'}</span>
+        </div>
+      </div>
+
+      {/* Main Glassmorphic Setup Console */}
+      <div className="bg-white border border-brand-gray-200/80 rounded-3xl p-6 sm:p-8 shadow-floating min-h-[420px] flex flex-col justify-between relative overflow-hidden">
+        
+        <AnimatePresence mode="wait">
+          
+          {/* STEP 1: Cities preferences selection */}
+          {step === 1 && (
+            <motion.div
+              key="step1"
+              initial={{ opacity: 0, x: 15 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -15 }}
+              className="flex flex-col gap-6"
+            >
+              <div>
+                <span className="text-[9px] uppercase font-black tracking-widest text-brand-accent flex items-center gap-1">
+                  <Compass className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '8s' }} />
+                  <span>{t('onboarding.step1Title')}</span>
+                </span>
+                <h2 className="text-xl font-black text-brand-black tracking-tight mt-1 mb-2">
+                  {language === 'es' ? 'Elige tus destinos soñados' : 'Pick your dream destinations'}
+                </h2>
+                <p className="text-xs text-brand-gray-500 font-semibold leading-relaxed">
+                  {t('onboarding.step1Subtitle')}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {targetCities.map((city) => {
+                  const isChecked = selectedCities.includes(city.id);
+                  return (
+                    <button
+                      key={city.id}
+                      onClick={() => handleToggleCity(city.id)}
+                      className={`relative rounded-2xl border overflow-hidden p-3.5 text-left transition-all cursor-pointer flex flex-col justify-between min-h-[90px] group ${
+                        isChecked 
+                          ? 'bg-brand-black border-brand-black text-white shadow-premium' 
+                          : 'bg-brand-gray-50/50 border-brand-gray-200 text-brand-black hover:bg-brand-gray-50'
+                      }`}
+                    >
+                      <MapPin className={`w-4 h-4 ${isChecked ? 'text-brand-accent' : 'text-brand-gray-400 group-hover:text-brand-black transition-colors'}`} />
+                      
+                      <div>
+                        <p className="text-[10px] font-black leading-none">{city.name.split(',')[0]}</p>
+                        <p className={`text-[8px] font-bold uppercase mt-1 tracking-wider leading-none ${isChecked ? 'text-brand-gray-300' : 'text-brand-gray-400'}`}>
+                          {city.name.split(',')[1].trim()}
+                        </p>
+                      </div>
+
+                      {isChecked && (
+                        <div className="absolute top-2.5 right-2.5 w-4 h-4 bg-brand-accent rounded-full flex items-center justify-center text-white">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Progress and control buttons */}
+              <div className="flex justify-end pt-6 border-t border-brand-gray-100 mt-4">
+                <button
+                  onClick={() => setStep(2)}
+                  disabled={selectedCities.length === 0}
+                  className="py-3 px-6 rounded-full bg-brand-black hover:bg-brand-black/90 text-white font-bold text-xs tracking-wider uppercase transition-colors cursor-pointer flex items-center gap-1.5 shadow-premium disabled:opacity-40"
+                >
+                  <span>{t('onboarding.nextBtn')}</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-brand-accent" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* STEP 2: Simulated KYC Document Upload */}
+          {step === 2 && (
+            <motion.div
+              key="step2"
+              initial={{ opacity: 0, x: 15 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -15 }}
+              className="flex flex-col gap-6"
+            >
+              <div>
+                <span className="text-[9px] uppercase font-black tracking-widest text-brand-accent flex items-center gap-1">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>{t('onboarding.step2Title')}</span>
+                </span>
+                <h2 className="text-xl font-black text-brand-black tracking-tight mt-1 mb-2">
+                  {language === 'es' ? 'Verificación de Seguridad KYC' : 'KYC Security Audit'}
+                </h2>
+                <p className="text-xs text-brand-gray-500 font-semibold leading-relaxed">
+                  {t('onboarding.step2Subtitle')}
+                </p>
+              </div>
+
+              {/* Upload Drag-and-drop simulated box */}
+              <div className="border-2 border-dashed border-brand-gray-200/80 hover:border-brand-black transition-colors rounded-2xl p-6 text-center bg-brand-gray-50/20 relative flex flex-col items-center justify-center min-h-[160px]">
+                <input
+                  type="file"
+                  id="kyc-file-input"
+                  className="hidden"
+                  onChange={handleSimulateKycUpload}
+                  accept=".pdf,.jpg,.jpeg,.png"
+                />
+
+                {uploading ? (
+                  <div className="flex flex-col items-center w-full max-w-xs animate-in fade-in">
+                    <div className="w-10 h-10 rounded-full border-4 border-brand-gray-200 border-t-brand-accent animate-spin mb-4" />
+                    <p className="text-[10px] font-black uppercase tracking-wider text-brand-gray-500 mb-2">
+                      {t('onboarding.kycProgress')}
+                    </p>
+                    <div className="w-full h-1.5 bg-brand-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-brand-accent transition-all duration-150" style={{ width: `${uploadProgress}%` }} />
+                    </div>
+                  </div>
+                ) : fileUploaded ? (
+                  <div className="flex flex-col items-center gap-2 animate-in fade-in">
+                    <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 mb-2 border border-emerald-100">
+                      <CheckCircle2 className="w-6 h-6" />
+                    </div>
+                    <p className="text-xs font-black text-brand-black">{t('onboarding.kycVerified')}</p>
+                    <p className="text-[10px] text-brand-gray-400 font-semibold flex items-center gap-1 mt-0.5">
+                      <File className="w-3.5 h-3.5 text-brand-gray-400" />
+                      <span>{fileName}</span>
+                    </p>
+                  </div>
+                ) : (
+                  <label htmlFor="kyc-file-input" className="cursor-pointer flex flex-col items-center gap-3 w-full">
+                    <Upload className="w-8 h-8 text-brand-gray-400" />
+                    <p className="text-[10px] text-brand-gray-500 font-bold max-w-sm leading-relaxed">
+                      {t('onboarding.kycDropzone')}
+                    </p>
+                    <span className="px-3.5 py-1.5 bg-brand-black hover:bg-brand-black/90 text-white font-bold text-[9px] uppercase tracking-wider rounded-xl transition-colors shadow-xs">
+                      {t('onboarding.kycSelectFile')}
+                    </span>
+                  </label>
+                )}
+              </div>
+
+              {/* Controls */}
+              <div className="flex justify-between pt-6 border-t border-brand-gray-100 mt-4">
+                <button
+                  onClick={() => setStep(1)}
+                  className="py-3 px-6 rounded-full border border-brand-gray-200 hover:bg-brand-gray-50 text-brand-black font-bold text-xs tracking-wider uppercase transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 text-brand-gray-400" />
+                  <span>{t('onboarding.backBtn')}</span>
+                </button>
+
+                <button
+                  onClick={() => setStep(3)}
+                  disabled={!fileUploaded}
+                  className="py-3 px-6 rounded-full bg-brand-black hover:bg-brand-black/90 text-white font-bold text-xs tracking-wider uppercase transition-colors cursor-pointer flex items-center gap-1.5 shadow-premium disabled:opacity-40"
+                >
+                  <span>{t('onboarding.nextBtn')}</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-brand-accent" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* STEP 3: Bio & Avatar choice */}
+          {step === 3 && (
+            <motion.div
+              key="step3"
+              initial={{ opacity: 0, x: 15 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -15 }}
+              className="flex flex-col gap-6"
+            >
+              <div>
+                <span className="text-[9px] uppercase font-black tracking-widest text-brand-accent flex items-center gap-1">
+                  <User className="w-4 h-4" />
+                  <span>{t('onboarding.step3Title')}</span>
+                </span>
+                <h2 className="text-xl font-black text-brand-black tracking-tight mt-1 mb-2">
+                  {language === 'es' ? 'Preséntate a la red' : 'Introduce yourself to the network'}
+                </h2>
+                <p className="text-xs text-brand-gray-500 font-semibold leading-relaxed">
+                  {t('onboarding.step3Subtitle')}
+                </p>
+              </div>
+
+              {/* Bio and Avatar Forms */}
+              <div className="flex flex-col gap-4">
+                
+                {/* Curator Avatar selection */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-black text-brand-black uppercase tracking-wider">
+                    {t('profile.avatarLabel') || 'Elige tu foto de perfil premium'}
+                  </label>
+                  <div className="flex items-center gap-3 overflow-x-auto py-1">
+                    {curatedAvatars.map((url, index) => {
+                      const isSelected = avatarUrl === url;
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => setAvatarUrl(url)}
+                          className={`relative w-12 h-12 rounded-full overflow-hidden shrink-0 border-2 cursor-pointer transition-all hover:scale-105 ${
+                            isSelected ? 'border-brand-accent ring-2 ring-brand-accent/25 scale-105 shadow-sm' : 'border-brand-gray-200'
+                          }`}
+                        >
+                          <img src={url} className="w-full h-full object-cover" />
+                          {isSelected && (
+                            <div className="absolute inset-0 bg-brand-accent/15 flex items-center justify-center text-white">
+                              <Check className="w-4 h-4 stroke-[3]" />
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Introductory Bio */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-black text-brand-black uppercase tracking-wider">
+                    {t('profile.bioLabel')}
+                  </label>
+                  <textarea
+                    rows={4}
+                    required
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder={t('onboarding.bioPlaceholder')}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-brand-gray-200 focus:outline-none focus:border-brand-black text-xs font-semibold leading-relaxed resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Controls */}
+              <div className="flex justify-between pt-6 border-t border-brand-gray-100 mt-4">
+                <button
+                  onClick={() => setStep(2)}
+                  className="py-3 px-6 rounded-full border border-brand-gray-200 hover:bg-brand-gray-50 text-brand-black font-bold text-xs tracking-wider uppercase transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 text-brand-gray-400" />
+                  <span>{t('onboarding.backBtn')}</span>
+                </button>
+
+                <button
+                  onClick={handleFinishOnboarding}
+                  disabled={!bio}
+                  className="py-3 px-6 rounded-full bg-brand-black hover:bg-brand-black/90 text-white font-bold text-xs tracking-wider uppercase transition-colors cursor-pointer flex items-center gap-1.5 shadow-premium disabled:opacity-40"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-brand-accent animate-pulse" />
+                  <span>{t('onboarding.completeBtn')}</span>
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+        </AnimatePresence>
+
+      </div>
+
+    </div>
+  );
+}
