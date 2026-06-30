@@ -136,6 +136,19 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
           boxShadow: glowShadow
         }}
       >
+        {/* Transparent click/tap interceptor overlay to bypass mobile browser native media player click capture */}
+        <div 
+          onClick={(e) => {
+            e.stopPropagation();
+            if (typeof window !== 'undefined' && (window as any).__eternaStartVoice) {
+              (window as any).__eternaStartVoice();
+            } else {
+              startVoice();
+            }
+          }}
+          className="absolute inset-0 z-20 cursor-pointer bg-transparent"
+        />
+
         {/* Main Video Element */}
         <video
           ref={videoRef}

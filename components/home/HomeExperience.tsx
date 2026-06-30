@@ -36,6 +36,17 @@ export default function HomeExperience() {
     }
   }, []);
 
+  // Force scroll viewport to top on load and mount to prevent viewport jumps on home page loading
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.scrollTo(0, 0);
+      const timer = setTimeout(() => {
+        window.scrollTo(0, 0);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   const toggleTheme = () => {
     const nextDark = !isDark;
     setIsDark(nextDark);
