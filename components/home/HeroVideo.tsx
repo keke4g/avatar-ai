@@ -114,7 +114,13 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
 
   return (
     <div 
-      onClick={startVoice}
+      onClick={() => {
+        if (typeof window !== 'undefined' && (window as any).__eternaStartVoice) {
+          (window as any).__eternaStartVoice();
+        } else {
+          startVoice();
+        }
+      }}
       className="relative flex items-center justify-center select-none w-full max-w-[340px] sm:max-w-[360px] mx-auto rounded-[32px] p-[3px] transition-all duration-300 ease-in-out mt-2 lg:mt-4 cursor-pointer"
       style={{ 
         height: "calc(100vh - 140px)",

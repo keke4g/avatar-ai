@@ -197,6 +197,25 @@ export default function EternaConcierge() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Expose a synchronous trigger for starting voice mode to preserve user-gesture activation context on mobile devices
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__eternaStartVoice = () => {
+        setIsOpen(true);
+        if (voiceMode) {
+          stopVoiceMode();
+        } else {
+          handleVoiceButtonClick();
+        }
+      };
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete (window as any).__eternaStartVoice;
+      }
+    };
+  }, [voiceMode, handleVoiceButtonClick, stopVoiceMode]);
+
   // Auto-focus input when the chat card is opened (MEJORA UX #1)
   useEffect(() => {
     if (isOpen) {
@@ -207,10 +226,12 @@ export default function EternaConcierge() {
     }
   }, [isOpen]);
 
-  // Scroll text log to bottom
+  // Scroll text log to bottom (skip on home page to avoid viewport jumping)
   useEffect(() => {
-    textEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatHistory, textResponse, simulatedText]);
+    if (!isHome) {
+      textEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatHistory, textResponse, simulatedText, isHome]);
 
   // Sync simulated status when WebSocket is active
   const activeStatus = isConnected ? wsStatus : simulatedStatus;

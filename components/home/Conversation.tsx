@@ -13,11 +13,14 @@ interface ConversationProps {
 export default function Conversation({ searchInput, setSearchInput, isDark }: ConversationProps) {
   const { eternaChatState } = useLiveContext();
   const { chatHistory } = eternaChatState;
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: scrollContainerRef.current.scrollHeight,
+        behavior: "smooth"
+      });
     }
   }, [chatHistory]);
 
@@ -79,7 +82,7 @@ export default function Conversation({ searchInput, setSearchInput, isDark }: Co
         }`} />
 
         {/* Historial de conversación o mensaje de bienvenida */}
-        <div className="flex-grow flex flex-col gap-4 overflow-y-auto pr-1 scrollbar-thin select-text">
+        <div ref={scrollContainerRef} className="flex-grow flex flex-col gap-4 overflow-y-auto pr-1 scrollbar-thin select-text">
           {hasHistory ? (
             chatHistory.map((msg, index) => {
               const isUser = msg.role === "user";
@@ -122,7 +125,7 @@ export default function Conversation({ searchInput, setSearchInput, isDark }: Co
               </p>
             </div>
           )}
-          <div ref={messagesEndRef} />
+
         </div>
       </div>
     </div>
