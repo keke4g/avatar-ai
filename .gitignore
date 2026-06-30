@@ -58,3 +58,17 @@ Desktop.ini
 
 # SQL exports (si no quieres subirlos)
 update_properties_geocoded.sql
+
+# Backend AI models
+backend/models/
+
+# Python cache
+backend/**/__pycache__/
+*.pyc
+
+# Modelos IA locales
+backend-local/models/
+backend-local/venv/
+backend-local/__pycache__/
+backend-local/avatar/__pycache__/
+backend-local/uploads/
