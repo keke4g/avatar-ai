@@ -80,15 +80,19 @@ export default function EternaConcierge() {
     chatHistoryRef.current = chatHistory;
   }, [chatHistory]);
 
-  // Keep Eterna compact on mobile property pages
+  const shouldBeCompactOnMobile = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return pathname !== '/';
+  }, [pathname]);
+
+  // Keep Eterna compact on mobile pages other than home page
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      const isPropertyPage = pathname?.startsWith('/property/');
-      if (isPropertyPage) {
+      if (shouldBeCompactOnMobile) {
         setIsCompact(true);
       }
     }
-  }, [pathname]);
+  }, [pathname, shouldBeCompactOnMobile]);
   // Eterna Search Concierge State
   const [searchIntent, setSearchIntent] = useState<PropertySearchIntent | null>(null);
   const [searchQuestionsCount, setSearchQuestionsCount] = useState<number>(0);
@@ -1957,7 +1961,7 @@ Do not invent any other routes. If the user asks you to go to a section, politel
 
     if (type === 'open') {
       setIsOpen(true);
-      if (typeof window !== 'undefined' && window.innerWidth < 768 && pathname?.startsWith('/property/')) {
+      if (typeof window !== 'undefined' && window.innerWidth < 768 && shouldBeCompactOnMobile) {
         setIsCompact(true);
       } else {
         setIsCompact(false);
@@ -1969,7 +1973,7 @@ Do not invent any other routes. If the user asks you to go to a section, politel
       setIsOpen(false);
     } else if (type === 'startVoice') {
       setIsOpen(true);
-      if (typeof window !== 'undefined' && window.innerWidth < 768 && pathname?.startsWith('/property/')) {
+      if (typeof window !== 'undefined' && window.innerWidth < 768 && shouldBeCompactOnMobile) {
         setIsCompact(true);
       } else {
         setIsCompact(false);
@@ -1987,7 +1991,7 @@ Do not invent any other routes. If the user asks you to go to a section, politel
       }
       handleSend(payload);
       setIsOpen(true);
-      if (typeof window !== 'undefined' && window.innerWidth < 768 && pathname?.startsWith('/property/')) {
+      if (typeof window !== 'undefined' && window.innerWidth < 768 && shouldBeCompactOnMobile) {
         setIsCompact(true);
       } else {
         setIsCompact(false);
@@ -1995,7 +1999,7 @@ Do not invent any other routes. If the user asks you to go to a section, politel
     }
 
     clearEternaCommand();
-  }, [eternaCommand, voiceMode, handleVoiceButtonClick, handleSend, clearEternaCommand]);
+  }, [eternaCommand, voiceMode, handleVoiceButtonClick, handleSend, clearEternaCommand, shouldBeCompactOnMobile]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
