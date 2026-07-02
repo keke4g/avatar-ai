@@ -57,6 +57,7 @@ export default function ImageUploadDropzone({
   // Unified items list (completed files + active uploads in stable positions)
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Sync completed images from parent with our local items
   useEffect(() => {
@@ -244,6 +245,14 @@ export default function ImageUploadDropzone({
 
     if (validFiles.length === 0) return;
 
+    setUploadProgress(15);
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) return prev;
+        return prev + Math.floor(Math.random() * 12) + 5;
+      });
+    }, 450);
+
     // Create job queues with local temporary previews
     const uploadJobs = validFiles.map((file, idx) => {
       const jobId = `job-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`;
@@ -332,6 +341,11 @@ export default function ImageUploadDropzone({
     });
 
     const results = await Promise.all(uploadPromises);
+    clearInterval(progressInterval);
+    setUploadProgress(100);
+    setTimeout(() => {
+      setUploadProgress(0);
+    }, 1000);
     const uploadedUrls = results.filter((url): url is string => url !== null);
 
     if (uploadedUrls.length > 0) {
@@ -537,6 +551,14 @@ export default function ImageUploadDropzone({
                 : 'Optimizing to WEBP format and uploading to cloud'
               }
             </p>
+            {uploadProgress > 0 && (
+              <div className="flex flex-col items-center gap-1.5 w-full max-w-[200px] mt-1.5">
+                <div className="w-full bg-brand-gray-200 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-brand-accent h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                </div>
+                <span className="text-[9px] font-black text-brand-accent">{uploadProgress}%</span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">

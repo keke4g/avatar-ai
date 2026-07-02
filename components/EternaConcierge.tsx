@@ -861,21 +861,33 @@ Do not invent any other routes. If the user asks you to go to a section, politel
       lastGuidedStepRef.current = step;
 
       const stepMessagesES: Record<number, string> = {
-        0: "Selecciona la opción que mejor te represente.\n\nSoy Propietario:\nsi la propiedad te pertenece.\n\nAgente Inmobiliario:\nsi representas a un cliente.\n\nDesarrollador Inmobiliario:\nsi pertenece a un proyecto inmobiliario.\n\nCuando selecciones una opción continuaremos automáticamente.",
-        1: "Ahora definiremos cómo deseas comercializar la propiedad.\n\nPuedes ofrecerla para venta, renta, intercambio o varias modalidades al mismo tiempo.\n\nSelecciona las opciones que mejor se adapten a tus objetivos.",
-        2: "Ahora vamos a crear el anuncio.\n\nUtiliza un título claro y atractivo.\n\nDespués agrega una descripción destacando ubicación, características principales, amenidades y ventajas competitivas.",
-        3: "Ingresa las características físicas de la propiedad.\n\nHabitaciones, baños, capacidad y demás información relevante.\n\nMientras más precisa sea la información, mejores resultados obtendrás.",
-        4: "Ahora agrega fotografías.\n\nTe recomiendo incluir fachada, áreas comunes, habitaciones, baños y espacios exteriores.\n\nLas imágenes de calidad mejoran significativamente el desempeño del anuncio.",
-        5: "Configura precios y modalidades comerciales.\n\nSi la propiedad está disponible para venta y renta puedes configurar ambas opciones."
+        0: "Selecciona el perfil que te representa: Propietario, Agente Inmobiliario, Desarrollador Inmobiliario o Administrador de Propiedades / Airbnb. Esto nos ayuda a adaptar las opciones a tu medida.",
+        1: "Escribe un título llamativo y un resumen de la propiedad (máximo 160 caracteres). También selecciona el tipo de inmueble.",
+        2: "Busca y selecciona la ubicación exacta. Puedes elegir ocultar la dirección exacta y mostrar una zona aproximada si lo deseas por privacidad.",
+        3: "Elige las modalidades comerciales: venta directa, renta o swap/intercambio. ¡Puedes seleccionar más de uno!",
+        4: "Ingresa los detalles físicos de la propiedad: recámaras, baños, estacionamientos, estilo arquitectónico y las superficies construidas y totales.",
+        5: "Marca las amenidades del espacio. Si no encuentras alguna en el catálogo, puedes agregarla manualmente escribiéndola en 'Otra amenidad'.",
+        6: "Define las características de la propiedad que buscas recibir a cambio y si aceptas efectivo, autos o terrenos como compensación.",
+        7: "Establece el precio mensual de renta, depósito, plazos mínimos, aval o póliza jurídica y las reglas básicas del inmueble.",
+        8: "Configura el precio total de venta y marca las condiciones legales como predial al corriente, escrituras y gravámenes.",
+        9: "Sube las fotografías de la propiedad. Recuerda marcar una como portada haciendo clic en la estrella, y agrega enlaces de video o Matterport si cuentas con ellos.",
+        10: "Configura la comisión total y el porcentaje co-operador para compartir con otros brokers. Las meta-etiquetas de SEO se generarán automáticamente mediante IA.",
+        11: "Valida la ficha técnica preliminar y nuestro checklist de calidad del anuncio. Si todo se ve correcto, haz clic en Publicar Anuncio."
       };
 
       const stepMessagesEN: Record<number, string> = {
-        0: "Select the option that best represents you.\n\nOwner:\nif the property belongs to you.\n\nReal Estate Agent:\nif you represent a client.\n\nReal Estate Developer:\nif it belongs to a real estate project.\n\nOnce you select an option, we will continue automatically.",
-        1: "Now we will define how you wish to market the property.\n\nYou can offer it for sale, rent, exchange, or several modalities at the same time.\n\nSelect the options that best fit your goals.",
-        2: "Now we are going to create the listing.\n\nUse a clear and attractive title.\n\nThen add a description highlighting location, main features, amenities, and competitive advantages.",
-        3: "Enter the physical characteristics of the property.\n\nBedrooms, bathrooms, capacity, and other relevant information.\n\nThe more precise the information is, the better results you will get.",
-        4: "Now add photographs.\n\nI recommend including the facade, common areas, bedrooms, bathrooms, and outdoor spaces.\n\nQuality images significantly improve the performance of the listing.",
-        5: "Configure prices and commercial modalities.\n\nIf the property is available for sale and rent, you can configure both options."
+        0: "Select the profile that represents you: Owner, Real Estate Agent, Developer, or Property Manager / Airbnb. This helps us customize your onboarding flow.",
+        1: "Create a catchy title and a short summary / description (max 160 characters). Don't forget to select the property type.",
+        2: "Search and select the exact location. You can choose to hide the exact address and show an approximate area for privacy.",
+        3: "Choose your marketing channels: sale, rent, or swap/exchange. You can activate multiple channels at the same time!",
+        4: "Enter the physical specs: bedrooms, bathrooms, parkings, architectural style, and construction / total surface areas.",
+        5: "Select the amenities. If you can't find one, add it manually in the 'Other amenity' box at the bottom.",
+        6: "Define what you're looking to receive in exchange, and whether you accept cash, vehicles, or land as difference.",
+        7: "Set the monthly rent price, security deposit, contract duration, legal policies, and home rules.",
+        8: "Set the sale price and check legal conditions such as tax records, deeds, and mortgage status.",
+        9: "Upload your photos. Star the main one to set it as cover, and link any video tours or 3D Matterport links.",
+        10: "Configure total commissions and the percentage shared with cooperating agents. SEO tags will be automatically optimized via AI.",
+        11: "Review your draft summary and listing quality checklist. If everything looks perfect, click Publish Listing."
       };
 
       const stepMsg = language === 'es' ? stepMessagesES[step] : stepMessagesEN[step];

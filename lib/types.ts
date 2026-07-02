@@ -175,6 +175,8 @@ export interface Property {
   featuredRank?: number; // Ordering precedence for premium listings
   offerings?: PropertyOffering[]; // Hybrid commercial modes while legacy swap fields remain supported
   metadata?: Record<string, any>;
+  isDemo?: boolean;
+  is_demo?: boolean;
 
   // Development info
   developmentName?: string | null;

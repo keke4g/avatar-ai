@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  X, ChevronLeft, ChevronRight, Sparkles, Check, Info, Loader2,
+  X, ChevronLeft, ChevronRight, ChevronDown, Sparkles, Check, Info, Loader2,
   Home, DollarSign, Calendar, MessageSquareCode, Award, Shield, User, Building, Briefcase, Camera, Play, Eye, AlertTriangle,
   MapPin, Sliders, FileText, Image
 } from 'lucide-react';
@@ -17,7 +17,15 @@ interface PropertyWizardModalProps {
   onDelete?: (id: string) => void;
 }
 
-type WizardStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+type WizardStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+
+interface WizardStepConfig {
+  id: WizardStep;
+  label: string;
+  description: string;
+  isVisible: boolean;
+  estTimeMinutes: number;
+}
 
 const AMENITY_OPTIONS = [
   // Interior
@@ -149,13 +157,112 @@ const parseCurrency = (inputString: string): number => {
   return parseInt(integerPart, 10) || 0;
 };
 
+interface CustomSelectProps<T> {
+  value: T;
+  onChange: (value: T) => void;
+  options: { value: T; label: string }[];
+  placeholder?: string;
+}
+
+function CustomSelect<T extends string>({
+  value,
+  onChange,
+  options,
+  placeholder = "Seleccionar..."
+}: CustomSelectProps<T>) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  const selectedOption = options.find(o => o.value === value);
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none flex items-center justify-between text-left cursor-pointer hover:border-brand-gray-400 transition-all text-brand-black"
+      >
+        <span>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-brand-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="absolute z-50 w-full mt-1.5 max-h-52 overflow-y-auto bg-white border border-brand-gray-200 rounded-xl shadow-premium no-scrollbar"
+          >
+            <div className="p-1 flex flex-col gap-0.5">
+              {options.map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(option.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    option.value === value 
+                      ? 'bg-brand-black text-white' 
+                      : 'hover:bg-brand-gray-50 text-brand-gray-600'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initialData, onDelete }: PropertyWizardModalProps) {
   const { t, language } = useTranslation();
   const [step, setStep] = useState<WizardStep>(0);
   const [localDeleteConfirm, setLocalDeleteConfirm] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  
+  // Swap limits
+  const [swapMinValue, setSwapMinValue] = useState<number | ''>('');
+  const [swapMaxValue, setSwapMaxValue] = useState<number | ''>('');
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    if (typeof document === 'undefined') return;
+    const existing = document.getElementById('aura-custom-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'aura-custom-toast';
+    toast.className = `fixed bottom-5 right-5 z-[9999] flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-floating border text-xs font-black animate-slide-up ${
+      type === 'success' 
+        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' 
+        : 'bg-rose-500/10 border-rose-500/20 text-rose-600'
+    }`;
+    toast.innerHTML = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.classList.add('opacity-0', 'transition-all', 'duration-300');
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  };
 
   // STEP 0: Publisher Type
-  const [publisherType, setPublisherType] = useState<'owner' | 'broker' | 'developer'>('owner');
+  const [publisherType, setPublisherType] = useState<'owner' | 'broker' | 'developer' | 'property_manager'>('owner');
 
   // STEP 1: Offerings Selection
   const [selectedModes, setSelectedModes] = useState<PropertyOfferingMode[]>([]);
@@ -169,7 +276,12 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
 
   useEffect(() => {
     if (isOpen) {
-      const currentMode = step === 5 ? activeConfigTab : (selectedModes.length > 0 ? selectedModes[0] : null);
+      let currentMode: PropertyOfferingMode | null = null;
+      if (step === 6) currentMode = 'SWAP';
+      else if (step === 7) currentMode = 'MONTHLY_RENT';
+      else if (step === 8) currentMode = 'SALE';
+      else if (selectedModes.length > 0) currentMode = selectedModes[0];
+
       window.dispatchEvent(new CustomEvent('auraswap:wizard-step', {
         detail: {
           isOpen: true,
@@ -259,6 +371,8 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
 
   // STEP 5: Amenities
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+  const [customAmenities, setCustomAmenities] = useState<string[]>([]);
+  const [newCustomAmenity, setNewCustomAmenity] = useState('');
 
   // STEP 6: Legal Info
   const [legalDebtFree, setLegalDebtFree] = useState(true);
@@ -267,6 +381,31 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
   const [legalServicesPaid, setLegalServicesPaid] = useState(true);
   const [legalOwnerType, setLegalOwnerType] = useState('Privada');
   const [legalIsMortgaged, setLegalIsMortgaged] = useState(false);
+
+  // Operation specific new fields - VENTA
+  const [valuationAmount, setValuationAmount] = useState<number | ''>('');
+  const [catastralValue, setCatastralValue] = useState<number | ''>('');
+  const [condoRegime, setCondoRegime] = useState(false);
+  const [maintenanceFee, setMaintenanceFee] = useState<number | ''>('');
+
+  // Operation specific new fields - RENTA
+  const [advanceMonths, setAdvanceMonths] = useState<number>(1);
+  const [requiresGuarantor, setRequiresGuarantor] = useState(false);
+  const [requiresLegalPolicy, setRequiresLegalPolicy] = useState(false);
+  const [acceptsPets, setAcceptsPets] = useState(true);
+  const [isFurnished, setIsFurnished] = useState(false);
+  const [includesServices, setIncludesServices] = useState(false);
+  const [includesMaintenance, setIncludesMaintenance] = useState(true);
+  const [rentRules, setRentRules] = useState('');
+
+  // Operation specific new fields - SWAP
+  const [swapMaxCashDiff, setSwapMaxCashDiff] = useState<number | ''>('');
+  const [swapAcceptsVehicle, setSwapAcceptsVehicle] = useState(false);
+  const [swapAcceptsLand, setSwapAcceptsLand] = useState(false);
+  const [swapAcceptsDept, setSwapAcceptsDept] = useState(true);
+  const [swapAcceptsHouse, setSwapAcceptsHouse] = useState(true);
+  const [swapAcceptsCash, setSwapAcceptsCash] = useState(true);
+  const [swapPriority, setSwapPriority] = useState<'Alta' | 'Media' | 'Baja'>('Media');
 
   // STEP 7: Media & Gallery
   const [images, setImages] = useState<string[]>([]);
@@ -473,6 +612,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setHalfBathrooms(Number(initialData.metadata?.halfBathrooms) || 0);
       setMaxGuests(initialData.maxGuests || 4);
       setSelectedAmenities(initialData.amenities || []);
+      setCustomAmenities(initialData.metadata?.customAmenities || []);
       setImages(initialData.images || []);
       setImagesMetadata(initialData.metadata?.imagesMetadata || {});
       
@@ -489,6 +629,8 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
         setSwapAvailableStart(swapOff.availableFrom || '2026-06-01');
         setSwapAvailableEnd(swapOff.availableUntil || '2026-12-31');
         setSwapPreferences(typeof swapOff.swapPreferences?.text === 'string' ? swapOff.swapPreferences.text : '');
+        setSwapMinValue(swapOff.swapMinValue || '');
+        setSwapMaxValue(swapOff.swapMaxValue || '');
       }
 
       const shortOff = initialData.offerings?.find(o => o.mode === 'SHORT_RENT');
@@ -513,6 +655,29 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
         setSaleAcceptsOffers(saleOff.acceptsOffers !== false);
       }
       
+      // Venta Extra
+      setValuationAmount(initialData.metadata?.valuationAmount || '');
+      setCatastralValue(initialData.metadata?.catastralValue || '');
+      setCondoRegime(!!initialData.metadata?.condoRegime);
+      setMaintenanceFee(initialData.metadata?.maintenanceFee || '');
+      // Renta Extra
+      setAdvanceMonths(initialData.metadata?.advanceMonths || 1);
+      setRequiresGuarantor(!!initialData.metadata?.requiresGuarantor);
+      setRequiresLegalPolicy(!!initialData.metadata?.requiresLegalPolicy);
+      setAcceptsPets(initialData.metadata?.acceptsPets !== false);
+      setIsFurnished(!!initialData.metadata?.isFurnished);
+      setIncludesServices(!!initialData.metadata?.includesServices);
+      setIncludesMaintenance(initialData.metadata?.includesMaintenance !== false);
+      setRentRules(initialData.metadata?.rentRules || '');
+      // Swap Extra
+      setSwapMaxCashDiff(initialData.metadata?.swapMaxCashDiff || '');
+      setSwapAcceptsVehicle(!!initialData.metadata?.swapAcceptsVehicle);
+      setSwapAcceptsLand(!!initialData.metadata?.swapAcceptsLand);
+      setSwapAcceptsDept(initialData.metadata?.swapAcceptsDept !== false);
+      setSwapAcceptsHouse(initialData.metadata?.swapAcceptsHouse !== false);
+      setSwapAcceptsCash(initialData.metadata?.swapAcceptsCash !== false);
+      setSwapPriority(initialData.metadata?.swapPriority || 'Media');
+
       setPublisherType((initialData.metadata?.publisherType as any) || 'owner');
       setStep(1); // Skip Step 0 when editing
     } else {
@@ -523,6 +688,30 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setActiveConfigTab('SWAP');
       setTitle('');
       setDescription('');
+      // Venta reset
+      setValuationAmount('');
+      setCatastralValue('');
+      setCondoRegime(false);
+      setMaintenanceFee('');
+      // Renta reset
+      setAdvanceMonths(1);
+      setRequiresGuarantor(false);
+      setRequiresLegalPolicy(false);
+      setAcceptsPets(true);
+      setIsFurnished(false);
+      setIncludesServices(false);
+      setIncludesMaintenance(true);
+      setRentRules('');
+      // Swap reset
+      setSwapMaxCashDiff('');
+      setSwapAcceptsVehicle(false);
+      setSwapAcceptsLand(false);
+      setSwapAcceptsDept(true);
+      setSwapAcceptsHouse(true);
+      setSwapAcceptsCash(true);
+      setSwapPriority('Media');
+      setSwapMinValue('');
+      setSwapMaxValue('');
       setType('Departamento');
       setLocation('');
       setCountry('');
@@ -539,6 +728,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setHalfBathrooms(0);
       setMaxGuests(4);
       setSelectedAmenities([]);
+      setCustomAmenities([]);
       setImages([]);
       setImagesMetadata({});
     }
@@ -774,6 +964,324 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     };
   }, [step, isOpen]);
 
+  // Auto-save to localStorage
+  useEffect(() => {
+    // Only auto-save if we are in draft mode and not publishing/submitting
+    if (!isOpen || !!initialData) return;
+    
+    const draftData = {
+      publisherType,
+      selectedModes,
+      title,
+      shortDescription,
+      type,
+      location,
+      country,
+      address,
+      latitude,
+      longitude,
+      placeId,
+      formattedAddress,
+      city,
+      stateName,
+      bedrooms,
+      bathrooms,
+      halfBathrooms,
+      maxGuests,
+      selectedAmenities,
+      customAmenities,
+      images,
+      imagesMetadata,
+      videoPlaceholder,
+      virtualTourPlaceholder,
+      isExclusive,
+      commissionTotalPct,
+      commissionSharedPct,
+      // prices
+      salePrice,
+      saleCurrency,
+      saleAcceptsOffers,
+      monthlyPrice,
+      monthlyDeposit,
+      monthlyContract,
+      nightlyPrice,
+      shortMinNights,
+      shortDeposit,
+      weeklyPrice,
+      swapValueTier,
+      swapAvailableStart,
+      swapAvailableEnd,
+      swapPreferences,
+      // operation specific
+      valuationAmount,
+      catastralValue,
+      condoRegime,
+      maintenanceFee,
+      advanceMonths,
+      requiresGuarantor,
+      requiresLegalPolicy,
+      acceptsPets,
+      isFurnished,
+      includesServices,
+      includesMaintenance,
+      rentRules,
+      swapMaxCashDiff,
+      swapAcceptsVehicle,
+      swapAcceptsLand,
+      swapAcceptsDept,
+      swapAcceptsHouse,
+      swapAcceptsCash,
+      swapPriority,
+      // legal
+      legalDebtFree,
+      legalPublicDeed,
+      legalTaxCurrent,
+      legalServicesPaid,
+      legalOwnerType,
+      legalIsMortgaged
+    };
+
+    localStorage.setItem('auraswap_draft_property', JSON.stringify(draftData));
+  }, [
+    isOpen,
+    initialData,
+    publisherType,
+    selectedModes,
+    title,
+    shortDescription,
+    type,
+    location,
+    country,
+    address,
+    latitude,
+    longitude,
+    placeId,
+    formattedAddress,
+    city,
+    stateName,
+    bedrooms,
+    bathrooms,
+    halfBathrooms,
+    maxGuests,
+    selectedAmenities,
+    customAmenities,
+    images,
+    imagesMetadata,
+    videoPlaceholder,
+    virtualTourPlaceholder,
+    isExclusive,
+    commissionTotalPct,
+    commissionSharedPct,
+    salePrice,
+    saleCurrency,
+    saleAcceptsOffers,
+    monthlyPrice,
+    monthlyDeposit,
+    monthlyContract,
+    nightlyPrice,
+    shortMinNights,
+    shortDeposit,
+    weeklyPrice,
+    swapValueTier,
+    swapAvailableStart,
+    swapAvailableEnd,
+    swapPreferences,
+    valuationAmount,
+    catastralValue,
+    condoRegime,
+    maintenanceFee,
+    advanceMonths,
+    requiresGuarantor,
+    requiresLegalPolicy,
+    acceptsPets,
+    isFurnished,
+    includesServices,
+    includesMaintenance,
+    rentRules,
+    swapMaxCashDiff,
+    swapAcceptsVehicle,
+    swapAcceptsLand,
+    swapAcceptsDept,
+    swapAcceptsHouse,
+    swapAcceptsCash,
+    swapPriority,
+    legalDebtFree,
+    legalPublicDeed,
+    legalTaxCurrent,
+    legalServicesPaid,
+    legalOwnerType,
+    legalIsMortgaged
+  ]);
+
+  // Load draft check on modal mount or open
+  useEffect(() => {
+    if (isOpen && !initialData) {
+      const savedDraft = localStorage.getItem('auraswap_draft_property');
+      if (savedDraft) {
+        try {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed.title || parsed.location) {
+            // Auto restore draft
+            if (parsed.publisherType) setPublisherType(parsed.publisherType);
+            if (parsed.selectedModes) setSelectedModes(parsed.selectedModes);
+            if (parsed.title) setTitle(parsed.title);
+            if (parsed.shortDescription) setShortDescription(parsed.shortDescription);
+            if (parsed.type) setType(parsed.type);
+            if (parsed.location) setLocation(parsed.location);
+            if (parsed.country) setCountry(parsed.country);
+            if (parsed.address) setAddress(parsed.address);
+            if (parsed.latitude) setLatitude(parsed.latitude);
+            if (parsed.longitude) setLongitude(parsed.longitude);
+            if (parsed.placeId) setPlaceId(parsed.placeId);
+            if (parsed.formattedAddress) setFormattedAddress(parsed.formattedAddress);
+            if (parsed.city) setCity(parsed.city);
+            if (parsed.stateName) setStateName(parsed.stateName);
+            if (parsed.bedrooms) setBedrooms(parsed.bedrooms);
+            if (parsed.bathrooms) setBathrooms(parsed.bathrooms);
+            if (parsed.halfBathrooms) setHalfBathrooms(parsed.halfBathrooms);
+            if (parsed.maxGuests) setMaxGuests(parsed.maxGuests);
+            if (parsed.selectedAmenities) setSelectedAmenities(parsed.selectedAmenities);
+            if (parsed.customAmenities) setCustomAmenities(parsed.customAmenities);
+            if (parsed.images) setImages(parsed.images);
+            if (parsed.imagesMetadata) setImagesMetadata(parsed.imagesMetadata);
+            if (parsed.videoPlaceholder) setVideoPlaceholder(parsed.videoPlaceholder);
+            if (parsed.virtualTourPlaceholder) setVirtualTourPlaceholder(parsed.virtualTourPlaceholder);
+            if (parsed.isExclusive !== undefined) setIsExclusive(parsed.isExclusive);
+            if (parsed.commissionTotalPct !== undefined) setCommissionTotalPct(parsed.commissionTotalPct);
+            if (parsed.commissionSharedPct !== undefined) setCommissionSharedPct(parsed.commissionSharedPct);
+            if (parsed.salePrice) setSalePrice(parsed.salePrice);
+            if (parsed.saleCurrency) setSaleCurrency(parsed.saleCurrency);
+            if (parsed.saleAcceptsOffers !== undefined) setSaleAcceptsOffers(parsed.saleAcceptsOffers);
+            if (parsed.monthlyPrice) setMonthlyPrice(parsed.monthlyPrice);
+            if (parsed.monthlyDeposit) setMonthlyDeposit(parsed.monthlyDeposit);
+            if (parsed.monthlyContract !== undefined) setMonthlyContract(parsed.monthlyContract);
+            if (parsed.nightlyPrice) setNightlyPrice(parsed.nightlyPrice);
+            if (parsed.shortMinNights) setShortMinNights(parsed.shortMinNights);
+            if (parsed.shortDeposit) setShortDeposit(parsed.shortDeposit);
+            if (parsed.weeklyPrice) setWeeklyPrice(parsed.weeklyPrice);
+            if (parsed.swapValueTier) setSwapValueTier(parsed.swapValueTier);
+            if (parsed.swapAvailableStart) setSwapAvailableStart(parsed.swapAvailableStart);
+            if (parsed.swapAvailableEnd) setSwapAvailableEnd(parsed.swapAvailableEnd);
+            if (parsed.swapPreferences) setSwapPreferences(parsed.swapPreferences);
+            // new fields
+            if (parsed.valuationAmount !== undefined) setValuationAmount(parsed.valuationAmount);
+            if (parsed.catastralValue !== undefined) setCatastralValue(parsed.catastralValue);
+            if (parsed.condoRegime !== undefined) setCondoRegime(parsed.condoRegime);
+            if (parsed.maintenanceFee !== undefined) setMaintenanceFee(parsed.maintenanceFee);
+            if (parsed.advanceMonths !== undefined) setAdvanceMonths(parsed.advanceMonths);
+            if (parsed.requiresGuarantor !== undefined) setRequiresGuarantor(parsed.requiresGuarantor);
+            if (parsed.requiresLegalPolicy !== undefined) setRequiresLegalPolicy(parsed.requiresLegalPolicy);
+            if (parsed.acceptsPets !== undefined) setAcceptsPets(parsed.acceptsPets);
+            if (parsed.isFurnished !== undefined) setIsFurnished(parsed.isFurnished);
+            if (parsed.includesServices !== undefined) setIncludesServices(parsed.includesServices);
+            if (parsed.includesMaintenance !== undefined) setIncludesMaintenance(parsed.includesMaintenance);
+            if (parsed.rentRules) setRentRules(parsed.rentRules);
+            if (parsed.swapMaxCashDiff !== undefined) setSwapMaxCashDiff(parsed.swapMaxCashDiff);
+            if (parsed.swapAcceptsVehicle !== undefined) setSwapAcceptsVehicle(parsed.swapAcceptsVehicle);
+            if (parsed.swapAcceptsLand !== undefined) setSwapAcceptsLand(parsed.swapAcceptsLand);
+            if (parsed.swapAcceptsDept !== undefined) setSwapAcceptsDept(parsed.swapAcceptsDept);
+            if (parsed.swapAcceptsHouse !== undefined) setSwapAcceptsHouse(parsed.swapAcceptsHouse);
+            if (parsed.swapAcceptsCash !== undefined) setSwapAcceptsCash(parsed.swapAcceptsCash);
+            if (parsed.swapPriority) setSwapPriority(parsed.swapPriority);
+            if (parsed.legalDebtFree !== undefined) setLegalDebtFree(parsed.legalDebtFree);
+            if (parsed.legalPublicDeed !== undefined) setLegalPublicDeed(parsed.legalPublicDeed);
+            if (parsed.legalTaxCurrent !== undefined) setLegalTaxCurrent(parsed.legalTaxCurrent);
+            if (parsed.legalServicesPaid !== undefined) setLegalServicesPaid(parsed.legalServicesPaid);
+            if (parsed.legalOwnerType) setLegalOwnerType(parsed.legalOwnerType);
+            if (parsed.legalIsMortgaged !== undefined) setLegalIsMortgaged(parsed.legalIsMortgaged);
+            
+            showToast(
+              language === 'es' 
+                ? 'Borrador recuperado automáticamente.' 
+                : 'Draft automatically restored.',
+              'success'
+            );
+          }
+        } catch (e) {
+          console.error('Error restoring draft:', e);
+        }
+      }
+    }
+  }, [isOpen, initialData, language]);
+  const getListingQuality = () => {
+    let score = 0;
+    const suggestions: string[] = [];
+
+    if (title && title.length >= 10) {
+      score += 15;
+    } else {
+      suggestions.push("Agrega un título descriptivo (mín. 10 caracteres).");
+    }
+
+    if (shortDescription && shortDescription.length >= 30) {
+      score += 15;
+    } else {
+      suggestions.push("Escribe un resumen más detallado (mín. 30 caracteres).");
+    }
+
+    if (location && country) {
+      score += 15;
+    } else {
+      suggestions.push("Especifica la ubicación y dirección completa.");
+    }
+
+    if (selectedModes.length > 0) {
+      score += 10;
+    } else {
+      suggestions.push("Selecciona al menos una modalidad comercial.");
+    }
+
+    if (images.length >= 5) {
+      score += 20;
+    } else if (images.length > 0) {
+      score += 10;
+      suggestions.push("Sube al menos 5 imágenes para mejorar el anuncio.");
+    } else {
+      suggestions.push("Sube fotografías de tu propiedad.");
+    }
+
+    if (selectedAmenities.length + customAmenities.length >= 5) {
+      score += 15;
+    } else if (selectedAmenities.length + customAmenities.length > 0) {
+      score += 8;
+      suggestions.push("Marca más amenidades del espacio.");
+    } else {
+      suggestions.push("Agrega amenidades para destacar tu propiedad.");
+    }
+
+    if (videoPlaceholder) {
+      score += 5;
+    } else {
+      suggestions.push("Agrega un video del inmueble (opcional).");
+    }
+
+    if (virtualTourPlaceholder) {
+      score += 5;
+    } else {
+      suggestions.push("Agrega un recorrido virtual 3D (opcional).");
+    }
+
+    return { score, suggestions };
+  };
+
+  const { score: qualityScore, suggestions: qualitySuggestions } = getListingQuality();
+
+  const getPreviewPriceLabel = () => {
+    if (selectedModes.includes('SALE')) {
+      return `$${Number(salePrice || 0).toLocaleString()} ${saleCurrency}`;
+    }
+    if (selectedModes.includes('SHORT_RENT')) {
+      return `$${nightlyPrice} USD / noche`;
+    }
+    if (selectedModes.includes('MONTHLY_RENT')) {
+      return `$${monthlyPrice} USD / mes`;
+    }
+    if (selectedModes.includes('SWAP')) {
+      return `Intercambio / Swap`;
+    }
+    return '$---';
+  };
+
   if (!isOpen) return null;
 
   const toggleMode = (mode: PropertyOfferingMode) => {
@@ -792,20 +1300,69 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     );
   };
 
+  const stepsConfig: WizardStepConfig[] = [
+    { id: 0, label: 'Identidad', description: 'Perfil de publicación', isVisible: true, estTimeMinutes: 0.5 },
+    { id: 1, label: 'Información Básica', description: 'Título y resumen', isVisible: true, estTimeMinutes: 1 },
+    { id: 2, label: 'Ubicación', description: 'Ubicación de la propiedad', isVisible: true, estTimeMinutes: 1 },
+    { id: 3, label: 'Operación', description: 'Canales de comercialización', isVisible: true, estTimeMinutes: 0.5 },
+    { id: 4, label: 'Características', description: 'Distribución y superficies', isVisible: true, estTimeMinutes: 1 },
+    { id: 5, label: 'Amenidades', description: 'Equipamiento y servicios', isVisible: true, estTimeMinutes: 1 },
+    { id: 6, label: 'Preferencias Swap', description: 'Configuración de intercambio', isVisible: selectedModes.includes('SWAP'), estTimeMinutes: 1.5 },
+    { id: 7, label: 'Condiciones de Renta', description: 'Precios y plazos de renta', isVisible: selectedModes.includes('RENT' as any) || selectedModes.includes('SHORT_RENT') || selectedModes.includes('MONTHLY_RENT'), estTimeMinutes: 1.5 },
+    { id: 8, label: 'Términos de Venta', description: 'Precios y legal de venta', isVisible: selectedModes.includes('SALE'), estTimeMinutes: 1.5 },
+    { id: 9, label: 'Multimedia', description: 'Galería de fotos y video', isVisible: true, estTimeMinutes: 1 },
+    { id: 10, label: 'Esquema Comercial', description: 'Exclusividad y comisiones', isVisible: true, estTimeMinutes: 1 },
+    { id: 11, label: 'Vista Previa', description: 'Revisión final', isVisible: true, estTimeMinutes: 1 }
+  ];
+
+  const activeSteps = stepsConfig.filter(s => s.isVisible);
+  const totalActiveSteps = activeSteps.length;
+  const currentActiveIndex = activeSteps.findIndex(s => s.id === step);
+  const progressPercentage = totalActiveSteps > 1 ? Math.round((currentActiveIndex / (totalActiveSteps - 1)) * 100) : 100;
+  const remainingStepsCount = totalActiveSteps - 1 - currentActiveIndex;
+  const remainingTimeMinutes = activeSteps
+    .slice(currentActiveIndex + 1)
+    .reduce((sum, s) => sum + s.estTimeMinutes, 0);
+
   const handleNext = () => {
-    if (step === 0) setStep(1);
-    else if (step === 1 && title && description) setStep(2);
-    else if (step === 2 && location && country) setStep(3);
-    else if (step === 3 && selectedModes.length > 0) setStep(4);
-    else if (step === 4) setStep(5);
-    else if (step === 5) setStep(6);
-    else if (step === 6) setStep(7);
-    else if (step === 7) setStep(8);
-    else if (step === 8) setStep(9);
+    setValidationError(null);
+
+    // Validation checks per step
+    if (step === 1) {
+      if (!title.trim()) {
+        setValidationError("Por favor, ingresa el título del anuncio.");
+        return;
+      }
+      if (!shortDescription.trim()) {
+        setValidationError("Por favor, ingresa el resumen / descripción de la propiedad.");
+        return;
+      }
+    }
+    if (step === 2) {
+      if (!location || !country) {
+        setValidationError("Por favor, selecciona una ubicación válida usando el buscador.");
+        return;
+      }
+    }
+    if (step === 3) {
+      if (selectedModes.length === 0) {
+        setValidationError("Por favor, selecciona al menos una modalidad comercial.");
+        return;
+      }
+    }
+
+    const nextStep = activeSteps[currentActiveIndex + 1];
+    if (nextStep) {
+      setStep(nextStep.id);
+    }
   };
 
   const handleBack = () => {
-    if (step > 0) setStep((prev) => (prev - 1) as WizardStep);
+    setValidationError(null);
+    const prevStep = activeSteps[currentActiveIndex - 1];
+    if (prevStep) {
+      setStep(prevStep.id);
+    }
   };
 
   const handlePublish = (e: React.FormEvent) => {
@@ -945,9 +1502,11 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       availableStart: selectedModes.includes('SWAP') ? swapAvailableStart : '2026-06-01',
       availableEnd: selectedModes.includes('SWAP') ? swapAvailableEnd : '2026-12-31',
       offerings,
+      desiredExchange: swapPreferences,
+      isDemo: initialData?.isDemo ?? false,
       folderStatus: 'DRAFT',
-      metaTitle,
-      metaDescription,
+      metaTitle: metaTitle || (title ? `${title} | AuraSwap` : ''),
+      metaDescription: metaDescription || shortDescription,
       metadata: {
         publisherType,
         videoPlaceholder,
@@ -957,10 +1516,34 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
         imagesMetadata,
         isExclusive,
         commissionTotalPct,
-        commissionSharedPct
+        commissionSharedPct,
+        customAmenities,
+        // Venta extra
+        valuationAmount,
+        catastralValue,
+        condoRegime,
+        maintenanceFee,
+        // Renta extra
+        advanceMonths,
+        requiresGuarantor,
+        requiresLegalPolicy,
+        acceptsPets,
+        isFurnished,
+        includesServices,
+        includesMaintenance,
+        rentRules,
+        // Swap extra
+        swapMaxCashDiff,
+        swapAcceptsVehicle,
+        swapAcceptsLand,
+        swapAcceptsDept,
+        swapAcceptsHouse,
+        swapAcceptsCash,
+        swapPriority
       }
     };
 
+    localStorage.removeItem('auraswap_draft_property');
     onSubmit(compiledPropertyData);
   };
 
@@ -1068,6 +1651,12 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                       </span>
                     ))}
                   </div>
+                  {/* Quality/Aura Badge overlay */}
+                  <div className="absolute top-3 right-3">
+                    <span className="text-[8px] font-black uppercase tracking-wider px-2.5 py-1 rounded bg-brand-black text-white shadow-xs">
+                      Aura Score 95
+                    </span>
+                  </div>
                 </div>
 
                 <div className="p-5 flex flex-col gap-3 flex-1 justify-between">
@@ -1079,29 +1668,86 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                       )}
                     </div>
                     <h4 className="text-sm font-black text-brand-black truncate">{title || 'Título provisional'}</h4>
-                    <p className="text-xs text-brand-gray-500 truncate mt-1">{location ? `${location}, ${country}` : 'Ubicación'}</p>
+                    <p className="text-xs text-brand-gray-500 truncate mt-1">
+                      {location ? `${neighborhood ? neighborhood + ', ' : ''}${location}` : 'Ubicación / Ciudad'}
+                    </p>
+
+                    <div className="flex items-center flex-wrap gap-2 text-[10px] text-brand-gray-500 font-bold mt-2 bg-brand-gray-150/40 p-2 rounded-lg">
+                      <span>{bedrooms} Rec</span>
+                      <span>•</span>
+                      <span>{bathrooms + halfBathrooms * 0.5} Baños</span>
+                      {parkingSpaces > 0 && (
+                        <>
+                          <span>•</span>
+                          <span>{parkingSpaces} Est</span>
+                        </>
+                      )}
+                      {surfaceTotal && (
+                        <>
+                          <span>•</span>
+                          <span>{surfaceTotal} m²</span>
+                        </>
+                      )}
+                    </div>
+
+                    {(() => {
+                      const firstAmenities = [...selectedAmenities, ...customAmenities].slice(0, 3);
+                      if (firstAmenities.length === 0) return null;
+                      return (
+                        <div className="flex flex-wrap gap-1 mt-2.5">
+                          {firstAmenities.map(amenity => (
+                            <span key={amenity} className="text-[9px] font-bold text-brand-gray-600 bg-brand-gray-100 px-2 py-0.5 rounded-full border border-brand-gray-200/40">
+                              {amenity}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
+
+                    <div className="mt-3.5 text-base font-black text-brand-black">
+                      {getPreviewPriceLabel()}
+                    </div>
                   </div>
 
                   <div className="border-t border-brand-gray-200/60 mt-4 pt-3 flex justify-between items-center">
                     <span className="text-xs font-bold text-brand-gray-500">Publicado por</span>
                     <span className="text-[10px] font-black uppercase text-brand-black px-2.5 py-1 rounded bg-brand-gray-100 border">
-                      {publisherType === 'owner' ? 'Propietario' : publisherType === 'broker' ? 'Agente' : 'Desarrollador'}
+                      {publisherType === 'owner' ? 'Propietario' : publisherType === 'broker' ? 'Agente' : publisherType === 'developer' ? 'Desarrollador' : 'Gestor'}
                     </span>
                   </div>
                 </div>
               </div>
+
+              {/* Quality Score widget in preview pane */}
+              <div className="p-4 rounded-2xl bg-brand-accent/[0.02] border border-brand-accent/15 flex flex-col gap-2 mt-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black uppercase text-brand-gray-500">Calidad del Anuncio</span>
+                  <span className="text-xs font-black text-brand-accent">{qualityScore}%</span>
+                </div>
+                <div className="w-full bg-brand-gray-100 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-brand-accent h-full transition-all duration-300" style={{ width: `${qualityScore}%` }} />
+                </div>
+                {qualitySuggestions.length > 0 && (
+                  <p className="text-[9px] text-brand-gray-500 leading-relaxed font-bold mt-1">
+                    💡 Sugerencia: {qualitySuggestions[0]}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Stepper Progress Indicator */}
-            <div className="flex flex-col gap-2.5 shrink-0 mt-4">
-              <span className="text-[10px] font-black uppercase tracking-wider text-brand-gray-400">Progreso del Registro</span>
+            <div className="flex flex-col gap-2 shrink-0 mt-4 border-t border-brand-gray-100 pt-4">
+              <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider text-brand-gray-400">
+                <span className="truncate max-w-[150px]">Paso: {stepsConfig[step]?.label}</span>
+                <span>Paso {currentActiveIndex + 1} de {totalActiveSteps}</span>
+              </div>
               <div className="flex items-center gap-1.5">
-                {([0, 1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map(s => {
-                  const isActive = step === s;
-                  const isCompleted = step > s;
+                {activeSteps.map((s, idx) => {
+                  const isActive = step === s.id;
+                  const isCompleted = currentActiveIndex > idx;
                   return (
                     <div 
-                      key={s} 
+                      key={s.id} 
                       className={`h-1.5 rounded-full transition-all duration-300 ${
                         isActive 
                           ? 'w-8 bg-brand-accent' 
@@ -1112,6 +1758,14 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                     />
                   );
                 })}
+              </div>
+              <div className="flex justify-between items-center text-[10px] text-brand-gray-500 font-bold mt-0.5">
+                <span>{progressPercentage}% completado</span>
+                <span>
+                  {remainingStepsCount > 0 
+                    ? `~${Math.ceil(remainingTimeMinutes)} min rest.` 
+                    : 'Último paso'}
+                </span>
               </div>
             </div>
           </div>
@@ -1199,6 +1853,26 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                           </span>
                         </div>
                       </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPublisherType('property_manager')}
+                        className={`w-full text-left p-4 rounded-2xl border transition-all cursor-pointer flex gap-4 ${
+                          publisherType === 'property_manager' 
+                            ? 'border-brand-accent bg-brand-accent/[0.02] shadow-sm' 
+                            : 'border-brand-gray-200 hover:border-brand-gray-400 bg-white'
+                        }`}
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-brand-accent/5 flex items-center justify-center shrink-0">
+                          <Home className="w-5 h-5 text-brand-accent" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-brand-black block">Soy Administrador de Propiedades / Airbnb</span>
+                          <span className="text-[10px] text-brand-gray-500 leading-normal mt-0.5 block">
+                            Administro propiedades de terceros para renta vacacional, renta tradicional o administración patrimonial.
+                          </span>
+                        </div>
+                      </button>
                     </div>
                   </motion.div>
                 )}
@@ -1217,12 +1891,12 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                         <Info className="w-4 h-4" />
                         <span>Paso 1: Información Básica</span>
                       </h4>
-                      <p className="text-xs text-brand-gray-500 mt-0.5">Ingresa los datos descriptivos generales del alojamiento.</p>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Ingresa los datos descriptivos generales del alojamiento. El resumen completo de IA se generará automáticamente.</p>
                     </div>
 
                     <div className="flex flex-col gap-3">
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500">Título del anuncio</label>
+                        <label className="text-xs font-bold text-brand-gray-500">Título del anuncio <span className="text-red-500">*</span></label>
                         <input
                           type="text"
                           required
@@ -1234,18 +1908,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                       </div>
 
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500">Subtítulo</label>
-                        <input
-                          type="text"
-                          value={subtitle}
-                          onChange={(e) => setSubtitle(e.target.value)}
-                          placeholder="Ej. Ideal para familias y nómadas digitales"
-                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500">Nombre del Desarrollo / Residencial</label>
+                        <label className="text-xs font-bold text-brand-gray-500">Nombre del Desarrollo / Residencial <span className="text-brand-gray-400 font-normal">(Opcional)</span></label>
                         <input
                           type="text"
                           value={developmentName}
@@ -1256,58 +1919,43 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                       </div>
 
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500">Descripción Corta</label>
-                        <input
-                          type="text"
-                          value={shortDescription}
-                          onChange={(e) => setShortDescription(e.target.value)}
-                          placeholder="Resumen ejecutivo del espacio (máx. 160 caracteres)"
-                          maxLength={160}
-                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500">Descripción Completa</label>
+                        <label className="text-xs font-bold text-brand-gray-500">Resumen / Descripción de la propiedad <span className="text-red-500">*</span></label>
                         <textarea
                           rows={4}
                           required
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          placeholder="Detalla la distribución del espacio, recámaras, accesos y cercanía..."
-                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent resize-none"
+                          value={shortDescription}
+                          onChange={(e) => {
+                            setShortDescription(e.target.value);
+                            setDescription(e.target.value); // Sync to description to prevent double input
+                          }}
+                          placeholder="Describe brevemente la distribución de la propiedad, habitaciones, accesos y ventajas (máx. 160 caracteres)"
+                          maxLength={160}
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent resize-none font-semibold leading-relaxed"
                         />
+                        <span className="text-[10px] text-right text-brand-gray-400 font-bold">
+                          {shortDescription.length}/160 caracteres
+                        </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500">Tipo de Propiedad</label>
-                          <select
-                            value={type}
-                            onChange={(e) => setType(e.target.value as UIType)}
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
-                          >
-                            <option value="Departamento">Departamento</option>
-                            <option value="Casa">Casa</option>
-                            <option value="Penthouse">Penthouse</option>
-                            <option value="Villa">Villa</option>
-                            <option value="Loft">Loft</option>
-                          </select>
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500">Categorización Premium</label>
-                          <select
-                            value={valueRating}
-                            onChange={(e) => setValueRating(e.target.value as any)}
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
-                          >
-                            <option value="Premium">Premium</option>
-                            <option value="Luxury">Luxury</option>
-                            <option value="Exclusive">Exclusive</option>
-                            <option value="Curated">Curated</option>
-                          </select>
-                        </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-brand-gray-500">Tipo de Propiedad <span className="text-red-500">*</span></label>
+                        <CustomSelect
+                          value={type}
+                          onChange={(val) => setType(val as UIType)}
+                          options={[
+                            { value: 'Casa', label: 'Casa' },
+                            { value: 'Departamento', label: 'Departamento' },
+                            { value: 'Penthouse', label: 'Penthouse' },
+                            { value: 'Townhouse', label: 'Townhouse' },
+                            { value: 'Villa', label: 'Villa' },
+                            { value: 'Casa de Playa', label: 'Casa de Playa' },
+                            { value: 'Cabaña', label: 'Cabaña' },
+                            { value: 'Loft', label: 'Loft' },
+                            { value: 'Terreno', label: 'Terreno' },
+                            { value: 'Local Comercial', label: 'Local Comercial' }
+                          ]}
+                          placeholder="Selecciona el tipo de inmueble..."
+                        />
                       </div>
                     </div>
                   </motion.div>
@@ -1419,7 +2067,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                   </motion.div>
                 )}
 
-                {/* STEP 3: Modalidad y Precios */}
+                {/* STEP 3: Modalidad de Comercialización */}
                 {step === 3 && (
                   <motion.div
                     key="step3"
@@ -1431,108 +2079,48 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                     <div>
                       <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
                         <DollarSign className="w-4 h-4" />
-                        <span>Paso 3: Operación y Comercialización</span>
+                        <span>Paso 3: Canales de Comercialización</span>
                       </h4>
-                      <p className="text-xs text-brand-gray-500 mt-0.5">Selecciona y configura las modalidades activas de este inmueble.</p>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Selecciona los canales en los que deseas publicar tu propiedad. Puedes activar varios a la vez.</p>
                     </div>
 
-                    <div className="flex flex-col gap-4">
-                      {/* Checkbox selectors */}
-                      <div className="grid grid-cols-4 gap-2">
-                        {(['SALE', 'RENT', 'SWAP'] as const).map(mode => {
-                          const isActive = selectedModes.includes(mode as any);
-                          return (
-                            <button
-                              key={mode}
-                              type="button"
-                              onClick={() => toggleMode(mode as any)}
-                              className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer text-xs font-bold ${
-                                isActive 
-                                  ? 'bg-brand-black border-brand-black text-white shadow-premium' 
-                                  : 'bg-white border-brand-gray-200 text-brand-gray-500 hover:bg-brand-gray-50'
-                              }`}
-                            >
-                              {mode === 'SALE' ? 'Venta' : mode === 'RENT' ? 'Renta' : 'Swap'}
-                            </button>
-                          );
-                        })}
-                      </div>
+                    <div className="flex flex-col gap-3">
+                      {(['SWAP', 'MONTHLY_RENT', 'SALE'] as const).map(mode => {
+                        const isActive = selectedModes.includes(mode);
+                        const titleMap = {
+                          SWAP: 'Swap / Intercambio',
+                          MONTHLY_RENT: 'Renta (Vacacional o Mensual)',
+                          SALE: 'Venta Directa'
+                        };
+                        const descMap = {
+                          SWAP: 'Intercambia temporal o permanentemente con otros miembros. Ideal para viajar sin pagar hospedaje o permutar propiedades.',
+                          MONTHLY_RENT: 'Publica tarifas por noche (renta vacacional) o mensualidades fijas (renta tradicional).',
+                          SALE: 'Promociona la venta de la propiedad física con soporte para créditos hipotecarios y escrituras.'
+                        };
 
-                      {/* Config Form based on selected checkmarks */}
-                      <div className="flex flex-col gap-3.5 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
-                        {/* SALE config details */}
-                        {selectedModes.includes('SALE' as any) && (
-                          <div className="border border-brand-accent/20 bg-brand-accent/[0.01] rounded-2xl p-4 flex flex-col gap-3">
-                            <span className="text-[10px] font-black uppercase text-brand-accent">Comercialización de Venta</span>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-brand-gray-500">Precio de Venta</label>
-                                <input
-                                  type="number"
-                                  value={salePrice}
-                                  onChange={(e) => setSalePrice(Number(e.target.value) || 0)}
-                                  className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
-                                />
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-brand-gray-500">Moneda</label>
-                                <select
-                                  value={saleCurrency}
-                                  onChange={(e) => setSaleCurrency(e.target.value)}
-                                  className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
-                                >
-                                  <option value="MXN">MXN ($)</option>
-                                  <option value="USD">USD ($)</option>
-                                </select>
-                              </div>
+                        return (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => toggleMode(mode)}
+                            className={`w-full text-left p-4 rounded-2xl border transition-all cursor-pointer flex gap-4 ${
+                              isActive 
+                                ? 'border-brand-accent bg-brand-accent/[0.02] shadow-sm' 
+                                : 'border-brand-gray-200 hover:border-brand-gray-400 bg-white'
+                            }`}
+                          >
+                            <div className="w-5 h-5 rounded-md bg-brand-gray-100 flex items-center justify-center shrink-0 border mt-0.5">
+                              {isActive && <Check className="w-3.5 h-3.5 text-brand-accent font-black" />}
                             </div>
-                          </div>
-                        )}
-
-                        {/* RENT config details */}
-                        {selectedModes.includes('RENT' as any) && (
-                          <div className="border border-brand-accent/20 bg-brand-accent/[0.01] rounded-2xl p-4 flex flex-col gap-3">
-                            <span className="text-[10px] font-black uppercase text-brand-accent">Comercialización de Renta</span>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-brand-gray-500">Precio Mensual</label>
-                                <input
-                                  type="number"
-                                  value={monthlyPrice}
-                                  onChange={(e) => setMonthlyPrice(Number(e.target.value) || 0)}
-                                  className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
-                                />
-                              </div>
-                              <div className="flex flex-col gap-1">
-                                <label className="text-[10px] font-bold text-brand-gray-500">Depósito Requerido</label>
-                                <input
-                                  type="number"
-                                  value={monthlyDeposit}
-                                  onChange={(e) => setMonthlyDeposit(Number(e.target.value) || 0)}
-                                  className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
-                                />
-                              </div>
+                            <div>
+                              <span className="text-xs font-bold text-brand-black block">{titleMap[mode]}</span>
+                              <span className="text-[10px] text-brand-gray-500 leading-normal mt-0.5 block">
+                                {descMap[mode]}
+                              </span>
                             </div>
-                          </div>
-                        )}
-
-                        {/* SWAP config details */}
-                        {selectedModes.includes('SWAP' as any) && (
-                          <div className="border border-brand-accent/20 bg-brand-accent/[0.01] rounded-2xl p-4 flex flex-col gap-3">
-                            <span className="text-[10px] font-black uppercase text-brand-accent">Comercialización de Swap / Permuta</span>
-                            <div className="flex flex-col gap-1">
-                              <label className="text-[10px] font-bold text-brand-gray-500">Propiedad Buscada / Intercambio deseado</label>
-                              <input
-                                type="text"
-                                value={swapPreferences}
-                                onChange={(e) => setSwapPreferences(e.target.value)}
-                                placeholder="Ej. Busco departamento vacacional frente al mar en Mazatlán"
-                                className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </motion.div>
                 )}
@@ -1624,31 +2212,31 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                       <div className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-brand-gray-500">Estilo Arquitectura</label>
-                          <select
+                          <CustomSelect
                             value={constructionType}
-                            onChange={(e) => setConstructionType(e.target.value)}
-                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
-                          >
-                            <option value="Modern">Moderna</option>
-                            <option value="Contemporary">Contemporánea</option>
-                            <option value="Classic">Clásica</option>
-                            <option value="Minimalist">Minimalista</option>
-                            <option value="Rustic">Rústica</option>
-                          </select>
+                            onChange={(val) => setConstructionType(val)}
+                            options={[
+                              { value: 'Modern', label: 'Moderna' },
+                              { value: 'Contemporary', label: 'Contemporánea' },
+                              { value: 'Classic', label: 'Clásica' },
+                              { value: 'Minimalist', label: 'Minimalista' },
+                              { value: 'Rustic', label: 'Rústica' }
+                            ]}
+                          />
                         </div>
                         <div className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-brand-gray-500">Estado de Conservación</label>
-                          <select
+                          <CustomSelect
                             value={conservationState}
-                            onChange={(e) => setConservationState(e.target.value)}
-                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
-                          >
-                            <option value="Excellent">Excelente</option>
-                            <option value="Good">Bueno</option>
-                            <option value="Fair">Regular</option>
-                            <option value="Remodelado">Remodelado</option>
-                            <option value="Para remodelar">Requiere remodelación</option>
-                          </select>
+                            onChange={(val) => setConservationState(val)}
+                            options={[
+                              { value: 'Excellent', label: 'Excelente' },
+                              { value: 'Good', label: 'Bueno' },
+                              { value: 'Fair', label: 'Regular' },
+                              { value: 'Remodelado', label: 'Remodelado' },
+                              { value: 'Para remodelar', label: 'Requiere remodelación' }
+                            ]}
+                          />
                         </div>
                       </div>
 
@@ -1750,10 +2338,10 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                         <Award className="w-4 h-4" />
                         <span>Paso 5: Amenidades del Inmueble</span>
                       </h4>
-                      <p className="text-xs text-brand-gray-500 mt-0.5">Selecciona el equipamiento y amenidades activas en el espacio.</p>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Selecciona el equipamiento y amenidades activas en el espacio. Si no encuentras alguna, escríbela en &quot;Otra amenidad&quot;.</p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
+                    <div className="grid grid-cols-2 gap-2 max-h-[190px] overflow-y-auto pr-1 no-scrollbar border-b border-brand-gray-100 pb-2">
                       {AMENITY_OPTIONS.map(amenity => {
                         const isChecked = selectedAmenities.includes(amenity);
                         return (
@@ -1773,103 +2361,520 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                         );
                       })}
                     </div>
+
+                    {/* Custom Amenities row */}
+                    <div className="flex flex-col gap-1.5 mt-1">
+                      <label className="text-xs font-bold text-brand-gray-500">¿Falta alguna amenidad? Escríbela aquí <span className="text-brand-gray-400 font-normal">(Opcional)</span></label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newCustomAmenity}
+                          onChange={(e) => setNewCustomAmenity(e.target.value)}
+                          placeholder="Ej. Cargador Tesla, Muelle privado, Bodega refrigerada"
+                          className="flex-1 p-2.5 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (newCustomAmenity.trim()) {
+                                const cleaned = newCustomAmenity.trim();
+                                if (!customAmenities.includes(cleaned) && !selectedAmenities.includes(cleaned)) {
+                                  setCustomAmenities(prev => [...prev, cleaned]);
+                                }
+                                setNewCustomAmenity('');
+                              }
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (newCustomAmenity.trim()) {
+                              const cleaned = newCustomAmenity.trim();
+                              if (!customAmenities.includes(cleaned) && !selectedAmenities.includes(cleaned)) {
+                                setCustomAmenities(prev => [...prev, cleaned]);
+                              }
+                              setNewCustomAmenity('');
+                            }
+                          }}
+                          className="px-4 py-2.5 bg-brand-black text-white text-xs font-black rounded-xl hover:bg-brand-gray-800 transition-all cursor-pointer shrink-0"
+                        >
+                          Agregar
+                        </button>
+                      </div>
+
+                      {/* Display custom amenities */}
+                      {customAmenities.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-1.5 max-h-16 overflow-y-auto no-scrollbar">
+                          {customAmenities.map(amenity => (
+                            <span 
+                              key={amenity} 
+                              className="text-[10px] font-bold text-brand-black bg-brand-accent/10 border border-brand-accent/25 px-2.5 py-1 rounded-lg flex items-center gap-1.5"
+                            >
+                              <span>{amenity}</span>
+                              <button
+                                type="button"
+                                onClick={() => setCustomAmenities(prev => prev.filter(a => a !== amenity))}
+                                className="text-brand-rose font-black hover:text-brand-rose/85 cursor-pointer text-xs"
+                              >
+                                &times;
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </motion.div>
                 )}
 
-                {/* STEP 6: Información Legal */}
+                {/* STEP 6: Preferencias de Swap */}
                 {step === 6 && (
                   <motion.div
                     key="step6"
                     initial={{ opacity: 0, x: 15 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -15 }}
-                    className="flex flex-col gap-4"
+                    className="flex flex-col gap-4 text-brand-black"
                   >
                     <div>
                       <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
-                        <FileText className="w-4 h-4" />
-                        <span>Paso 6: Información Legal</span>
+                        <Sparkles className="w-4 h-4" />
+                        <span>Paso 6: Configuración de Swap / Intercambio</span>
                       </h4>
-                      <p className="text-xs text-brand-gray-500 mt-0.5">Indica las condiciones jurídicas del expediente de la propiedad.</p>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Define qué tipo de propiedad buscas y las condiciones de permuta.</p>
                     </div>
 
                     <div className="flex flex-col gap-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
-                          <input
-                            type="checkbox"
-                            id="legalDebtFree"
-                            checked={legalDebtFree}
-                            onChange={(e) => setLegalDebtFree(e.target.checked)}
-                            className="w-4 h-4 accent-brand-accent cursor-pointer"
-                          />
-                          <label htmlFor="legalDebtFree" className="text-xs font-bold text-brand-black cursor-pointer">
-                            Libre de Gravamen
-                          </label>
-                        </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-brand-gray-500">¿Qué buscas recibir? <span className="text-red-500">*</span></label>
+                        <input
+                          type="text"
+                          required
+                          value={swapPreferences}
+                          onChange={(e) => setSwapPreferences(e.target.value)}
+                          placeholder="Ej. Casa o Depto frente al mar en Mazatlán o Sinaloa"
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
+                        />
+                      </div>
 
-                        <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Valor Mínimo Deseado</label>
                           <input
-                            type="checkbox"
-                            id="legalPublicDeed"
-                            checked={legalPublicDeed}
-                            onChange={(e) => setLegalPublicDeed(e.target.checked)}
-                            className="w-4 h-4 accent-brand-accent cursor-pointer"
+                            type="number"
+                            value={swapMinValue || ''}
+                            onChange={(e) => setSwapMinValue(Number(e.target.value) || 0)}
+                            placeholder="Ej. 3000000"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
                           />
-                          <label htmlFor="legalPublicDeed" className="text-xs font-bold text-brand-black cursor-pointer">
-                            Escritura Pública
-                          </label>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Valor Máximo Deseado</label>
+                          <input
+                            type="number"
+                            value={swapMaxValue || ''}
+                            onChange={(e) => setSwapMaxValue(Number(e.target.value) || 0)}
+                            placeholder="Ej. 6000000"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Diferencia Económica Máxima</label>
                           <input
-                            type="checkbox"
-                            id="legalTaxCurrent"
-                            checked={legalTaxCurrent}
-                            onChange={(e) => setLegalTaxCurrent(e.target.checked)}
-                            className="w-4 h-4 accent-brand-accent cursor-pointer"
+                            type="number"
+                            value={swapMaxCashDiff}
+                            onChange={(e) => setSwapMaxCashDiff(Number(e.target.value) || '')}
+                            placeholder="Monto en efectivo que puedes aportar o recibir"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
                           />
-                          <label htmlFor="legalTaxCurrent" className="text-xs font-bold text-brand-black cursor-pointer">
-                            Predial al Corriente
-                          </label>
                         </div>
-
-                        <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
-                          <input
-                            type="checkbox"
-                            id="legalIsMortgaged"
-                            checked={legalIsMortgaged}
-                            onChange={(e) => setLegalIsMortgaged(e.target.checked)}
-                            className="w-4 h-4 accent-brand-accent cursor-pointer"
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Prioridad del Intercambio</label>
+                          <CustomSelect
+                            value={swapPriority}
+                            onChange={(val) => setSwapPriority(val as any)}
+                            options={[
+                              { value: 'Alta', label: 'Alta (Urgente)' },
+                              { value: 'Media', label: 'Media (Estándar)' },
+                              { value: 'Baja', label: 'Baja (Informativo)' }
+                            ]}
                           />
-                          <label htmlFor="legalIsMortgaged" className="text-xs font-bold text-brand-black cursor-pointer">
-                            ¿Tiene Hipoteca activa?
-                          </label>
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-1.5 mt-2">
-                        <label className="text-xs font-bold text-brand-gray-500">Régimen de Propiedad</label>
-                        <select
-                          value={legalOwnerType}
-                          onChange={(e) => setLegalOwnerType(e.target.value)}
-                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
-                        >
-                          <option value="Privada">Propiedad Privada (Escriturada)</option>
-                          <option value="Ejidal">Ejidal / Posesión</option>
-                          <option value="Fideicomiso">Fideicomiso Bancario</option>
-                        </select>
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-[10px] font-black text-brand-gray-500 uppercase tracking-wider">¿Qué estás dispuesto a aceptar?</span>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                            <input
+                              type="checkbox"
+                              id="swapAcceptsDept"
+                              checked={swapAcceptsDept}
+                              onChange={(e) => setSwapAcceptsDept(e.target.checked)}
+                              className="w-4 h-4 accent-brand-accent cursor-pointer"
+                            />
+                            <label htmlFor="swapAcceptsDept" className="text-xs font-bold text-brand-black cursor-pointer">Acepto Departamento</label>
+                          </div>
+                          <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                            <input
+                              type="checkbox"
+                              id="swapAcceptsHouse"
+                              checked={swapAcceptsHouse}
+                              onChange={(e) => setSwapAcceptsHouse(e.target.checked)}
+                              className="w-4 h-4 accent-brand-accent cursor-pointer"
+                            />
+                            <label htmlFor="swapAcceptsHouse" className="text-xs font-bold text-brand-black cursor-pointer">Acepto Casa</label>
+                          </div>
+                          <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                            <input
+                              type="checkbox"
+                              id="swapAcceptsLand"
+                              checked={swapAcceptsLand}
+                              onChange={(e) => setSwapAcceptsLand(e.target.checked)}
+                              className="w-4 h-4 accent-brand-accent cursor-pointer"
+                            />
+                            <label htmlFor="swapAcceptsLand" className="text-xs font-bold text-brand-black cursor-pointer">Acepto Terreno</label>
+                          </div>
+                          <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                            <input
+                              type="checkbox"
+                              id="swapAcceptsVehicle"
+                              checked={swapAcceptsVehicle}
+                              onChange={(e) => setSwapAcceptsVehicle(e.target.checked)}
+                              className="w-4 h-4 accent-brand-accent cursor-pointer"
+                            />
+                            <label htmlFor="swapAcceptsVehicle" className="text-xs font-bold text-brand-black cursor-pointer">Acepto Vehículo / Auto</label>
+                          </div>
+                          <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white col-span-2">
+                            <input
+                              type="checkbox"
+                              id="swapAcceptsCash"
+                              checked={swapAcceptsCash}
+                              onChange={(e) => setSwapAcceptsCash(e.target.checked)}
+                              className="w-4 h-4 accent-brand-accent cursor-pointer"
+                            />
+                            <label htmlFor="swapAcceptsCash" className="text-xs font-bold text-brand-black cursor-pointer">Acepto Efectivo como compensación</label>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </motion.div>
                 )}
 
-                {/* STEP 7: Multimedia */}
+                {/* STEP 7: Condiciones de Renta */}
                 {step === 7 && (
                   <motion.div
                     key="step7"
+                    initial={{ opacity: 0, x: 15 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -15 }}
+                    className="flex flex-col gap-4 text-brand-black"
+                  >
+                    <div>
+                      <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
+                        <Calendar className="w-4 h-4" />
+                        <span>Paso 7: Condiciones y Tarifas de Renta</span>
+                      </h4>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Ingresa los precios de renta, depósito y condiciones de arrendamiento.</p>
+                    </div>
+
+                    <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
+                      {/* Price fields depending on short / monthly modes */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Renta Mensual ($ USD)</label>
+                          <input
+                            type="number"
+                            value={monthlyPrice}
+                            onChange={(e) => setMonthlyPrice(Number(e.target.value) || 0)}
+                            placeholder="Monto al mes"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Depósito Requerido ($ USD)</label>
+                          <input
+                            type="number"
+                            value={monthlyDeposit}
+                            onChange={(e) => setMonthlyDeposit(Number(e.target.value) || 0)}
+                            placeholder="Depósito de garantía"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Meses Adelantados</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={advanceMonths}
+                            onChange={(e) => setAdvanceMonths(Number(e.target.value) || 0)}
+                            placeholder="Ej. 1"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Plazo Mínimo (Meses)</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={shortMinNights}
+                            onChange={(e) => setShortMinNights(Number(e.target.value) || 1)}
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Disponible A Partir De</label>
+                          <input
+                            type="date"
+                            value={swapAvailableStart}
+                            onChange={(e) => setSwapAvailableStart(e.target.value)}
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Mantenimiento Incluido</label>
+                          <div className="flex items-center gap-2.5 p-3.5 rounded-xl border bg-white h-[42px]">
+                            <input
+                              type="checkbox"
+                              id="includesMaintenance"
+                              checked={includesMaintenance}
+                              onChange={(e) => setIncludesMaintenance(e.target.checked)}
+                              className="w-4 h-4 accent-brand-accent cursor-pointer"
+                            />
+                            <label htmlFor="includesMaintenance" className="text-xs font-bold text-brand-black cursor-pointer">Sí, incluido</label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                          <input
+                            type="checkbox"
+                            id="requiresGuarantor"
+                            checked={requiresGuarantor}
+                            onChange={(e) => setRequiresGuarantor(e.target.checked)}
+                            className="w-4 h-4 accent-brand-accent cursor-pointer"
+                          />
+                          <label htmlFor="requiresGuarantor" className="text-xs font-bold text-brand-black cursor-pointer">Aval Requerido</label>
+                        </div>
+                        <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                          <input
+                            type="checkbox"
+                            id="requiresLegalPolicy"
+                            checked={requiresLegalPolicy}
+                            onChange={(e) => setRequiresLegalPolicy(e.target.checked)}
+                            className="w-4 h-4 accent-brand-accent cursor-pointer"
+                          />
+                          <label htmlFor="requiresLegalPolicy" className="text-xs font-bold text-brand-black cursor-pointer">Póliza Jurídica</label>
+                        </div>
+                        <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                          <input
+                            type="checkbox"
+                            id="acceptsPets"
+                            checked={acceptsPets}
+                            onChange={(e) => setAcceptsPets(e.target.checked)}
+                            className="w-4 h-4 accent-brand-accent cursor-pointer"
+                          />
+                          <label htmlFor="acceptsPets" className="text-xs font-bold text-brand-black cursor-pointer">Acepta Mascotas</label>
+                        </div>
+                        <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                          <input
+                            type="checkbox"
+                            id="isFurnished"
+                            checked={isFurnished}
+                            onChange={(e) => setIsFurnished(e.target.checked)}
+                            className="w-4 h-4 accent-brand-accent cursor-pointer"
+                          />
+                          <label htmlFor="isFurnished" className="text-xs font-bold text-brand-black cursor-pointer">Amueblado</label>
+                        </div>
+                        <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white col-span-2">
+                          <input
+                            type="checkbox"
+                            id="includesServices"
+                            checked={includesServices}
+                            onChange={(e) => setIncludesServices(e.target.checked)}
+                            className="w-4 h-4 accent-brand-accent cursor-pointer"
+                          />
+                          <label htmlFor="includesServices" className="text-xs font-bold text-brand-black cursor-pointer">Servicios Incluidos (Agua/Luz/Internet)</label>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-brand-gray-500">Reglas del Inmueble</label>
+                        <textarea
+                          rows={2}
+                          value={rentRules}
+                          onChange={(e) => setRentRules(e.target.value)}
+                          placeholder="Ej. No fiestas, fumar solo en terraza, horario de ruido..."
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent resize-none text-brand-black"
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* STEP 8: Términos de Venta */}
+                {step === 8 && (
+                  <motion.div
+                    key="step8"
+                    initial={{ opacity: 0, x: 15 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -15 }}
+                    className="flex flex-col gap-4 text-brand-black"
+                  >
+                    <div>
+                      <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
+                        <FileText className="w-4 h-4" />
+                        <span>Paso 8: Términos y Legal de Venta</span>
+                      </h4>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Configura el precio de venta y las condiciones legales del expediente.</p>
+                    </div>
+
+                    <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Precio de Venta <span className="text-red-500">*</span></label>
+                          <input
+                            type="number"
+                            required
+                            value={salePrice}
+                            onChange={(e) => setSalePrice(Number(e.target.value) || 0)}
+                            placeholder="Monto total"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Moneda</label>
+                          <CustomSelect
+                            value={saleCurrency}
+                            onChange={(val) => setSaleCurrency(val)}
+                            options={[
+                              { value: 'MXN', label: 'MXN ($)' },
+                              { value: 'USD', label: 'USD ($)' }
+                            ]}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Mantenimiento Mensual ($)</label>
+                          <input
+                            type="number"
+                            value={maintenanceFee}
+                            onChange={(e) => setMaintenanceFee(Number(e.target.value) || '')}
+                            placeholder="Cuota de condominio"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Régimen de Propiedad</label>
+                          <CustomSelect
+                            value={legalOwnerType}
+                            onChange={(val) => setLegalOwnerType(val)}
+                            options={[
+                              { value: 'Privada', label: 'Propiedad Privada (Escriturada)' },
+                              { value: 'Ejidal', label: 'Ejidal / Posesión' },
+                              { value: 'Fideicomiso', label: 'Fideicomiso Bancario' }
+                            ]}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Valor de Avalúo Comercial</label>
+                          <input
+                            type="number"
+                            value={valuationAmount}
+                            onChange={(e) => setValuationAmount(Number(e.target.value) || '')}
+                            placeholder="Opcional"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Valor Catastral (Opcional)</label>
+                          <input
+                            type="number"
+                            value={catastralValue}
+                            onChange={(e) => setCatastralValue(Number(e.target.value) || '')}
+                            placeholder="Opcional"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5 mt-1">
+                        <span className="text-[10px] font-black text-brand-gray-500 uppercase tracking-wider">Condiciones Legales</span>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                            <input
+                              type="checkbox"
+                              id="legalDebtFree"
+                              checked={legalDebtFree}
+                              onChange={(e) => setLegalDebtFree(e.target.checked)}
+                              className="w-4 h-4 accent-brand-accent cursor-pointer"
+                            />
+                            <label htmlFor="legalDebtFree" className="text-xs font-bold text-brand-black cursor-pointer">Libre de Gravamen</label>
+                          </div>
+                          <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                            <input
+                              type="checkbox"
+                              id="legalPublicDeed"
+                              checked={legalPublicDeed}
+                              onChange={(e) => setLegalPublicDeed(e.target.checked)}
+                              className="w-4 h-4 accent-brand-accent cursor-pointer"
+                            />
+                            <label htmlFor="legalPublicDeed" className="text-xs font-bold text-brand-black cursor-pointer">Escritura Pública</label>
+                          </div>
+                          <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                            <input
+                              type="checkbox"
+                              id="legalTaxCurrent"
+                              checked={legalTaxCurrent}
+                              onChange={(e) => setLegalTaxCurrent(e.target.checked)}
+                              className="w-4 h-4 accent-brand-accent cursor-pointer"
+                            />
+                            <label htmlFor="legalTaxCurrent" className="text-xs font-bold text-brand-black cursor-pointer">Predial al Corriente</label>
+                          </div>
+                          <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                            <input
+                              type="checkbox"
+                              id="legalIsMortgaged"
+                              checked={legalIsMortgaged}
+                              onChange={(e) => setLegalIsMortgaged(e.target.checked)}
+                              className="w-4 h-4 accent-brand-accent cursor-pointer"
+                            />
+                            <label htmlFor="legalIsMortgaged" className="text-xs font-bold text-brand-black cursor-pointer">Tiene Hipoteca Activa</label>
+                          </div>
+                          <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white col-span-2">
+                            <input
+                              type="checkbox"
+                              id="condoRegime"
+                              checked={condoRegime}
+                              onChange={(e) => setCondoRegime(e.target.checked)}
+                              className="w-4 h-4 accent-brand-accent cursor-pointer"
+                            />
+                            <label htmlFor="condoRegime" className="text-xs font-bold text-brand-black cursor-pointer">Sujeto a Régimen de Condominio</label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* STEP 9: Multimedia */}
+                {step === 9 && (
+                  <motion.div
+                    key="step9"
                     initial={{ opacity: 0, x: 15 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -15 }}
@@ -1878,7 +2883,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                     <div>
                       <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
                         <Image className="w-4 h-4" />
-                        <span>Paso 7: Galería y Multimedia</span>
+                        <span>Paso 9: Galería y Multimedia</span>
                       </h4>
                       <p className="text-xs text-brand-gray-500 mt-0.5">Agrega las fotos oficiales y enlaces a recorridos virtuales 3D.</p>
                     </div>
@@ -1919,47 +2924,55 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                   </motion.div>
                 )}
 
-                {/* STEP 8: Información Comercial & SEO */}
-                {step === 8 && (
+                {/* STEP 10: Esquema Comercial */}
+                {step === 10 && (
                   <motion.div
-                    key="step8"
+                    key="step10"
                     initial={{ opacity: 0, x: 15 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -15 }}
-                    className="flex flex-col gap-4"
+                    className="flex flex-col gap-4 text-brand-black"
                   >
                     <div>
                       <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
                         <Briefcase className="w-4 h-4" />
-                        <span>Paso 8: Comercial & SEO</span>
+                        <span>Paso 10: Esquema Comercial</span>
                       </h4>
-                      <p className="text-xs text-brand-gray-500 mt-0.5">Configura exclusivas, comisiones de red y meta etiquetas para buscadores.</p>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Configura las comisiones compartidas de la red y la exclusividad del inmueble.</p>
                     </div>
 
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
-                        <input
-                          type="checkbox"
-                          id="isExclusive"
-                          checked={isExclusive}
-                          onChange={(e) => setIsExclusive(e.target.checked)}
-                          className="w-4 h-4 accent-brand-accent cursor-pointer"
-                        />
-                        <label htmlFor="isExclusive" className="text-xs font-bold text-brand-black cursor-pointer">
-                          Ficha en Exclusiva
-                        </label>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-1.5 p-3.5 rounded-2xl border bg-white">
+                        <div className="flex items-center gap-2.5">
+                          <input
+                            type="checkbox"
+                            id="isExclusive"
+                            checked={isExclusive}
+                            onChange={(e) => setIsExclusive(e.target.checked)}
+                            className="w-4 h-4 accent-brand-accent cursor-pointer"
+                          />
+                          <label htmlFor="isExclusive" className="text-xs font-bold text-brand-black cursor-pointer">
+                            Ficha en Exclusiva
+                          </label>
+                        </div>
+                        <p className="text-[10px] text-brand-gray-400 leading-normal mt-0.5">
+                          Al marcar esto, confirmas que posees los derechos exclusivos de promoción y comercialización del inmueble. Las propiedades en exclusiva reciben hasta un 40% más de visibilidad en el feed y búsquedas de AuraSwap.
+                        </p>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-bold text-brand-gray-500">Comisión Total (%)</label>
                           <input
                             type="number"
                             value={commissionTotalPct}
                             onChange={(e) => setCommissionTotalPct(e.target.value === '' ? '' : Number(e.target.value))}
-                            placeholder="Ej. 5%"
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
+                            placeholder="Ej. 5"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
                           />
+                          <p className="text-[9px] text-brand-gray-400 leading-normal">
+                            Comisión total pactada con el cliente propietario para la operación.
+                          </p>
                         </div>
 
                         <div className="flex flex-col gap-1.5">
@@ -1968,52 +2981,40 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                             type="number"
                             value={commissionSharedPct}
                             onChange={(e) => setCommissionSharedPct(e.target.value === '' ? '' : Number(e.target.value))}
-                            placeholder="Ej. 2.5%"
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
+                            placeholder="Ej. 2.5"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
                           />
+                          <p className="text-[9px] text-brand-gray-400 leading-normal">
+                            Comisión que compartes con el broker co-operador que traiga el cliente final.
+                          </p>
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500">Meta Title SEO</label>
-                        <input
-                          type="text"
-                          value={metaTitle}
-                          onChange={(e) => setMetaTitle(e.target.value)}
-                          placeholder="Ej. Mansión en Renta Culiacán Tres Ríos"
-                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500">Meta Description SEO</label>
-                        <input
-                          type="text"
-                          value={metaDescription}
-                          onChange={(e) => setMetaDescription(e.target.value)}
-                          placeholder="Descripción breve para motores de búsqueda..."
-                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
-                        />
+                      <div className="p-3 bg-brand-gray-50/50 border border-dashed rounded-2xl flex flex-col gap-1 mt-2">
+                        <span className="text-[10px] font-black text-brand-black uppercase tracking-wider">Optimización SEO Inteligente</span>
+                        <p className="text-[10px] text-brand-gray-500 leading-normal">
+                          Para tu comodidad, las etiquetas Meta Title, Meta Description y OpenGraph se generarán automáticamente en segundo plano utilizando inteligencia artificial a partir de los datos cargados en el paso 1.
+                        </p>
                       </div>
                     </div>
                   </motion.div>
                 )}
 
-                {/* STEP 9: Vista Previa y Publicación */}
-                {step === 9 && (
+                {/* STEP 11: Vista Previa y Publicación */}
+                {step === 11 && (
                   <motion.div
-                    key="step9"
+                    key="step11"
                     initial={{ opacity: 0, x: 15 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -15 }}
-                    className="flex flex-col gap-4"
+                    className="flex flex-col gap-4 text-brand-black"
                   >
                     <div>
                       <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
                         <Sparkles className="w-4 h-4" />
-                        <span>Paso 9: Vista Previa</span>
+                        <span>Paso 11: Vista Previa y Calidad</span>
                       </h4>
-                      <p className="text-xs text-brand-gray-500 mt-0.5">Valida el resumen técnico del anuncio antes de guardarlo en base de datos.</p>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Valida el resumen técnico y el checklist de calidad antes de guardar el anuncio.</p>
                     </div>
 
                     <div className="border border-brand-gray-200 rounded-2xl p-4 bg-brand-gray-50/50 flex flex-col gap-3">
@@ -2046,10 +3047,74 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                         </div>
                       </div>
                     </div>
+
+                    {/* Pre-publication Checklist */}
+                    <div className="flex flex-col gap-2 mt-2">
+                      <span className="text-[10px] font-black text-brand-gray-500 uppercase tracking-wider">Checklist de Calidad del Anuncio</span>
+                      <div className="flex flex-col gap-2 p-3 bg-brand-gray-50 rounded-2xl border">
+                        {/* Checklist items */}
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-brand-gray-600">Título y descripción básica</span>
+                          <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-brand-gray-600">Ubicación georreferenciada</span>
+                          <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-brand-gray-600">Canales de operación configurados</span>
+                          <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-brand-gray-600">Imágenes cargadas ({images.length})</span>
+                          {images.length >= 5 ? (
+                            <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                          ) : (
+                            <span className="text-amber-500 font-bold flex items-center gap-1">⚠ Recomendado subir 5+</span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-brand-gray-600">Video recorrido</span>
+                          {videoPlaceholder ? (
+                            <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                          ) : (
+                            <span className="text-brand-gray-400 font-normal">Opcional (sin video)</span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-brand-gray-600">Recorrido virtual 3D</span>
+                          {virtualTourPlaceholder ? (
+                            <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                          ) : (
+                            <span className="text-brand-gray-400 font-normal">Opcional (sin Matterport)</span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-brand-gray-600">Amenidades ({selectedAmenities.length + customAmenities.length})</span>
+                          {selectedAmenities.length + customAmenities.length >= 5 ? (
+                            <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                          ) : (
+                            <span className="text-amber-500 font-bold flex items-center gap-1">⚠ Recomendado seleccionar 5+</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
+
+            {/* Inline Validation Alert */}
+            {validationError && (
+              <motion.div 
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-brand-rose/5 border border-brand-rose/10 rounded-2xl p-3 text-xs text-brand-rose font-semibold mt-4 flex items-center gap-2 shrink-0 z-10"
+              >
+                <AlertTriangle className="w-4 h-4 shrink-0 text-brand-rose animate-pulse" />
+                <span>{validationError}</span>
+              </motion.div>
+            )}
 
             {/* Stepper Navigation Buttons */}
             <div className="border-t border-brand-gray-100 pt-4 mt-6 shrink-0 flex items-center justify-between bg-white z-10">
@@ -2065,7 +3130,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                 <span>Atrás</span>
               </button>
 
-              {step === 9 ? (
+              {step === 11 ? (
                 <button
                   type="button"
                   onClick={handlePublish}
@@ -2078,18 +3143,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                 <button
                   type="button"
                   onClick={handleNext}
-                  disabled={
-                    (step === 1 && (!title || !description)) ||
-                    (step === 2 && (!location || !country)) ||
-                    (step === 3 && selectedModes.length === 0)
-                  }
-                  className={`px-6 py-3 bg-brand-black hover:bg-brand-black/90 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 ${
-                    ((step === 1 && (!title || !description)) ||
-                     (step === 2 && (!location || !country)) ||
-                     (step === 3 && selectedModes.length === 0))
-                      ? 'opacity-40 cursor-not-allowed shadow-none'
-                      : ''
-                  }`}
+                  className="px-6 py-3 bg-brand-black hover:bg-brand-black/90 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
                 >
                   <span>Siguiente</span>
                   <ChevronRight className="w-4 h-4" />
