@@ -162,18 +162,26 @@ interface CustomSelectProps<T> {
   onChange: (value: T) => void;
   options: { value: T; label: string }[];
   placeholder?: string;
+  /** Optional ref to the scroll container — used to scroll-into-view before opening */
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 function CustomSelect<T extends string>({
   value,
   onChange,
   options,
-  placeholder = "Seleccionar..."
+  placeholder = "Seleccionar...",
+  scrollContainerRef,
 }: CustomSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  // Close on outside click
   useEffect(() => {
+    if (!isOpen) return;
     const handleOutsideClick = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
@@ -181,29 +189,89 @@ function CustomSelect<T extends string>({
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, []);
+  }, [isOpen]);
+
+  // Close on scroll of the form container
+  useEffect(() => {
+    if (!isOpen) return;
+    const el = scrollContainerRef?.current;
+    if (!el) return;
+    const handleScroll = () => setIsOpen(false);
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [isOpen, scrollContainerRef]);
+
+  const MENU_MAX_H = 208; // px — matches max-h-52
+  const SPACE_THRESHOLD = 12; // px of breathing room
+
+  const handleOpen = () => {
+    if (isOpen) {
+      setIsOpen(false);
+      return;
+    }
+
+    const trigger = triggerRef.current;
+    if (!trigger) { setIsOpen(true); return; }
+
+    const rect = trigger.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom - SPACE_THRESHOLD;
+    const spaceAbove = rect.top - SPACE_THRESHOLD;
+    const needsUp = spaceBelow < MENU_MAX_H && spaceAbove > spaceBelow;
+
+    if (needsUp) {
+      // Open upward — anchor bottom of menu to top of trigger
+      setDropUp(true);
+      setMenuStyle({
+        position: 'fixed',
+        top: 'auto',
+        bottom: window.innerHeight - rect.top + 4,
+        left: rect.left,
+        width: rect.width,
+        zIndex: 9999,
+      });
+    } else {
+      // Open downward — if not enough space, scroll the container first
+      setDropUp(false);
+      if (spaceBelow < MENU_MAX_H && scrollContainerRef?.current) {
+        const needed = MENU_MAX_H - spaceBelow;
+        scrollContainerRef.current.scrollBy({ top: needed + 16, behavior: 'smooth' });
+      }
+      setMenuStyle({
+        position: 'fixed',
+        top: rect.bottom + 4,
+        bottom: 'auto',
+        left: rect.left,
+        width: rect.width,
+        zIndex: 9999,
+      });
+    }
+    setIsOpen(true);
+  };
 
   const selectedOption = options.find(o => o.value === value);
 
   return (
     <div ref={containerRef} className="relative w-full">
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleOpen}
         className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none flex items-center justify-between text-left cursor-pointer hover:border-brand-gray-400 transition-all text-brand-black"
       >
         <span>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <ChevronDown className={`w-4 h-4 text-brand-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-brand-gray-400 transition-transform duration-200 ${isOpen ? (dropUp ? '' : 'rotate-180') : ''}`} />
       </button>
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -4 }}
+            initial={{ opacity: 0, y: dropUp ? 4 : -4 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            className="absolute z-50 w-full mt-1.5 max-h-52 overflow-y-auto bg-white border border-brand-gray-200 rounded-xl shadow-premium no-scrollbar"
+            exit={{ opacity: 0, y: dropUp ? 4 : -4 }}
+            transition={{ duration: 0.15 }}
+            style={menuStyle}
+            className="max-h-52 overflow-y-auto bg-white border border-brand-gray-200 rounded-xl shadow-premium no-scrollbar"
           >
             <div className="p-1 flex flex-col gap-0.5">
               {options.map(option => (
@@ -215,8 +283,8 @@ function CustomSelect<T extends string>({
                     setIsOpen(false);
                   }}
                   className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    option.value === value 
-                      ? 'bg-brand-black text-white' 
+                    option.value === value
+                      ? 'bg-brand-black text-white'
                       : 'hover:bg-brand-gray-50 text-brand-gray-600'
                   }`}
                 >
@@ -251,17 +319,12 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
   });
   const [hasReviewedAll, setHasReviewedAll] = useState(false);
 
-  // Reset scroll state & position on step change
-  useEffect(() => {
-    setHasReviewedAll(false);
-    const el = scrollAreaRef.current;
-    if (el) el.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
-  }, [step]);
-
-  // Track scroll position and overflow
+  // Single persistent scroll tracker — survives step changes and dynamic content
   useEffect(() => {
     const el = scrollAreaRef.current;
     if (!el) return;
+
+    let rafId: number;
 
     const update = () => {
       const { scrollTop, scrollHeight, clientHeight } = el;
@@ -277,16 +340,57 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       if (atBottom && maxScroll > 8) setHasReviewedAll(true);
     };
 
-    update();
-    el.addEventListener('scroll', update, { passive: true });
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    // also observe children in case content is added dynamically
-    Array.from(el.children).forEach(c => ro.observe(c));
-    return () => {
-      el.removeEventListener('scroll', update);
-      ro.disconnect();
+    // Debounced rAF update so rapid DOM mutations don't thrash state
+    const scheduleUpdate = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(update);
     };
+
+    el.addEventListener('scroll', scheduleUpdate, { passive: true });
+
+    // ResizeObserver on the container itself — catches viewport/layout changes
+    const ro = new ResizeObserver(scheduleUpdate);
+    ro.observe(el);
+
+    // MutationObserver on the subtree — catches content added/removed inside steps
+    const mo = new MutationObserver(scheduleUpdate);
+    mo.observe(el, { childList: true, subtree: true, attributes: false, characterData: false });
+
+    // Initial measurement (use rAF so Framer Motion animations have a chance to start)
+    scheduleUpdate();
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      el.removeEventListener('scroll', scheduleUpdate);
+      ro.disconnect();
+      mo.disconnect();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // ← runs ONCE on mount, observers stay alive for the full modal lifetime
+
+  // On step change: scroll to top and reset "reviewed all" flag
+  useEffect(() => {
+    setHasReviewedAll(false);
+    // Small delay so Framer Motion can swap content before we measure
+    const id = setTimeout(() => {
+      const el = scrollAreaRef.current;
+      if (el) {
+        el.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+        // Force a re-measurement after the animation frame
+        requestAnimationFrame(() => {
+          const { scrollTop, scrollHeight, clientHeight } = el;
+          const maxScroll = Math.max(0, scrollHeight - clientHeight);
+          const atBottom = scrollTop >= maxScroll - 12;
+          setScrollInfo({
+            canScrollUp: false,
+            canScrollDown: !atBottom && maxScroll > 8,
+            scrollPct: 0,
+            hasOverflow: maxScroll > 8,
+          });
+        });
+      }
+    }, 80); // 80 ms — Framer exit+enter is 150ms total, this runs mid-animation
+    return () => clearTimeout(id);
   }, [step]);
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -1635,7 +1739,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
           exit={{ scale: 0.95, y: 15 }}
           role="dialog"
           aria-modal="true"
-          className="relative z-10 w-full max-w-5xl bg-white rounded-3xl p-6 md:p-8 shadow-floating border border-brand-gray-200/60 overflow-hidden flex flex-col md:grid md:grid-cols-12 gap-8 md:h-[82vh] md:max-h-[720px] md:min-h-[580px]"
+          className="relative z-10 w-full max-w-5xl bg-white rounded-3xl p-6 md:p-8 shadow-floating border border-brand-gray-200/60 overflow-hidden flex flex-col md:grid md:grid-cols-12 gap-8 md:h-[90vh] md:max-h-[860px] md:min-h-[580px]"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header Close button */}
@@ -2035,6 +2139,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                             { value: 'Local Comercial', label: 'Local Comercial' }
                           ]}
                           placeholder="Selecciona el tipo de inmueble..."
+                          scrollContainerRef={scrollAreaRef}
                         />
                       </div>
                     </div>
@@ -2302,6 +2407,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                               { value: 'Minimalist', label: 'Minimalista' },
                               { value: 'Rustic', label: 'Rústica' }
                             ]}
+                            scrollContainerRef={scrollAreaRef}
                           />
                         </div>
                         <div className="flex flex-col gap-1">
@@ -2316,6 +2422,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                               { value: 'Remodelado', label: 'Remodelado' },
                               { value: 'Para remodelar', label: 'Requiere remodelación' }
                             ]}
+                            scrollContainerRef={scrollAreaRef}
                           />
                         </div>
                       </div>
@@ -2580,6 +2687,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                               { value: 'Media', label: 'Media (Estándar)' },
                               { value: 'Baja', label: 'Baja (Informativo)' }
                             ]}
+                            scrollContainerRef={scrollAreaRef}
                           />
                         </div>
                       </div>
@@ -2840,6 +2948,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                               { value: 'MXN', label: 'MXN ($)' },
                               { value: 'USD', label: 'USD ($)' }
                             ]}
+                            scrollContainerRef={scrollAreaRef}
                           />
                         </div>
                       </div>
@@ -2865,6 +2974,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                               { value: 'Ejidal', label: 'Ejidal / Posesión' },
                               { value: 'Fideicomiso', label: 'Fideicomiso Bancario' }
                             ]}
+                            scrollContainerRef={scrollAreaRef}
                           />
                         </div>
                       </div>
