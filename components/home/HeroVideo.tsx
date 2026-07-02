@@ -53,6 +53,31 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
     console.log("[MOBILE TAP] HeroVideo hydrated");
   }, [addDebugLog]);
 
+  const activationLockRef = useRef<boolean>(false);
+
+  const activateConversation = useCallback((sourceEvent: string) => {
+    if (activationLockRef.current) return;
+    activationLockRef.current = true;
+    setTimeout(() => {
+      activationLockRef.current = false;
+    }, 300);
+
+    console.log(`[ACTIVATE] activateConversation() via ${sourceEvent}`);
+    addDebugLog(`[ACTIVATE] activateConversation() via ${sourceEvent}`);
+
+    console.log("[ACTIVATE] calling window.__eternaStartVoice");
+    addDebugLog("[ACTIVATE] calling window.__eternaStartVoice");
+
+    if (typeof window !== 'undefined' && (window as any).__eternaStartVoice) {
+      (window as any).__eternaStartVoice();
+    } else {
+      startVoice();
+    }
+
+    console.log("[ACTIVATE] finished");
+    addDebugLog("[ACTIVATE] finished");
+  }, [startVoice, addDebugLog]);
+
   const getRandomTalkingVideo = useCallback(() => {
     const filtered = TALKING_VIDEOS.filter(v => v !== lastTalkingVideoRef.current);
     const selected = filtered[Math.floor(Math.random() * filtered.length)];
@@ -140,19 +165,17 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
       onClick={() => {
         addDebugLog("Click fired (Outer)");
         console.log("[MOBILE TAP] HeroVideo onClick");
-        if (typeof window !== 'undefined' && (window as any).__eternaStartVoice) {
-          (window as any).__eternaStartVoice();
-        } else {
-          startVoice();
-        }
+        activateConversation("Click (Outer)");
       }}
       onPointerDown={(e) => {
         addDebugLog(`PointerDown fired (Outer). pointerType: ${(e.nativeEvent as any).pointerType || 'n/a'}`);
         console.log("[MOBILE TAP] HeroVideo onPointerDown");
+        activateConversation("PointerDown (Outer)");
       }}
       onTouchStart={() => {
         addDebugLog("TouchStart fired (Outer)");
         console.log("[MOBILE TAP] HeroVideo onTouchStart");
+        activateConversation("TouchStart (Outer)");
       }}
       className="relative flex items-center justify-center select-none w-full max-w-[340px] sm:max-w-[360px] mx-auto rounded-[32px] p-[3px] transition-all duration-300 ease-in-out mt-2 lg:mt-4 cursor-pointer"
       style={{ 
@@ -191,19 +214,20 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
             addDebugLog(`window.__eternaStartVoice exists: ${typeof (window as any).__eternaStartVoice === 'function'}`);
 
             e.stopPropagation();
-            if (typeof window !== 'undefined' && (window as any).__eternaStartVoice) {
-              (window as any).__eternaStartVoice();
-            } else {
-              startVoice();
-            }
+            activateConversation("Click (Overlay)");
           }}
           onPointerDown={(e) => {
-            addDebugLog(`PointerDown fired (Overlay). pointerType: ${(e.nativeEvent as any).pointerType || 'n/a'}`);
+            const pType = (e.nativeEvent as any).pointerType || 'n/a';
+            addDebugLog(`PointerDown fired (Overlay). pointerType: ${pType}`);
             console.log("[MOBILE TAP] HeroVideo onPointerDown (Overlay)");
+            e.stopPropagation();
+            activateConversation("PointerDown (Overlay)");
           }}
-          onTouchStart={() => {
+          onTouchStart={(e) => {
             addDebugLog("TouchStart fired (Overlay)");
             console.log("[MOBILE TAP] HeroVideo onTouchStart (Overlay)");
+            e.stopPropagation();
+            activateConversation("TouchStart (Overlay)");
           }}
           className="absolute inset-0 z-20 cursor-pointer bg-transparent"
         />
