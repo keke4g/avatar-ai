@@ -30,6 +30,29 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
   const [opacity, setOpacity] = useState(1);
   const lastTalkingVideoRef = useRef<string>("");
 
+  const addDebugLog = useCallback((msg: string) => {
+    if (typeof window !== 'undefined') {
+      if ((window as any).__eternaAddDebugLog) {
+        (window as any).__eternaAddDebugLog(msg);
+      } else {
+        (window as any).__eternaDebugLogs = (window as any).__eternaDebugLogs || [];
+        (window as any).__eternaDebugLogs.push({ time: new Date().toLocaleTimeString(), message: msg });
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    addDebugLog("HeroVideo mounted");
+    console.log("[MOBILE TAP] HeroVideo mounted");
+  }, [addDebugLog]);
+
+  const [isHydrated, setIsHydrated] = useState(false);
+  useEffect(() => {
+    setIsHydrated(true);
+    addDebugLog("HeroVideo hydrated");
+    console.log("[MOBILE TAP] HeroVideo hydrated");
+  }, [addDebugLog]);
+
   const getRandomTalkingVideo = useCallback(() => {
     const filtered = TALKING_VIDEOS.filter(v => v !== lastTalkingVideoRef.current);
     const selected = filtered[Math.floor(Math.random() * filtered.length)];
@@ -115,11 +138,21 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
   return (
     <div 
       onClick={() => {
+        addDebugLog("Click fired (Outer)");
+        console.log("[MOBILE TAP] HeroVideo onClick");
         if (typeof window !== 'undefined' && (window as any).__eternaStartVoice) {
           (window as any).__eternaStartVoice();
         } else {
           startVoice();
         }
+      }}
+      onPointerDown={(e) => {
+        addDebugLog(`PointerDown fired (Outer). pointerType: ${(e.nativeEvent as any).pointerType || 'n/a'}`);
+        console.log("[MOBILE TAP] HeroVideo onPointerDown");
+      }}
+      onTouchStart={() => {
+        addDebugLog("TouchStart fired (Outer)");
+        console.log("[MOBILE TAP] HeroVideo onTouchStart");
       }}
       className="relative flex items-center justify-center select-none w-full max-w-[340px] sm:max-w-[360px] mx-auto rounded-[32px] p-[3px] transition-all duration-300 ease-in-out mt-2 lg:mt-4 cursor-pointer"
       style={{ 
@@ -139,12 +172,38 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
         {/* Transparent click/tap interceptor overlay to bypass mobile browser native media player click capture */}
         <div 
           onClick={(e) => {
+            console.log("[MOBILE TAP] HeroVideo onClick (Overlay) fired");
+            console.log("[MOBILE TAP] event.target:", e.target);
+            console.log("[MOBILE TAP] event.currentTarget:", e.currentTarget);
+            
+            const pType = (e.nativeEvent as any).pointerType || 'n/a';
+            const targetTag = e.target ? (e.target as HTMLElement).tagName + '.' + (e.target as HTMLElement).className.split(' ').join('.') : 'n/a';
+            const currentTargetTag = e.currentTarget ? (e.currentTarget as HTMLElement).tagName + '.' + (e.currentTarget as HTMLElement).className.split(' ').join('.') : 'n/a';
+            let elFromPoint = 'n/a';
+            if (e.clientX && e.clientY) {
+              const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY);
+              elFromPoint = elementAtPoint ? elementAtPoint.tagName + '.' + elementAtPoint.className.split(' ').join('.') : 'null';
+              console.log("[MOBILE TAP] elementFromPoint at (" + e.clientX + ", " + e.clientY + "):", elementAtPoint);
+            }
+            console.log("[MOBILE TAP] window.__eternaStartVoice exists:", typeof (window as any).__eternaStartVoice === 'function');
+            
+            addDebugLog(`Overlay clicked! type: ${e.type}, pointerType: ${pType}, target: ${targetTag}, currentTarget: ${currentTargetTag}, X/Y: (${e.clientX}, ${e.clientY}), elementFromPoint: ${elFromPoint}`);
+            addDebugLog(`window.__eternaStartVoice exists: ${typeof (window as any).__eternaStartVoice === 'function'}`);
+
             e.stopPropagation();
             if (typeof window !== 'undefined' && (window as any).__eternaStartVoice) {
               (window as any).__eternaStartVoice();
             } else {
               startVoice();
             }
+          }}
+          onPointerDown={(e) => {
+            addDebugLog(`PointerDown fired (Overlay). pointerType: ${(e.nativeEvent as any).pointerType || 'n/a'}`);
+            console.log("[MOBILE TAP] HeroVideo onPointerDown (Overlay)");
+          }}
+          onTouchStart={() => {
+            addDebugLog("TouchStart fired (Overlay)");
+            console.log("[MOBILE TAP] HeroVideo onTouchStart (Overlay)");
           }}
           className="absolute inset-0 z-20 cursor-pointer bg-transparent"
         />

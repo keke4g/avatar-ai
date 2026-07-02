@@ -162,6 +162,17 @@ interface UseEternaVoiceProps {
   setSimulatedText: Dispatch<SetStateAction<string>>;
 }
 
+const addVoiceDebugLog = (msg: string) => {
+  if (typeof window !== 'undefined') {
+    if ((window as any).__eternaAddDebugLog) {
+      (window as any).__eternaAddDebugLog(msg);
+    } else {
+      (window as any).__eternaDebugLogs = (window as any).__eternaDebugLogs || [];
+      (window as any).__eternaDebugLogs.push({ time: new Date().toLocaleTimeString(), message: msg });
+    }
+  }
+};
+
 export function useEternaVoice({
   language,
   isConnected,
@@ -212,19 +223,26 @@ export function useEternaVoice({
   };
 
   const enterListeningState = useCallback(() => {
+    addVoiceDebugLog(`enterListeningState called. voiceMode: ${voiceModeRef.current}, recognition exists: ${!!recognitionRef.current}`);
+    console.log("[MOBILE TAP] enterListeningState called. voiceMode =", voiceModeRef.current, "recognition exists =", !!recognitionRef.current);
     if (!voiceModeRef.current || !recognitionRef.current) return;
     
     if (voiceStateRef.current === 'LISTENING' && recognitionActiveRef.current) {
+      addVoiceDebugLog("enterListeningState: already listening");
+      console.log("[MOBILE TAP] enterListeningState: already listening");
       return;
     }
 
+    addVoiceDebugLog("transitionToState('LISTENING')");
     transitionToState('LISTENING');
 
     if (!recognitionActiveRef.current) {
       try {
         console.log('[VOICE STATE] recognition started');
+        addVoiceDebugLog("recognition.start() called");
         recognitionRef.current.start();
-      } catch (e) {
+      } catch (e: any) {
+        addVoiceDebugLog(`recognition.start() failed: ${e?.message || e}`);
         console.warn('[Eterna Voice] start failed:', e);
       }
     }
@@ -458,6 +476,8 @@ export function useEternaVoice({
   }, []);
 
   const startConversationMode = useCallback(() => {
+    addVoiceDebugLog(`startConversationMode called. voiceMode before: ${voiceModeRef.current}`);
+    console.log("[MOBILE TAP] startConversationMode before: voiceMode =", voiceModeRef.current);
     setVoiceMode(true);
     voiceModeRef.current = true; // Synchronously update ref to avoid React state batching delays
     if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -474,9 +494,13 @@ export function useEternaVoice({
     pendingUtteranceRef.current = null;
 
     enterListeningState();
+    addVoiceDebugLog(`startConversationMode completed. voiceMode after: ${voiceModeRef.current}`);
+    console.log("[MOBILE TAP] startConversationMode after: voiceMode =", voiceModeRef.current);
   }, []);
 
   const stopConversationMode = useCallback(() => {
+    addVoiceDebugLog(`stopConversationMode called. voiceMode before: ${voiceModeRef.current}`);
+    console.log("[MOBILE TAP] stopConversationMode before: voiceMode =", voiceModeRef.current);
     setVoiceMode(false);
     voiceModeRef.current = false; // Synchronously update ref
     transitionToState('disabled');
@@ -504,10 +528,15 @@ export function useEternaVoice({
     setPartialTranscript('');
     setSimulatedStatusRef.current?.('idle');
     setThinkingContextRef.current?.('general');
+    addVoiceDebugLog(`stopConversationMode completed. voiceMode after: ${voiceModeRef.current}`);
+    console.log("[MOBILE TAP] stopConversationMode after: voiceMode =", voiceModeRef.current);
   }, []);
 
   const toggleVoiceMode = useCallback(() => {
+    addVoiceDebugLog(`toggleVoiceMode called. supported: ${speechRecognitionSupportedRef.current}, active: ${voiceModeRef.current}`);
+    console.log("[MOBILE TAP] toggleVoiceMode: supported =", speechRecognitionSupportedRef.current, "active =", voiceModeRef.current);
     if (!speechRecognitionSupportedRef.current) {
+      addVoiceDebugLog("toggleVoiceMode: speech recognition not supported, appending warning message");
       setChatHistoryRef.current?.(prev => [...prev, { 
         role: 'assistant', 
         content: languageRef.current === 'es' ? 'Tu navegador no soporta conversación por voz.' : 'Your browser does not support voice conversation.' 

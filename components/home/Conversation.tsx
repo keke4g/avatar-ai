@@ -16,6 +16,10 @@ export default function Conversation({ searchInput, setSearchInput, isDark }: Co
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    console.log("[MOBILE TAP] Conversation mounted");
+  }, []);
+
+  useEffect(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTo({
         top: scrollContainerRef.current.scrollHeight,

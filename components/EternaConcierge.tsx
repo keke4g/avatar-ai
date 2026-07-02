@@ -179,6 +179,22 @@ export default function EternaConcierge() {
     setSimulatedText
   });
 
+  const addDebugLog = useCallback((msg: string) => {
+    if (typeof window !== 'undefined') {
+      if ((window as any).__eternaAddDebugLog) {
+        (window as any).__eternaAddDebugLog(msg);
+      } else {
+        (window as any).__eternaDebugLogs = (window as any).__eternaDebugLogs || [];
+        (window as any).__eternaDebugLogs.push({ time: new Date().toLocaleTimeString(), message: msg });
+      }
+    }
+  }, []);
+
+  // Track key voice and conversation states
+  useEffect(() => {
+    addDebugLog(`EternaState: listening=${isListening}, voiceState=${voiceState}, voiceMode=${voiceMode}, speechRecognitionSupported=${speechRecognitionSupported}`);
+  }, [isListening, voiceState, voiceMode, speechRecognitionSupported, addDebugLog]);
+
   const textEndRef = useRef<HTMLDivElement>(null);
   const greetingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -205,12 +221,16 @@ export default function EternaConcierge() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       (window as any).__eternaStartVoice = () => {
+        addDebugLog(`__eternaStartVoice invoked. voiceMode: ${voiceMode}, speechRecognitionSupported: ${speechRecognitionSupported}`);
+        console.log("[MOBILE TAP] __eternaStartVoice handler fired, voiceMode before:", voiceMode);
         setIsOpen(true);
         if (voiceMode) {
           stopVoiceMode();
         } else {
           handleVoiceButtonClick();
         }
+        addDebugLog("__eternaStartVoice completed");
+        console.log("[MOBILE TAP] __eternaStartVoice completed");
       };
     }
     return () => {
@@ -218,7 +238,7 @@ export default function EternaConcierge() {
         delete (window as any).__eternaStartVoice;
       }
     };
-  }, [voiceMode, handleVoiceButtonClick, stopVoiceMode]);
+  }, [voiceMode, handleVoiceButtonClick, stopVoiceMode, speechRecognitionSupported, addDebugLog]);
 
   // Auto-focus input when the chat card is opened (MEJORA UX #1)
   useEffect(() => {

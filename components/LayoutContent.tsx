@@ -4,6 +4,7 @@ import { useLayoutContext } from "../lib/context/LayoutContext";
 import Navbar from "./Navbar";
 import EternaConcierge from "./EternaConcierge";
 import Footer from "./Footer";
+import DebugOverlay from "./DebugOverlay";
 
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
   const { hideHeader, hideFooter } = useLayoutContext();
@@ -12,6 +13,7 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
     <div className="flex flex-col min-h-screen">
       {!hideHeader && <Navbar />}
       <EternaConcierge />
+      <DebugOverlay />
       <main className={`flex-grow ${hideHeader ? "" : "pt-24 pb-16"}`}>
         {children}
       </main>
