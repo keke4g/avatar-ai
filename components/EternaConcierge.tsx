@@ -190,6 +190,67 @@ export default function EternaConcierge() {
     }
   }, []);
 
+  const [micPermissionDeniedOpen, setMicPermissionDeniedOpen] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
+
+  const checkMicPermission = useCallback(async (): Promise<'granted' | 'prompt' | 'denied'> => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices) return 'prompt';
+    try {
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const result = await navigator.permissions.query({ name: 'microphone' as any });
+          if (result.state === 'granted') return 'granted';
+          if (result.state === 'denied') return 'denied';
+          return 'prompt';
+        } catch (e) {
+          // Fallback if query for "microphone" rejects
+        }
+      }
+      
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasLabels = devices.some(device => device.kind === 'audioinput' && device.label !== '');
+      if (hasLabels) return 'granted';
+      return 'prompt';
+    } catch (error) {
+      return 'prompt';
+    }
+  }, []);
+
+  const requestMicPermission = useCallback(async (): Promise<boolean> => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices) return false;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+      return true;
+    } catch (err: any) {
+      console.warn("Microphone access denied:", err);
+      return false;
+    }
+  }, []);
+
+  const handleMicButtonClickWithPermission = useCallback(async () => {
+    addDebugLog("[PERMISSION] handleMicButtonClickWithPermission triggered");
+    if (voiceMode) {
+      addDebugLog("[PERMISSION] voiceMode is active (muting), bypassing check");
+      handleVoiceButtonClick();
+      return;
+    }
+    const permission = await checkMicPermission();
+    addDebugLog(`[PERMISSION] checked state: ${permission}`);
+    if (permission === 'granted') {
+      handleVoiceButtonClick();
+    } else if (permission === 'prompt') {
+      const allowed = await requestMicPermission();
+      if (allowed) {
+        handleVoiceButtonClick();
+      } else {
+        setMicPermissionDeniedOpen(true);
+      }
+    } else {
+      setMicPermissionDeniedOpen(true);
+    }
+  }, [voiceMode, checkMicPermission, requestMicPermission, handleVoiceButtonClick, addDebugLog]);
+
   // Track key voice and conversation states
   useEffect(() => {
     addDebugLog(`EternaState: listening=${isListening}, voiceState=${voiceState}, voiceMode=${voiceMode}, speechRecognitionSupported=${speechRecognitionSupported}`);
@@ -220,14 +281,34 @@ export default function EternaConcierge() {
   // Expose a synchronous trigger for starting voice mode to preserve user-gesture activation context on mobile devices
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      (window as any).__eternaStartVoice = () => {
+      (window as any).__eternaStartVoice = async () => {
         addDebugLog(`__eternaStartVoice invoked. voiceMode: ${voiceMode}, speechRecognitionSupported: ${speechRecognitionSupported}`);
         console.log("[MOBILE TAP] __eternaStartVoice handler fired, voiceMode before:", voiceMode);
-        setIsOpen(true);
-        if (voiceMode) {
-          stopVoiceMode();
+        
+        const permission = await checkMicPermission();
+        addDebugLog(`__eternaStartVoice [PERMISSION] state: ${permission}`);
+
+        if (permission === 'granted') {
+          setIsOpen(true);
+          if (voiceMode) {
+            stopVoiceMode();
+          } else {
+            handleVoiceButtonClick();
+          }
+        } else if (permission === 'prompt') {
+          const allowed = await requestMicPermission();
+          if (allowed) {
+            setIsOpen(true);
+            if (voiceMode) {
+              stopVoiceMode();
+            } else {
+              handleVoiceButtonClick();
+            }
+          } else {
+            setMicPermissionDeniedOpen(true);
+          }
         } else {
-          handleVoiceButtonClick();
+          setMicPermissionDeniedOpen(true);
         }
         addDebugLog("__eternaStartVoice completed");
         console.log("[MOBILE TAP] __eternaStartVoice completed");
@@ -238,7 +319,35 @@ export default function EternaConcierge() {
         delete (window as any).__eternaStartVoice;
       }
     };
-  }, [voiceMode, handleVoiceButtonClick, stopVoiceMode, speechRecognitionSupported, addDebugLog]);
+  }, [voiceMode, handleVoiceButtonClick, stopVoiceMode, speechRecognitionSupported, addDebugLog, checkMicPermission, requestMicPermission]);
+
+  // Re-check microphone permission when the page regains focus or visibility (returning from browser Settings)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleRecheckPermission = async () => {
+      if (micPermissionDeniedOpen) {
+        addDebugLog("[PERMISSION] Window focus/visibility changed. Re-checking permission status...");
+        const permission = await checkMicPermission();
+        addDebugLog(`[PERMISSION] Re-check state: ${permission}`);
+        if (permission === 'granted') {
+          setMicPermissionDeniedOpen(false);
+          setIsOpen(true);
+          if (!voiceMode) {
+            handleVoiceButtonClick();
+          }
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleRecheckPermission);
+    window.addEventListener("focus", handleRecheckPermission);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleRecheckPermission);
+      window.removeEventListener("focus", handleRecheckPermission);
+    };
+  }, [micPermissionDeniedOpen, voiceMode, handleVoiceButtonClick, checkMicPermission, addDebugLog]);
 
   // Auto-focus input when the chat card is opened (MEJORA UX #1)
   useEffect(() => {
@@ -2086,7 +2195,7 @@ Do not invent any other routes. If the user asks you to go to a section, politel
             {/* Voice Mode Toggle Button (Closed Orb view) */}
             <button
               type="button"
-              onClick={handleVoiceButtonClick}
+              onClick={handleMicButtonClickWithPermission}
               className={`mr-3 px-3.5 py-2.5 rounded-full font-extrabold text-[10px] tracking-wider uppercase transition-all duration-300 flex items-center gap-1.5 shadow-premium text-white active:scale-95 cursor-pointer ${
                 voiceMode
                   ? 'bg-red-500 hover:bg-red-600'
@@ -2185,7 +2294,7 @@ Do not invent any other routes. If the user asks you to go to a section, politel
               {conciergeMode === 'avatar' ? (
                 /* MODALIDAD AVATAR */
                 <div 
-                  onClick={handleVoiceButtonClick}
+                  onClick={handleMicButtonClickWithPermission}
                   className="relative w-full h-full rounded-[28px] overflow-hidden bg-slate-950 flex flex-col justify-between"
                 >
                   {/* Main Video Element */}
@@ -2617,7 +2726,7 @@ Do not invent any other routes. If the user asks you to go to a section, politel
                         {/* Microphone Toggle */}
                         {speechRecognitionSupported && (
                           <button
-                            onClick={handleVoiceButtonClick}
+                            onClick={handleMicButtonClickWithPermission}
                             className={`transition-all cursor-pointer shrink-0 ${
                               isCompact ? 'p-1 rounded-lg' : 'p-2 rounded-xl'
                             } ${
@@ -2637,7 +2746,7 @@ Do not invent any other routes. If the user asks you to go to a section, politel
                       {/* Voice Mode Toggle Button (Expanded Chat view) */}
                       <button
                         type="button"
-                        onClick={handleVoiceButtonClick}
+                        onClick={handleMicButtonClickWithPermission}
                         className={`px-4 py-2.5 rounded-xl font-extrabold text-[10px] tracking-wider uppercase transition-all duration-200 flex items-center gap-1.5 shadow-sm text-white active:scale-95 cursor-pointer shrink-0 ${
                           voiceMode
                             ? 'bg-red-500 hover:bg-red-600'
@@ -2684,6 +2793,125 @@ Do not invent any other routes. If the user asks you to go to a section, politel
                   </div>
                 </>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* C. PREMIUM MICROPHONE PERMISSION DENIED MODAL */}
+      <AnimatePresence>
+        {micPermissionDeniedOpen && (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="relative w-full max-w-[420px] bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-slate-100 flex flex-col items-center text-center gap-5 select-none"
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => {
+                  setMicPermissionDeniedOpen(false);
+                  setShowInstructions(false);
+                }}
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full bg-slate-800/40 hover:bg-slate-800/80 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              {/* Icon Container */}
+              <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 animate-pulse mt-2">
+                <MicOff className="w-8 h-8" />
+              </div>
+
+              {/* Title & Description */}
+              <div className="flex flex-col gap-2">
+                <h3 className="font-extrabold text-sm text-slate-100 uppercase tracking-wider">
+                  {language === 'es' ? 'Acceso al micrófono denegado' : 'Microphone Access Denied'}
+                </h3>
+                <p className="text-xs text-slate-400 font-medium leading-relaxed px-2">
+                  {language === 'es' 
+                    ? 'Tienes desactivado el acceso al micrófono. Para hablar con Eterna debes permitir el uso del micrófono para este sitio.'
+                    : 'Microphone access is disabled. To talk with Eterna, you must allow microphone access for this site.'}
+                </p>
+              </div>
+
+              {/* Instructions Panel */}
+              <AnimatePresence>
+                {showInstructions && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="w-full text-left bg-slate-950/60 border border-slate-800/60 rounded-2xl p-4 flex flex-col gap-3 text-[11px] leading-relaxed text-slate-300 overflow-hidden"
+                  >
+                    <div className="font-bold text-slate-200 uppercase tracking-wider text-[9px] border-b border-slate-800/50 pb-1">
+                      {language === 'es' ? 'Cómo activarlo:' : 'How to enable:'}
+                    </div>
+                    <div>
+                      <span className="font-bold text-rose-400">Safari (iOS/Mac):</span>{' '}
+                      {language === 'es'
+                        ? 'Ve a Ajustes > Safari > Micrófono > Permitir, o toca el icono "aA" en la barra de direcciones y selecciona "Configuración del sitio web".'
+                        : 'Go to Settings > Safari > Microphone > Allow, or tap the "aA" icon in the address bar and select "Website Settings".'}
+                    </div>
+                    <div>
+                      <span className="font-bold text-blue-400">Chrome (Android/PC):</span>{' '}
+                      {language === 'es'
+                        ? 'Toca el candado o el icono de ajustes junto a la URL en la barra de direcciones, selecciona "Permisos" y activa el Micrófono.'
+                        : 'Tap the lock or settings icon next to the URL in the address bar, select "Permissions" and enable the Microphone.'}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Action Buttons */}
+              <div className="w-full flex flex-col gap-2 mt-2">
+                <button
+                  onClick={async () => {
+                    addDebugLog("[PERMISSION] Retry requested");
+                    const allowed = await requestMicPermission();
+                    if (allowed) {
+                      setMicPermissionDeniedOpen(false);
+                      setShowInstructions(false);
+                      setIsOpen(true);
+                      if (!voiceMode) {
+                        handleVoiceButtonClick();
+                      }
+                    }
+                  }}
+                  className="w-full py-3 bg-brand-accent hover:bg-brand-accent/90 text-white font-extrabold text-xs tracking-wider uppercase rounded-2xl transition-all shadow-md active:scale-98 cursor-pointer"
+                >
+                  {language === 'es' ? 'Reintentar' : 'Retry'}
+                </button>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setMicPermissionDeniedOpen(false);
+                      setShowInstructions(false);
+                      setIsOpen(true);
+                      if (typeof window !== 'undefined') {
+                        const chatInput = document.querySelector('input[type="text"]');
+                        if (chatInput) {
+                          chatInput.scrollIntoView({ behavior: 'smooth' });
+                          (chatInput as HTMLInputElement).focus();
+                        }
+                      }
+                    }}
+                    className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-extrabold text-[10px] tracking-wider uppercase rounded-xl transition-all active:scale-98 cursor-pointer"
+                  >
+                    {language === 'es' ? 'Escribir' : 'Write'}
+                  </button>
+
+                  <button
+                    onClick={() => setShowInstructions(prev => !prev)}
+                    className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-extrabold text-[10px] tracking-wider uppercase rounded-xl transition-all active:scale-98 cursor-pointer"
+                  >
+                    {language === 'es' ? 'Cómo activarlo' : 'Instructions'}
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}
