@@ -32,7 +32,11 @@ WHERE property_id IN (SELECT id FROM public.properties WHERE is_demo = true);
 
 -- 6. Delete child review records
 DELETE FROM public.reviews
-WHERE target_property_id IN (SELECT id FROM public.properties WHERE is_demo = true);
+WHERE swap_id IN (
+    SELECT id FROM public.swaps
+    WHERE sender_property_id IN (SELECT id FROM public.properties WHERE is_demo = true)
+       OR receiver_property_id IN (SELECT id FROM public.properties WHERE is_demo = true)
+);
 
 -- 7. Delete child favorites junction records
 DELETE FROM public.favorites
@@ -45,6 +49,27 @@ WHERE swap_id IN (
     WHERE sender_property_id IN (SELECT id FROM public.properties WHERE is_demo = true)
        OR receiver_property_id IN (SELECT id FROM public.properties WHERE is_demo = true)
 );
+
+-- 8.5. Self-healing delete for disputes and travel details if tables exist
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'disputes') THEN
+        EXECUTE 'DELETE FROM public.disputes WHERE swap_id IN (
+            SELECT id FROM public.swaps
+            WHERE sender_property_id IN (SELECT id FROM public.properties WHERE is_demo = true)
+               OR receiver_property_id IN (SELECT id FROM public.properties WHERE is_demo = true)
+        )';
+    END IF;
+
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'swap_travel_details') THEN
+        EXECUTE 'DELETE FROM public.swap_travel_details WHERE swap_id IN (
+            SELECT id FROM public.swaps
+            WHERE sender_property_id IN (SELECT id FROM public.properties WHERE is_demo = true)
+               OR receiver_property_id IN (SELECT id FROM public.properties WHERE is_demo = true)
+        )';
+    END IF;
+END
+$$;
 
 -- 9. Delete swap requests involving demo properties
 DELETE FROM public.swaps
