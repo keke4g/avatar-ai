@@ -1,34 +1,18 @@
 "use client";
-/* eslint-disable react-hooks/set-state-in-effect */
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { AvatarState } from "../../hooks/useAvatarState";
 import { useLiveContext } from "../../lib/context/LiveContext";
 import { Mic } from "lucide-react";
+import { DoubleBufferVideoPlayer } from "../DoubleBufferVideoPlayer";
+import { AvatarStateName } from "../../lib/eternaAssets";
 
 interface HeroVideoProps {
   avatarState: AvatarState;
 }
 
-const TALKING_VIDEOS = [
-  "/videos/hablando.mp4",
-  "/videos/caminando y hablando.mp4",
-  "/videos/caminando y hablando2.mp4",
-  "/videos/caminando y hablando3.mp4",
-  "/videos/caminando y hablando4.mp4",
-];
-
-const ALL_VIDEOS = [
-  "/videos/tranquila.mp4",
-  "/videos/idle.mp4",
-  ...TALKING_VIDEOS,
-];
-
 export default function HeroVideo({ avatarState }: HeroVideoProps) {
   const { startVoice } = useLiveContext();
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [currentSrc, setCurrentSrc] = useState("/videos/tranquila.mp4");
-  const [opacity, setOpacity] = useState(1);
-  const lastTalkingVideoRef = useRef<string>("");
+
 
   const addDebugLog = useCallback((msg: string) => {
     if (typeof window !== 'undefined') {
@@ -114,69 +98,6 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
     activateConversation(`TAP (${source})`);
   }, [activateConversation, addDebugLog]);
 
-  const getRandomTalkingVideo = useCallback(() => {
-    const filtered = TALKING_VIDEOS.filter(v => v !== lastTalkingVideoRef.current);
-    const selected = filtered[Math.floor(Math.random() * filtered.length)];
-    lastTalkingVideoRef.current = selected;
-    return selected;
-  }, []);
-
-  // Determine target video source
-  const getTargetSrc = useCallback(() => {
-    if (avatarState === "LISTENING" || avatarState === "THINKING") {
-      return "/videos/idle.mp4";
-    }
-    if (avatarState === "TALKING") {
-      if (TALKING_VIDEOS.includes(currentSrc)) {
-        return currentSrc;
-      }
-      return getRandomTalkingVideo();
-    }
-    return "/videos/tranquila.mp4";
-  }, [avatarState, currentSrc, getRandomTalkingVideo]);
-
-  // Handle source changes with crossfade
-  useEffect(() => {
-    const target = getTargetSrc();
-    if (target !== currentSrc) {
-      setOpacity(0);
-      
-      const timer = setTimeout(() => {
-        setCurrentSrc(target);
-      }, 150);
-
-      return () => clearTimeout(timer);
-    }
-  }, [avatarState, getTargetSrc, currentSrc]);
-
-  // Load and play when source changes
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.load();
-      videoRef.current.play().catch(err => {
-        console.warn("[HeroVideo] Play interrupted or blocked:", err);
-      });
-    }
-  }, [currentSrc]);
-
-  const handleCanPlay = () => {
-    setOpacity(1);
-  };
-
-  const handleVideoEnded = () => {
-    if (avatarState === "TALKING") {
-      const nextVideo = getRandomTalkingVideo();
-      setOpacity(0);
-      setTimeout(() => {
-        setCurrentSrc(nextVideo);
-      }, 150);
-    } else {
-      setOpacity(0);
-      setTimeout(() => {
-        setCurrentSrc("/videos/tranquila.mp4");
-      }, 150);
-    }
-  };
 
   // Border & Glow configuration based on avatarState
   let frameBg = "rgba(120, 170, 255, 0.25)";
@@ -272,21 +193,12 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
           className="absolute inset-0 z-20 cursor-pointer bg-transparent"
         />
 
-        {/* Main Video Element */}
-        <video
-          ref={videoRef}
-          src={currentSrc}
-          onCanPlay={handleCanPlay}
-          onEnded={handleVideoEnded}
-          muted
-          playsInline
-          autoPlay
-          loop={avatarState !== "TALKING"}
-          className="w-full h-full object-cover rounded-[28px] bg-transparent shadow-xs transition-opacity duration-200"
-          style={{ 
-            opacity,
-            objectPosition: "center 15%"
-          }}
+        {/* Main Double Buffered Video Element */}
+        <DoubleBufferVideoPlayer
+          state={avatarState === "WAITING" ? "IDLE" : avatarState}
+          loop={true}
+          className="w-full h-full object-cover rounded-[28px] bg-transparent shadow-xs"
+          objectPosition="center 15%"
         />
       </div>
 
@@ -305,19 +217,6 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
           <div className="w-2 h-2 md:w-2.5 md:h-2.5 bg-white/95 dark:bg-zinc-950/95 border-r border-b border-zinc-200/50 dark:border-white/10 rotate-45 -mt-1 md:-mt-1.5 shadow-xs" />
         </div>
       )}
-
-      {/* Invisible Preloader Elements to cache all videos */}
-      <div className="hidden" aria-hidden="true">
-        {ALL_VIDEOS.map((src) => (
-          <video
-            key={src}
-            src={src}
-            preload="auto"
-            muted
-            playsInline
-          />
-        ))}
-      </div>
 
       {/* Styles for dynamic thinking/talking border animations */}
       <style jsx global>{`

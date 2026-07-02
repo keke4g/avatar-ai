@@ -1,7 +1,7 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+import React from "react";
+import { DoubleBufferVideoPlayer } from "./DoubleBufferVideoPlayer";
 import { StreamStatus } from "../hooks/useWebSocketStream";
-import { ETERNA_ASSETS } from "../lib/eternaAssets";
 
 interface VideoAvatarProps {
   status: StreamStatus;
@@ -18,39 +18,6 @@ export function VideoAvatar({
   hideGlow = false,
   isListening = false
 }: VideoAvatarProps) {
-  const idleVideoRef = useRef<HTMLVideoElement | null>(null);
-  const talkingVideoRef = useRef<HTMLVideoElement | null>(null);
-
-  // Ensure both videos are playing on mount
-  useEffect(() => {
-    const playVideo = (video: HTMLVideoElement | null) => {
-      if (!video) return;
-      video.play().catch((err) => {
-        console.warn("[VideoAvatar] Autoplay blocked, will retry on interaction:", err);
-      });
-    };
-
-    playVideo(idleVideoRef.current);
-    playVideo(talkingVideoRef.current);
-  }, []);
-
-  // Manage play state on status changes to ensure seamless transitions
-  useEffect(() => {
-    const idleVideo = idleVideoRef.current;
-    const talkingVideo = talkingVideoRef.current;
-
-    if (status === "talking") {
-      if (talkingVideo && talkingVideo.paused) {
-        talkingVideo.play().catch(() => {});
-      }
-    } else {
-      if (idleVideo && idleVideo.paused) {
-        idleVideo.play().catch(() => {});
-      }
-    }
-  }, [status]);
-
-  const isTalking = status === "talking";
 
   // Determine state-aware glow and rotation animations
   let glowAnimation = "pulse-idle 5s infinite ease-in-out";
@@ -111,28 +78,17 @@ export function VideoAvatar({
       <div 
         className="absolute inset-[4px] rounded-full overflow-hidden bg-slate-950 flex items-center justify-center VideoAvatar-core"
       >
-        {/* Idle Video Layer — always present, visible when NOT talking */}
-        <video
-          ref={idleVideoRef}
-          src={ETERNA_ASSETS.avatar.idleVideo}
-          loop
-          muted
-          playsInline
-          autoPlay
-          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
-          style={{ opacity: isTalking ? 0 : 1, zIndex: 10 }}
-        />
-
-        {/* Talking Video Layer — always present, visible when talking */}
-        <video
-          ref={talkingVideoRef}
-          src={ETERNA_ASSETS.avatar.talkingVideo}
-          loop
-          muted
-          playsInline
-          autoPlay
-          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
-          style={{ opacity: isTalking ? 1 : 0, zIndex: 11 }}
+        {/* Main Double Buffered Video Element */}
+        <DoubleBufferVideoPlayer
+          state={
+            isListening ? 'LISTENING' :
+            status === 'thinking' ? 'THINKING' :
+            status === 'talking' ? 'TALKING' :
+            'IDLE'
+          }
+          loop={true}
+          className="absolute inset-0 w-full h-full object-cover z-10"
+          objectPosition="center 15%"
         />
 
         {/* Tactile 3D Glass Dome/Lens Overlay for physical realism */}

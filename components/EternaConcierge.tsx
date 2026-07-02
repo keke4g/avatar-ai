@@ -41,6 +41,8 @@ import { ServiceFactory } from '../lib/services/ServiceFactory';
 import { parseBudgetToNumber } from '../lib/search/SearchEngine';
 import { PropertySearchFilters } from '../lib/search/types';
 import { searchLogger } from '../lib/search/searchLogger';
+import { DoubleBufferVideoPlayer } from './DoubleBufferVideoPlayer';
+import { AvatarStateName } from '../lib/eternaAssets';
 // ────────────────────────────────────────────────
 // MAIN COMPONENT
 // ────────────────────────────────────────────────
@@ -381,52 +383,7 @@ export default function EternaConcierge() {
   // Sync simulated status when WebSocket is active
   const activeStatus = isConnected ? wsStatus : simulatedStatus;
 
-  // Floating Concierge Dual-Modality State (Phase 7)
   const [conciergeMode, setConciergeMode] = useState<'avatar' | 'chat'>('avatar');
-  const [conciergeSrc, setConciergeSrc] = useState("/videos/tranquila.mp4");
-  const [conciergeOpacity, setConciergeOpacity] = useState(1);
-  const conciergeVideoRef = useRef<HTMLVideoElement | null>(null);
-
-  const getConciergeTargetSrc = useCallback(() => {
-    if (isListening || activeStatus === "thinking") {
-      return "/videos/idle.mp4";
-    }
-    if (activeStatus === "talking") {
-      return "/videos/talking.mp4";
-    }
-    return "/videos/tranquila.mp4";
-  }, [isListening, activeStatus]);
-
-  // Handle source changes with crossfade
-  useEffect(() => {
-    const target = getConciergeTargetSrc();
-    if (target !== conciergeSrc) {
-      setConciergeOpacity(0);
-      
-      const timer = setTimeout(() => {
-        setConciergeSrc(target);
-      }, 150);
-
-      return () => clearTimeout(timer);
-    }
-  }, [getConciergeTargetSrc, conciergeSrc]);
-
-  // Load and play video when source changes or mode changes to avatar
-  useEffect(() => {
-    if (conciergeMode === 'avatar' && conciergeVideoRef.current) {
-      conciergeVideoRef.current.load();
-      conciergeVideoRef.current.play().catch(err => {
-        console.warn("[Concierge Video] Play blocked or interrupted:", err);
-      });
-    }
-  }, [conciergeSrc, conciergeMode]);
-
-  // Handle opacity transitions
-  useEffect(() => {
-    if (conciergeOpacity === 0) {
-      setConciergeOpacity(1);
-    }
-  }, [conciergeSrc, conciergeOpacity]);
 
   // ────────────────────────────────────────────────
   // CONTEXT BRIDGE — Real user data for LLM
@@ -2309,19 +2266,17 @@ Do not invent any other routes. If the user asks you to go to a section, politel
                   onClick={handleMicButtonClickWithPermission}
                   className="relative w-full h-full rounded-[28px] overflow-hidden bg-slate-950 flex flex-col justify-between"
                 >
-                  {/* Main Video Element */}
-                  <video
-                    ref={conciergeVideoRef}
-                    src={conciergeSrc}
-                    muted
-                    playsInline
-                    autoPlay
-                    loop={activeStatus !== 'talking'}
-                    className="absolute inset-0 w-full h-full object-cover transition-opacity duration-200 z-10"
-                    style={{ 
-                       opacity: conciergeOpacity,
-                       objectPosition: "center 15%"
-                    }}
+                  {/* Main Double Buffered Video Element */}
+                  <DoubleBufferVideoPlayer
+                    state={
+                      isListening ? 'LISTENING' :
+                      activeStatus === 'thinking' ? 'THINKING' :
+                      activeStatus === 'talking' ? 'TALKING' :
+                      'IDLE'
+                    }
+                    loop={true}
+                    className="absolute inset-0 w-full h-full object-cover z-10"
+                    objectPosition="center 15%"
                   />
 
                   {/* Header Overlay */}
