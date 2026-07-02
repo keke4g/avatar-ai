@@ -83,6 +83,9 @@ function ExploreContent() {
   const [pickerPosition, setPickerPosition] = useState<FloatingPosition | null>(null);
   const [guestPickerPosition, setGuestPickerPosition] = useState<FloatingPosition | null>(null);
   const [selectedSwapType, setSelectedSwapType] = useState('All'); // Swap Tiers: Premium, Luxury, Exclusive, Curated
+  const [selectedViewType, setSelectedViewType] = useState('All');
+  const [selectedAgeRange, setSelectedAgeRange] = useState('All');
+  const [selectedAmenityCategory, setSelectedAmenityCategory] = useState('All');
   const [sortBy, setSortBy] = useState('match'); // 'match' | 'capacity' | 'rating'
   const selectedDates = startDate && endDate ? { start: startDate, end: endDate } : null;
   const guestsCount = hasFilteredGuests ? adults + children : 0;
@@ -248,6 +251,18 @@ function ExploreContent() {
     const operation = activeOfferingTab === 'SALE' ? 'sale' : activeOfferingTab === 'RENT' ? 'rent' : undefined;
     const budget = (activeOfferingTab !== 'SWAP' && activeOfferingTab !== 'ALL' && searchBudget) ? parseFloat(searchBudget) : undefined;
 
+    let ageMin: number | undefined;
+    let ageMax: number | undefined;
+    if (selectedAgeRange === '0-2') {
+      ageMin = 0; ageMax = 2;
+    } else if (selectedAgeRange === '3-5') {
+      ageMin = 3; ageMax = 5;
+    } else if (selectedAgeRange === '6-10') {
+      ageMin = 6; ageMax = 10;
+    } else if (selectedAgeRange === '10+') {
+      ageMin = 10;
+    }
+
     const currentFilters: PropertySearchFilters = {
       city: searchQuery.trim() || undefined,
       operation,
@@ -255,6 +270,10 @@ function ExploreContent() {
       budget,
       rooms: searchParams.get('rooms') ? parseInt(searchParams.get('rooms')!) : undefined,
       sort: (sortBy === 'capacity' ? 'featured' : sortBy === 'rating' ? 'featured' : 'best_match') as SearchSort,
+      amenityCategories: selectedAmenityCategory !== 'All' ? [selectedAmenityCategory] : undefined,
+      viewTypeId: selectedViewType !== 'All' ? selectedViewType : undefined,
+      constructionAgeMin: ageMin,
+      constructionAgeMax: ageMax,
     };
 
     const filtersKey = getCacheKey(currentFilters);
@@ -267,9 +286,20 @@ function ExploreContent() {
       prevImmediateFiltersRef.current.activeCategory !== activeCategory ||
       prevImmediateFiltersRef.current.activeOfferingTab !== activeOfferingTab ||
       prevImmediateFiltersRef.current.sortBy !== sortBy ||
-      prevImmediateFiltersRef.current.selectedSwapType !== selectedSwapType;
+      prevImmediateFiltersRef.current.selectedSwapType !== selectedSwapType ||
+      (prevImmediateFiltersRef.current as any).selectedViewType !== selectedViewType ||
+      (prevImmediateFiltersRef.current as any).selectedAgeRange !== selectedAgeRange ||
+      (prevImmediateFiltersRef.current as any).selectedAmenityCategory !== selectedAmenityCategory;
 
-    prevImmediateFiltersRef.current = { activeCategory, activeOfferingTab, sortBy, selectedSwapType };
+    prevImmediateFiltersRef.current = { 
+      activeCategory, 
+      activeOfferingTab, 
+      sortBy, 
+      selectedSwapType,
+      selectedViewType,
+      selectedAgeRange,
+      selectedAmenityCategory
+    } as any;
 
     const executeSearch = () => {
       const requestId = ++lastRequestIdRef.current;
@@ -331,6 +361,9 @@ function ExploreContent() {
     activeOfferingTab,
     sortBy,
     selectedSwapType,
+    selectedViewType,
+    selectedAgeRange,
+    selectedAmenityCategory,
     searchQuery,
     startDate,
     endDate,
@@ -365,6 +398,9 @@ function ExploreContent() {
     setTempChildren(0);
     setHasFilteredGuests(false);
     setSelectedSwapType('All');
+    setSelectedViewType('All');
+    setSelectedAgeRange('All');
+    setSelectedAmenityCategory('All');
     setSortBy('match');
     setSearchBudget('');
     setPageSize(4);
@@ -507,9 +543,27 @@ function ExploreContent() {
     };
   }, [showGuestPicker]);
 
+  const ageLimits = useMemo(() => {
+    let ageMin: number | undefined;
+    let ageMax: number | undefined;
+    if (selectedAgeRange === '0-2') {
+      ageMin = 0; ageMax = 2;
+    } else if (selectedAgeRange === '3-5') {
+      ageMin = 3; ageMax = 5;
+    } else if (selectedAgeRange === '6-10') {
+      ageMin = 6; ageMax = 10;
+    } else if (selectedAgeRange === '10+') {
+      ageMin = 10;
+    }
+    return { ageMin, ageMax };
+  }, [selectedAgeRange]);
+
   // Calculate base properties matching all other filters EXCEPT category/type filter
   const basePropertiesForCategoryCounts = useMemo(() => {
-    // If activeSearch has results, we calculate base counts from the search results
+    if (activeSearch) {
+      if (activeSearch.loading) return [];
+      return activeSearch.results;
+    }
     // But since search results are already filtered by type, we should fetch base properties using filterAndSortProperties
     // which aligns in-memory filtering with database search criteria.
     const base = filterAndSortProperties({
@@ -524,9 +578,13 @@ function ExploreContent() {
       endDate,
       guestsCount,
       budget: searchBudget ? parseFloat(searchBudget) : undefined,
+      amenityCategories: selectedAmenityCategory !== 'All' ? [selectedAmenityCategory] : undefined,
+      viewTypeId: selectedViewType !== 'All' ? selectedViewType : undefined,
+      constructionAgeMin: ageLimits.ageMin,
+      constructionAgeMax: ageLimits.ageMax,
     });
     return base.filter((property) => propertyMatchesOfferingTab(property, activeOfferingTab));
-  }, [properties, swaps, searchQuery, selectedSwapType, sortBy, startDate, endDate, guestsCount, activeOfferingTab, searchBudget]);
+  }, [properties, swaps, searchQuery, selectedSwapType, sortBy, startDate, endDate, guestsCount, activeOfferingTab, searchBudget, selectedAmenityCategory, selectedViewType, ageLimits, activeSearch]);
 
   // Compute dynamic category counts
   const categoryCounts = useMemo(() => {
@@ -563,8 +621,12 @@ function ExploreContent() {
       endDate,
       guestsCount,
       budget: searchBudget ? parseFloat(searchBudget) : undefined,
+      amenityCategories: selectedAmenityCategory !== 'All' ? [selectedAmenityCategory] : undefined,
+      viewTypeId: selectedViewType !== 'All' ? selectedViewType : undefined,
+      constructionAgeMin: ageLimits.ageMin,
+      constructionAgeMax: ageLimits.ageMax,
     });
-  }, [properties, swaps, activeCategory, searchQuery, selectedSwapType, sortBy, startDate, endDate, guestsCount, searchBudget, activeSearch]);
+  }, [properties, swaps, activeCategory, searchQuery, selectedSwapType, sortBy, startDate, endDate, guestsCount, searchBudget, selectedAmenityCategory, selectedViewType, ageLimits, activeSearch]);
 
   const filteredSortedProperties = useMemo(() => {
     if (activeSearch && activeSearch.loading) {
@@ -750,6 +812,65 @@ function ExploreContent() {
                 <option value="Curated">Curated</option>
                 <option value="Exclusive">Exclusive</option>
                 <option value="Luxury">Luxury</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5 px-3.5 py-2.5 border border-brand-gray-200 rounded-2xl text-xs font-bold text-brand-gray-600 bg-white">
+              <Filter className="w-3.5 h-3.5 text-brand-gray-400" />
+              <select
+                value={selectedViewType}
+                onChange={(e) => {
+                  setSelectedViewType(e.target.value);
+                  setPageSize(4);
+                  if (!activeSearch) setActiveSearch(null);
+                }}
+                className="outline-none bg-transparent font-bold cursor-pointer"
+              >
+                <option value="All">Cualquier Vista</option>
+                <option value="Marina">Vista a la Marina</option>
+                <option value="Al Mar">Vista al Mar</option>
+                <option value="Al Bosque">Vista al Bosque</option>
+                <option value="Golf">Vista al Campo de Golf</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5 px-3.5 py-2.5 border border-brand-gray-200 rounded-2xl text-xs font-bold text-brand-gray-600 bg-white">
+              <Filter className="w-3.5 h-3.5 text-brand-gray-400" />
+              <select
+                value={selectedAgeRange}
+                onChange={(e) => {
+                  setSelectedAgeRange(e.target.value);
+                  setPageSize(4);
+                  if (!activeSearch) setActiveSearch(null);
+                }}
+                className="outline-none bg-transparent font-bold cursor-pointer"
+              >
+                <option value="All">Cualquier Antigüedad</option>
+                <option value="0-2">Nueva (0-2 años)</option>
+                <option value="3-5">3-5 años</option>
+                <option value="6-10">6-10 años</option>
+                <option value="10+">Más de 10 años</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5 px-3.5 py-2.5 border border-brand-gray-200 rounded-2xl text-xs font-bold text-brand-gray-600 bg-white">
+              <Filter className="w-3.5 h-3.5 text-brand-gray-400" />
+              <select
+                value={selectedAmenityCategory}
+                onChange={(e) => {
+                  setSelectedAmenityCategory(e.target.value);
+                  setPageSize(4);
+                  if (!activeSearch) setActiveSearch(null);
+                }}
+                className="outline-none bg-transparent font-bold cursor-pointer"
+              >
+                <option value="All">Cualquier Amenidad</option>
+                <option value="Alberca">Alberca</option>
+                <option value="Seguridad 24/7">Seguridad 24/7</option>
+                <option value="Gimnasio">Gimnasio</option>
+                <option value="Domótica">Domótica</option>
+                <option value="Cerradura inteligente">Cerradura inteligente</option>
+                <option value="Vista al mar">Vista al mar</option>
               </select>
             </div>
 

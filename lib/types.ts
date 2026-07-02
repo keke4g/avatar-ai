@@ -40,6 +40,7 @@ export interface PropertyOfferingPricingRule {
 export interface PropertyOffering {
   id: string;
   propertyId: string;
+  commercialCode?: string;
   mode: PropertyOfferingMode;
   status: PropertyOfferingStatus;
   visibility: PropertyOfferingVisibility;
@@ -48,6 +49,40 @@ export interface PropertyOffering {
   priceAmount?: number | null;
   currency: string;
   billingPeriod: PropertyBillingPeriod;
+  
+  // Financial specifics
+  acceptsBankCredit?: boolean;
+  acceptsInfonavit?: boolean;
+  acceptsFovissste?: boolean;
+  acceptsCash?: boolean;
+  developerFinancing?: boolean;
+
+  // Rental specifics
+  depositAmount?: number | null;
+  advanceMonths?: number;
+  requiresGuarantor?: boolean;
+  requiresLegalPolicy?: boolean;
+
+  // Swap specifics
+  swapEstimatedValue?: number | null;
+  desiredExchange?: string | null;
+  swapMinValue?: number | null;
+  swapMaxValue?: number | null;
+  swapCashDifferenceAllowed?: boolean;
+
+  // Maintenance and average costs
+  annualPropertyTax?: number;
+  waterMonthlyAvg?: number;
+  electricityMonthlyAvg?: number;
+  gasMonthlyAvg?: number;
+
+  // Broker details
+  commissionTotalPct?: number | null;
+  commissionSharedPct?: number | null;
+  agentResponsibleId?: string | null;
+  estimatedDeliveryDate?: string | null;
+
+  // Legacy compatibility fields
   securityDepositAmount?: number | null;
   cleaningFeeAmount?: number | null;
   serviceFeePercent?: number | null;
@@ -75,8 +110,35 @@ export interface PropertyOffering {
   updatedAt?: string;
 }
 
+export interface PropertyDocument {
+  id: string;
+  propertyId: string;
+  documentType: 'DEED' | 'TAX_RECIPET' | 'APPRAISAL' | 'CONDO_REGIME' | 'PLAN' | 'CONTRACT' | 'ID_PROPRIETOR';
+  fileUrl: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+}
+
+export interface CustomField {
+  id: string;
+  name: string;
+  fieldType: 'text' | 'number' | 'boolean' | 'select';
+  options?: string[];
+  defaultValue?: string;
+}
+
+export interface CustomFieldValue {
+  propertyId: string;
+  fieldId: string;
+  value: string;
+}
+
 export interface Property {
   id: string;
+  internalCode?: string;
+  primaryOperation?: 'SALE' | 'RENT' | 'SWAP';
+  ownerProfileId?: string | null;
+  companyId?: string | null;
   title: string;
   description: string;
   type: 'Apartment' | 'Beach House' | 'Cabin' | 'Penthouse' | 'Villa' | 'Loft';
@@ -113,6 +175,100 @@ export interface Property {
   featuredRank?: number; // Ordering precedence for premium listings
   offerings?: PropertyOffering[]; // Hybrid commercial modes while legacy swap fields remain supported
   metadata?: Record<string, any>;
+
+  // Development info
+  developmentName?: string | null;
+  subdivisionName?: string | null;
+  privateNeighborhood?: string | null;
+  phaseStage?: string | null;
+  lotNumber?: string | null;
+  blockNumber?: string | null;
+  condominiumRegime?: boolean;
+  maintenanceFeeAmount?: number;
+
+  // Detailed Location
+  neighborhood?: string | null;
+  postalCode?: string | null;
+  streetName?: string | null;
+  streetNumber?: string | null;
+  locationReference?: string | null;
+  showPublicAddress?: boolean;
+
+  // Extra features
+  halfBathrooms?: number;
+  parkingSpaces?: number;
+  levelsCount?: number;
+  constructionAge?: number | null;
+  conservationStateId?: string | null;
+  constructionTypeId?: string | null;
+
+  // Surfaces
+  surfaceTotal?: number | null;
+  surfaceBuilt?: number | null;
+  surfaceFront?: number | null;
+  surfaceDepth?: number | null;
+  surfaceGarden?: number;
+  surfaceTerrace?: number;
+  surfaceRoofGarden?: number;
+  surfacePatio?: number;
+
+  // Legal
+  legalDebtFree?: boolean;
+  legalPublicDeed?: boolean;
+  legalTaxCurrent?: boolean;
+  legalServicesPaid?: boolean;
+  legalOwnerType?: string | null;
+  legalIsMortgaged?: boolean;
+
+  // Services
+  servicesWater?: boolean;
+  servicesElectricity?: boolean;
+  servicesSewerage?: boolean;
+  servicesNatGas?: boolean;
+  servicesLpGas?: boolean;
+  servicesInternet?: string;
+  servicesGarbage?: boolean;
+
+  // Security
+  securityCctv?: boolean;
+  securityGuardhouse?: boolean;
+  security24_7?: boolean;
+  securityBiometric?: boolean;
+
+  // View and Orientation
+  viewTypeId?: string | null;
+  orientationId?: string | null;
+
+  // IA
+  aiSummary?: string | null;
+  aiDescription?: string | null;
+  aiTags?: string[];
+  aiKeywords?: string[];
+  aiScoreOverride?: number | null;
+  aiRecommendations?: string[];
+
+  // Workflow Folder Status
+  folderStatus?: 'DRAFT' | 'PENDING_DOCUMENTS' | 'UNDER_REVIEW' | 'PUBLISHED' | 'PAUSED' | 'SOLD' | 'RENTED' | 'ARCHIVED';
+
+  // Owner private info
+  ownerPrivateName?: string | null;
+  ownerPrivatePhone?: string | null;
+  ownerPrivateEmail?: string | null;
+  ownerContactTime?: string | null;
+
+  // SEO
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  metaKeywords?: string[];
+
+  // IDs Aux
+  qrCodeUrl?: string | null;
+  shortCode?: string | null;
+  shortLink?: string | null;
+  updatedAt?: string;
+
+  // Relations
+  documents?: PropertyDocument[];
 }
 
 export type SwapStatus = 'PENDING' | 'APPROVED' | 'DECLINED' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED';
@@ -195,7 +351,7 @@ export interface Notification {
   createdAt: string;
 }
 
-export type UserRole = 'ADMIN' | 'HOST' | 'MEMBER';
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'REAL_ESTATE_COMPANY' | 'DEVELOPER' | 'PROPERTY_MANAGER' | 'BROKER' | 'AGENT' | 'OWNER' | 'MARKETING' | 'ASSISTANT' | 'MEMBER' | 'HOST';
 
 export interface User {
   id: string;
@@ -211,4 +367,7 @@ export interface User {
   isSuspended?: boolean;
   bio?: string;
   email?: string;
+  companyId?: string | null;
+  officeId?: string | null;
+  profileType?: 'OWNER' | 'AGENT' | 'PROPERTY_MANAGER' | null;
 }

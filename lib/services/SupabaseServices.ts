@@ -19,6 +19,7 @@ const isMissingOfferingsRelationError = (error: any): boolean => {
 const mapPostgresOffering = (row: any): PropertyOffering => ({
   id: row.id,
   propertyId: row.property_id,
+  commercialCode: row.commercial_code,
   mode: row.mode,
   status: row.status,
   visibility: row.visibility,
@@ -27,6 +28,40 @@ const mapPostgresOffering = (row: any): PropertyOffering => ({
   priceAmount: row.price_amount == null ? null : Number(row.price_amount),
   currency: row.currency || 'USD',
   billingPeriod: row.billing_period || 'NONE',
+  
+  // Financial specifics
+  acceptsBankCredit: row.accepts_bank_credit,
+  acceptsInfonavit: row.accepts_infonavit,
+  acceptsFovissste: row.accepts_fovissste,
+  acceptsCash: row.accepts_cash,
+  developerFinancing: row.developer_financing,
+
+  // Rental specifics
+  depositAmount: row.deposit_amount == null ? null : Number(row.deposit_amount),
+  advanceMonths: row.advance_months,
+  requiresGuarantor: row.requires_guarantor,
+  requiresLegalPolicy: row.requires_legal_policy,
+
+  // Swap specifics
+  swapEstimatedValue: row.swap_estimated_value == null ? null : Number(row.swap_estimated_value),
+  desiredExchange: row.desired_exchange,
+  swapMinValue: row.swap_min_value == null ? null : Number(row.swap_min_value),
+  swapMaxValue: row.swap_max_value == null ? null : Number(row.swap_max_value),
+  swapCashDifferenceAllowed: row.swap_cash_difference_allowed,
+
+  // Maintenance and average costs
+  annualPropertyTax: row.annual_property_tax == null ? 0 : Number(row.annual_property_tax),
+  waterMonthlyAvg: row.water_monthly_avg == null ? 0 : Number(row.water_monthly_avg),
+  electricityMonthlyAvg: row.electricity_monthly_avg == null ? 0 : Number(row.electricity_monthly_avg),
+  gasMonthlyAvg: row.gas_monthly_avg == null ? 0 : Number(row.gas_monthly_avg),
+
+  // Broker details
+  commissionTotalPct: row.commission_total_pct == null ? null : Number(row.commission_total_pct),
+  commissionSharedPct: row.commission_shared_pct == null ? null : Number(row.commission_shared_pct),
+  agentResponsibleId: row.agent_responsible_id,
+  estimatedDeliveryDate: row.estimated_delivery_date,
+
+  // Legacy compatibility fields
   securityDepositAmount: row.security_deposit_amount == null ? null : Number(row.security_deposit_amount),
   cleaningFeeAmount: row.cleaning_fee_amount == null ? null : Number(row.cleaning_fee_amount),
   serviceFeePercent: row.service_fee_percent == null ? null : Number(row.service_fee_percent),
@@ -85,6 +120,10 @@ const mapPostgresProperty = (row: any): Property => {
 
   const property: Property = {
     id: row.id,
+    internalCode: row.internal_code,
+    primaryOperation: row.primary_operation,
+    ownerProfileId: row.owner_profile_id,
+    companyId: row.company_id,
     title: row.title,
     description: row.description,
     type: row.type,
@@ -119,7 +158,98 @@ const mapPostgresProperty = (row: any): Property => {
     featuredRank: row.featured_rank || 0,
     rules: row.rules || [],
     reviews: [], // Loaded on-demand in Phase 4B
-    offerings: row.property_offerings ? row.property_offerings.map(mapPostgresOffering) : []
+    offerings: row.property_offerings ? row.property_offerings.map(mapPostgresOffering) : [],
+
+    // Development info
+    developmentName: row.development_name,
+    subdivisionName: row.subdivision_name,
+    privateNeighborhood: row.private_neighborhood,
+    phaseStage: row.phase_stage,
+    lotNumber: row.lot_number,
+    blockNumber: row.block_number,
+    condominiumRegime: row.condominium_regime,
+    maintenanceFeeAmount: row.maintenance_fee_amount == null ? 0 : Number(row.maintenance_fee_amount),
+
+    // Detailed Location
+    neighborhood: row.neighborhood,
+    postalCode: row.postal_code,
+    streetName: row.street_name,
+    streetNumber: row.street_number,
+    locationReference: row.location_reference,
+    showPublicAddress: row.show_public_address,
+
+    // Extra features
+    halfBathrooms: row.half_bathrooms || 0,
+    parkingSpaces: row.parking_spaces || 0,
+    levelsCount: row.levels_count || 1,
+    constructionAge: row.construction_age,
+    conservationStateId: row.conservation_state_id,
+    constructionTypeId: row.construction_type_id,
+
+    // Surfaces
+    surfaceTotal: row.surface_total == null ? null : Number(row.surface_total),
+    surfaceBuilt: row.surface_built == null ? null : Number(row.surface_built),
+    surfaceFront: row.surface_front == null ? null : Number(row.surface_front),
+    surfaceDepth: row.surface_depth == null ? null : Number(row.surface_depth),
+    surfaceGarden: row.surface_garden == null ? 0 : Number(row.surface_garden),
+    surfaceTerrace: row.surface_terrace == null ? 0 : Number(row.surface_terrace),
+    surfaceRoofGarden: row.surface_roof_garden == null ? 0 : Number(row.surface_roof_garden),
+    surfacePatio: row.surface_patio == null ? 0 : Number(row.surface_patio),
+
+    // Legal
+    legalDebtFree: row.legal_debt_free,
+    legalPublicDeed: row.legal_public_deed,
+    legalTaxCurrent: row.legal_tax_current,
+    legalServicesPaid: row.legal_services_paid,
+    legalOwnerType: row.legal_owner_type,
+    legalIsMortgaged: row.legal_is_mortgaged,
+
+    // Services
+    servicesWater: row.services_water,
+    servicesElectricity: row.services_electricity,
+    servicesSewerage: row.services_sewerage,
+    servicesNatGas: row.services_nat_gas,
+    servicesLpGas: row.services_lp_gas,
+    servicesInternet: row.services_internet,
+    servicesGarbage: row.services_garbage,
+
+    // Security
+    securityCctv: row.security_cctv,
+    securityGuardhouse: row.security_guardhouse,
+    security24_7: row.security_24_7,
+    securityBiometric: row.security_biometric,
+
+    // View and Orientation
+    viewTypeId: row.view_type_id,
+    orientationId: row.orientation_id,
+
+    // IA
+    aiSummary: row.ai_summary,
+    aiDescription: row.ai_description,
+    aiTags: row.ai_tags || [],
+    aiKeywords: row.ai_keywords || [],
+    aiScoreOverride: row.ai_score_override == null ? null : Number(row.ai_score_override),
+    aiRecommendations: row.ai_recommendations || [],
+
+    // Workflow Folder Status
+    folderStatus: row.folder_status,
+
+    // Owner private info
+    ownerPrivateName: row.owner_private_name,
+    ownerPrivatePhone: row.owner_private_phone,
+    ownerPrivateEmail: row.owner_private_email,
+    ownerContactTime: row.owner_contact_time,
+
+    // SEO
+    metaTitle: row.meta_title,
+    metaDescription: row.meta_description,
+    metaKeywords: row.meta_keywords || [],
+
+    // IDs Aux
+    qrCodeUrl: row.qr_code_url,
+    shortCode: row.short_code,
+    shortLink: row.short_link,
+    updatedAt: row.updated_at
   };
 
   return ensurePropertyOfferings(property);
@@ -665,7 +795,10 @@ export class SupabaseUserService implements IUserService {
       joinDate: row.created_at?.split('T')[0] || '2026-05-01',
       swapsCount: 0,
       isSuspended: false,
-      favorites: []
+      favorites: [],
+      companyId: row.company_id,
+      officeId: row.office_id,
+      profileType: row.profile_type
     }));
   }
 
@@ -696,7 +829,10 @@ export class SupabaseUserService implements IUserService {
       joinDate: data.created_at?.split('T')[0] || '2026-05-01',
       swapsCount: 0,
       isSuspended: false,
-      favorites: []
+      favorites: [],
+      companyId: data.company_id,
+      officeId: data.office_id,
+      profileType: data.profile_type
     } : null;
   }
 
@@ -710,6 +846,9 @@ export class SupabaseUserService implements IUserService {
       payload.is_verified = userData.kycStatus === 'VERIFIED';
     }
     if (userData.isVerified !== undefined) payload.is_verified = userData.isVerified;
+    if (userData.companyId !== undefined) payload.company_id = userData.companyId;
+    if (userData.officeId !== undefined) payload.office_id = userData.officeId;
+    if (userData.profileType !== undefined) payload.profile_type = userData.profileType;
 
     const { data, error } = await supabase
       .from('profiles')

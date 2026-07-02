@@ -9,6 +9,10 @@ export interface PropertySearchFilters {
   budget?: number;
   rooms?: number;
   sort?: SearchSort;
+  amenityCategories?: string[];
+  viewTypeId?: string;
+  constructionAgeMin?: number;
+  constructionAgeMax?: number;
 }
 
 export interface SearchResult {

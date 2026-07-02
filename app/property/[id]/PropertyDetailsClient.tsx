@@ -807,6 +807,65 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             </p>
           </div>
 
+          {/* Ficha Técnica y Superficies */}
+          <div className="border-b border-brand-gray-200/80 pb-6">
+            <h3 className="text-base font-bold text-brand-black mb-3">
+              {language === 'es' ? 'Ficha Técnica' : 'Technical Specifications'}
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5 text-sm text-brand-gray-500 font-semibold">
+              {property.developmentName && (
+                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                  <span className="text-brand-gray-400">{language === 'es' ? 'Desarrollo' : 'Development'}</span>
+                  <span className="text-brand-black">{property.developmentName}</span>
+                </div>
+              )}
+              {property.parkingSpaces !== undefined && property.parkingSpaces !== null && (
+                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                  <span className="text-brand-gray-400">{language === 'es' ? 'Estacionamientos' : 'Parking Spaces'}</span>
+                  <span className="text-brand-black">{property.parkingSpaces}</span>
+                </div>
+              )}
+              {property.levelsCount !== undefined && property.levelsCount !== null && (
+                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                  <span className="text-brand-gray-400">{language === 'es' ? 'Niveles' : 'Levels'}</span>
+                  <span className="text-brand-black">{property.levelsCount}</span>
+                </div>
+              )}
+              {property.constructionAge !== undefined && property.constructionAge !== null && (
+                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                  <span className="text-brand-gray-400">{language === 'es' ? 'Antigüedad' : 'Age'}</span>
+                  <span className="text-brand-black">
+                    {property.constructionAge === 0 ? (language === 'es' ? 'Nueva' : 'Brand New') : `${property.constructionAge} ${language === 'es' ? 'años' : 'years'}`}
+                  </span>
+                </div>
+              )}
+              {property.conservationStateId && (
+                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                  <span className="text-brand-gray-400">{language === 'es' ? 'Estado' : 'Conservation'}</span>
+                  <span className="text-brand-black">{property.conservationStateId}</span>
+                </div>
+              )}
+              {property.constructionTypeId && (
+                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                  <span className="text-brand-gray-400">{language === 'es' ? 'Estilo' : 'Style'}</span>
+                  <span className="text-brand-black">{property.constructionTypeId}</span>
+                </div>
+              )}
+              {property.surfaceTotal !== undefined && property.surfaceTotal !== null && (
+                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                  <span className="text-brand-gray-400">{language === 'es' ? 'Terreno total' : 'Total Lot'}</span>
+                  <span className="text-brand-black">{property.surfaceTotal} m²</span>
+                </div>
+              )}
+              {property.surfaceBuilt !== undefined && property.surfaceBuilt !== null && (
+                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                  <span className="text-brand-gray-400">{language === 'es' ? 'Construcción' : 'Built Area'}</span>
+                  <span className="text-brand-black">{property.surfaceBuilt} m²</span>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Amenities grid */}
           <div className="border-b border-brand-gray-200/80 pb-6">
             <h3 className="text-base font-bold text-brand-black mb-4">{t('details.whatOffers')}</h3>

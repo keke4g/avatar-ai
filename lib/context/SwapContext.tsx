@@ -49,7 +49,7 @@ interface SwapContextType {
   registerMock: (email: string, name: string, password?: string) => Promise<User>;
   logoutMock: () => void;
   updateProfileMock: (updatedFields: Partial<User>) => void;
-  completeOnboardingMock: (selectedCities: string[], bio: string, avatarUrl: string) => void;
+  completeOnboardingMock: (selectedCities: string[], bio: string, avatarUrl: string, profileType?: 'OWNER' | 'AGENT' | 'PROPERTY_MANAGER' | null) => void;
   resetPasswordMock: (email: string) => Promise<void>;
   resendVerificationEmail: (email: string) => Promise<boolean>;
   markMessagesAsRead: (swapRequestId: string) => Promise<void>;
@@ -1432,7 +1432,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
   };
 
-  const completeOnboardingMock = async (selectedCities: string[], bio: string, avatarUrl: string) => {
+  const completeOnboardingMock = async (selectedCities: string[], bio: string, avatarUrl: string, profileType?: 'OWNER' | 'AGENT' | 'PROPERTY_MANAGER' | null) => {
     if (!currentUser) return;
     
     const updatedUser: User = {
@@ -1440,7 +1440,8 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avatar: avatarUrl || currentUser.avatar,
       kycStatus: 'VERIFIED', // Automatically verify KYC on onboarding complete for simulation!
       isVerified: true,
-      favorites: selectedCities // Save selected target destinations as favorites or profile metadata
+      favorites: selectedCities, // Save selected target destinations as favorites or profile metadata
+      profileType: profileType || currentUser.profileType
     };
     
     setCurrentUser(updatedUser);
@@ -1451,7 +1452,8 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await ServiceFactory.getUserService().update(currentUser.id, {
           avatar: avatarUrl || currentUser.avatar,
           kycStatus: 'VERIFIED',
-          isVerified: true
+          isVerified: true,
+          profileType: profileType || currentUser.profileType
         });
       } catch (err) {
         console.error('[SwapContext] Supabase onboarding save failed:', err);

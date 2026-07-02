@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, ChevronLeft, ChevronRight, Sparkles, Check, Info, Loader2,
-  Home, DollarSign, Calendar, MessageSquareCode, Award, Shield, User, Building, Briefcase, Camera, Play, Eye, AlertTriangle
+  Home, DollarSign, Calendar, MessageSquareCode, Award, Shield, User, Building, Briefcase, Camera, Play, Eye, AlertTriangle,
+  MapPin, Sliders, FileText, Image
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Property, PropertyOffering, PropertyOfferingMode, PropertyOfferingStatus, PropertyBillingPeriod, PropertyOfferingVisibility } from '../lib/types';
@@ -16,21 +17,45 @@ interface PropertyWizardModalProps {
   onDelete?: (id: string) => void;
 }
 
-type WizardStep = 0 | 1 | 2 | 3 | 4 | 5;
+type WizardStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 const AMENITY_OPTIONS = [
-  'Wifi',
-  'Aire acondicionado',
+  // Interior
+  'Cocina integral',
   'Cocina equipada',
-  'Estacionamiento',
+  'Cocina con isla',
+  'Desayunador',
+  'Sala doble altura',
+  'Family Room',
+  'Sala TV',
+  'Biblioteca',
+  'Oficina',
+  'Estudio',
+  'Cuarto de servicio',
+  'Cuarto de lavado',
+  'Vestidor',
+  'Bodega',
+  'Bar',
+  'Cava',
+  'Jacuzzi',
+  'Sauna',
+  // Exterior
   'Alberca',
-  'Jardín',
   'Terraza',
+  'Roof Garden',
+  'Jardín',
+  'Patio',
+  'Balcón',
   'Asador',
-  'Lavadora',
-  'Secadora',
-  'Seguridad 24/7',
-  'Pet Friendly'
+  'Huerto',
+  'Cancha',
+  // Technology
+  'Domótica',
+  'Alexa',
+  'Cerradura inteligente',
+  'Paneles solares',
+  'Cargador vehículo eléctrico',
+  'Internet fibra óptica'
 ];
 
 type UIType = 'Casa' | 'Departamento' | 'Penthouse' | 'Townhouse' | 'Villa' | 'Casa de Playa' | 'Cabaña' | 'Loft' | 'Terreno' | 'Local Comercial';
@@ -179,10 +204,16 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     };
   }, [isOpen, step, activeConfigTab, selectedModes, initialData]);
 
-  // STEP 2: Basic Info
+  // STEP 1: Basic Info (New fields)
   const [title, setTitle] = useState('');
+  const [subtitle, setSubtitle] = useState('');
+  const [shortDescription, setShortDescription] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<UIType>('Departamento');
+  const [developmentName, setDevelopmentName] = useState('');
+  const [valueRating, setValueRating] = useState<'Premium' | 'Luxury' | 'Exclusive' | 'Curated'>('Premium');
+
+  // STEP 2: Location
   const [location, setLocation] = useState('');
   const [country, setCountry] = useState('');
   const [address, setAddress] = useState('');
@@ -193,24 +224,64 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
   const [city, setCity] = useState<string | null>(null);
   const [stateName, setStateName] = useState<string | null>(null);
   const [geometrySource, setGeometrySource] = useState<'google_places' | 'google_geocoding' | 'manual' | 'legacy' | null>(null);
+  
+  // Location Details
+  const [neighborhood, setNeighborhood] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [streetName, setStreetName] = useState('');
+  const [streetNumber, setStreetNumber] = useState('');
+  const [locationReference, setLocationReference] = useState('');
+  const [showPublicAddress, setShowPublicAddress] = useState(true);
 
   const autocompleteInputRef = useRef<HTMLInputElement | null>(null);
   const autocompleteRef = useRef<any>(null);
 
-  // STEP 3: Specs & Features
+  // STEP 4: Specs & Features
   const [bedrooms, setBedrooms] = useState(2);
   const [bathrooms, setBathrooms] = useState(2);
   const [halfBathrooms, setHalfBathrooms] = useState(0);
+  const [parkingSpaces, setParkingSpaces] = useState(0);
+  const [levelsCount, setLevelsCount] = useState(1);
   const [maxGuests, setMaxGuests] = useState(4);
+  const [constructionAge, setConstructionAge] = useState<number | ''>('');
+  const [conservationState, setConservationState] = useState('Excellent');
+  const [constructionType, setConstructionType] = useState('Modern');
+
+  // Surfaces
+  const [surfaceTotal, setSurfaceTotal] = useState<number | ''>('');
+  const [surfaceBuilt, setSurfaceBuilt] = useState<number | ''>('');
+  const [surfaceFront, setSurfaceFront] = useState<number | ''>('');
+  const [surfaceDepth, setSurfaceDepth] = useState<number | ''>('');
+  const [surfaceGarden, setSurfaceGarden] = useState(0);
+  const [surfaceTerrace, setSurfaceTerrace] = useState(0);
+  const [surfaceRoofGarden, setSurfaceRoofGarden] = useState(0);
+  const [surfacePatio, setSurfacePatio] = useState(0);
+
+  // STEP 5: Amenities
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
 
-  // STEP 4: Media & Gallery
+  // STEP 6: Legal Info
+  const [legalDebtFree, setLegalDebtFree] = useState(true);
+  const [legalPublicDeed, setLegalPublicDeed] = useState(true);
+  const [legalTaxCurrent, setLegalTaxCurrent] = useState(true);
+  const [legalServicesPaid, setLegalServicesPaid] = useState(true);
+  const [legalOwnerType, setLegalOwnerType] = useState('Privada');
+  const [legalIsMortgaged, setLegalIsMortgaged] = useState(false);
+
+  // STEP 7: Media & Gallery
   const [images, setImages] = useState<string[]>([]);
   const [imagesMetadata, setImagesMetadata] = useState<Record<string, any>>({});
   const [videoPlaceholder, setVideoPlaceholder] = useState('');
   const [virtualTourPlaceholder, setVirtualTourPlaceholder] = useState('');
 
-  // STEP 5: Dynamic Configuration Values
+  // STEP 8: Commercial & SEO
+  const [isExclusive, setIsExclusive] = useState(false);
+  const [commissionTotalPct, setCommissionTotalPct] = useState<number | ''>('');
+  const [commissionSharedPct, setCommissionSharedPct] = useState<number | ''>('');
+  const [metaTitle, setMetaTitle] = useState('');
+  const [metaDescription, setMetaDescription] = useState('');
+
+  // STEP 3: Dynamic Pricing Settings
   // Swap settings
   const [swapValueTier, setSwapValueTier] = useState<'Premium' | 'Luxury' | 'Exclusive' | 'Curated'>('Premium');
   const [swapAvailableStart, setSwapAvailableStart] = useState('2026-06-01');
@@ -723,14 +794,17 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
 
   const handleNext = () => {
     if (step === 0) setStep(1);
-    else if (step === 1 && selectedModes.length > 0) setStep(2);
-    else if (step === 2 && title && location && country && description) setStep(3);
-    else if (step === 3) setStep(4);
+    else if (step === 1 && title && description) setStep(2);
+    else if (step === 2 && location && country) setStep(3);
+    else if (step === 3 && selectedModes.length > 0) setStep(4);
     else if (step === 4) setStep(5);
+    else if (step === 5) setStep(6);
+    else if (step === 6) setStep(7);
+    else if (step === 7) setStep(8);
+    else if (step === 8) setStep(9);
   };
 
   const handleBack = () => {
-    if (step === 1 && initialData) return; // Prevent going to Step 0 when editing
     if (step > 0) setStep((prev) => (prev - 1) as WizardStep);
   };
 
@@ -762,6 +836,11 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       if (mode === 'SWAP') {
         return {
           ...baseOffering,
+          swapEstimatedValue: Number(salePrice) || 0,
+          desiredExchange: swapPreferences,
+          swapMinValue: Number(salePrice) * 0.8,
+          swapMaxValue: Number(salePrice) * 1.2,
+          swapCashDifferenceAllowed: true,
           swapPreferences: { text: swapPreferences },
           auraScoreOverride: existing?.auraScoreOverride || initialData?.auraScore || 95
         };
@@ -769,6 +848,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
         return {
           ...baseOffering,
           priceAmount: nightlyPrice,
+          depositAmount: shortDeposit,
           minNights: shortMinNights,
           securityDepositAmount: shortDeposit,
           metadata: {
@@ -780,6 +860,9 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
         return {
           ...baseOffering,
           priceAmount: monthlyPrice,
+          depositAmount: monthlyDeposit,
+          requiresGuarantor: true,
+          requiresLegalPolicy: true,
           securityDepositAmount: monthlyDeposit,
           metadata: {
             ...baseOffering.metadata,
@@ -791,6 +874,9 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
           ...baseOffering,
           priceAmount: salePrice,
           currency: saleCurrency,
+          acceptsBankCredit: true,
+          acceptsInfonavit: true,
+          acceptsFovissste: true,
           acceptsOffers: saleAcceptsOffers
         };
       }
@@ -799,8 +885,11 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
 
     const compiledPropertyData = {
       title,
+      subtitle,
+      shortDescription,
       description,
       type: mapUiToDbType(type),
+      developmentName,
       location,
       country,
       address,
@@ -811,23 +900,64 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       city,
       state: stateName,
       geometrySource,
+      neighborhood,
+      postalCode,
+      streetName,
+      streetNumber,
+      locationReference,
+      showPublicAddress,
       bedrooms,
       bathrooms,
-      maxGuests,
-      amenities: selectedAmenities,
       halfBathrooms,
+      parkingSpaces,
+      levelsCount,
+      constructionAge: constructionAge === '' ? null : Number(constructionAge),
+      conservationStateId: conservationState,
+      constructionTypeId: constructionType,
+      surfaceTotal: surfaceTotal === '' ? null : Number(surfaceTotal),
+      surfaceBuilt: surfaceBuilt === '' ? null : Number(surfaceBuilt),
+      surfaceFront: surfaceFront === '' ? null : Number(surfaceFront),
+      surfaceDepth: surfaceDepth === '' ? null : Number(surfaceDepth),
+      surfaceGarden: Number(surfaceGarden),
+      surfaceTerrace: Number(surfaceTerrace),
+      surfaceRoofGarden: Number(surfaceRoofGarden),
+      surfacePatio: Number(surfacePatio),
+      amenities: selectedAmenities,
+      legalDebtFree,
+      legalPublicDeed,
+      legalTaxCurrent,
+      legalServicesPaid,
+      legalOwnerType,
+      legalIsMortgaged,
+      servicesWater: true,
+      servicesElectricity: true,
+      servicesSewerage: true,
+      servicesNatGas: false,
+      servicesLpGas: true,
+      servicesInternet: 'Fiber Optic',
+      servicesGarbage: true,
+      securityCctv: selectedAmenities.includes('Domótica'),
+      securityGuardhouse: selectedAmenities.includes('Seguridad 24/7'),
+      security24_7: selectedAmenities.includes('Seguridad 24/7'),
+      securityBiometric: selectedAmenities.includes('Cerradura inteligente'),
       images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80'],
       valueRating: selectedModes.includes('SWAP') ? swapValueTier : 'Premium',
       availableStart: selectedModes.includes('SWAP') ? swapAvailableStart : '2026-06-01',
       availableEnd: selectedModes.includes('SWAP') ? swapAvailableEnd : '2026-12-31',
       offerings,
+      folderStatus: 'DRAFT',
+      metaTitle,
+      metaDescription,
       metadata: {
         publisherType,
         videoPlaceholder,
         virtualTourPlaceholder,
         uiPropertyType: type,
         halfBathrooms,
-        imagesMetadata
+        imagesMetadata,
+        isExclusive,
+        commissionTotalPct,
+        commissionSharedPct
       }
     };
 
@@ -966,8 +1096,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
             <div className="flex flex-col gap-2.5 shrink-0 mt-4">
               <span className="text-[10px] font-black uppercase tracking-wider text-brand-gray-400">Progreso del Registro</span>
               <div className="flex items-center gap-1.5">
-                {([0, 1, 2, 3, 4, 5] as const).map(s => {
-                  if (initialData && s === 0) return null; // Hide Step 0 indicator on edit
+                {([0, 1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map(s => {
                   const isActive = step === s;
                   const isCompleted = step > s;
                   return (
@@ -1074,780 +1203,848 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                   </motion.div>
                 )}
 
-                {/* STEP 1: Premium Offering Card Selectors */}
+                {/* STEP 1: Información Básica */}
                 {step === 1 && (
                   <motion.div
                     key="step1"
                     initial={{ opacity: 0, x: 15 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -15 }}
-                    className="flex flex-col gap-5"
+                    className="flex flex-col gap-4"
                   >
                     <div>
                       <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
-                        <Award className="w-4 h-4" />
-                        <span>Paso 1: Modalidad de Publicación</span>
+                        <Info className="w-4 h-4" />
+                        <span>Paso 1: Información Básica</span>
                       </h4>
-                      <h3 className="text-lg font-bold text-brand-black mt-1">¿Cómo deseas publicar esta propiedad?</h3>
-                      <p className="text-xs text-brand-gray-500 mt-0.5">Puedes elegir múltiples opciones comerciales para habilitar la experiencia híbrida.</p>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Ingresa los datos descriptivos generales del alojamiento.</p>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 p-1">
-                      {/* Premium SWAP Card */}
-                      <button
-                        type="button"
-                        onClick={() => toggleMode('SWAP')}
-                        className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between h-[108px] ${
-                          selectedModes.includes('SWAP') 
-                            ? 'border-brand-accent bg-brand-accent/[0.02] ring-2 ring-brand-accent/25 shadow-md' 
-                            : 'border-brand-gray-200 hover:border-brand-gray-400 bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-brand-accent/5 flex items-center justify-center shrink-0">
-                            <Calendar className="w-3.5 h-3.5 text-brand-accent" />
-                          </div>
-                          <span className="text-xs font-bold text-brand-black">Intercambio Gratis (SWAP)</span>
-                        </div>
-                        <p className="text-[10px] text-brand-gray-500 leading-normal mt-1.5 flex-1">
-                          Haz trueque de casa libre de renta con otros anfitriones verificado. Ahorra 100%.
-                        </p>
-                      </button>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-brand-gray-500">Título del anuncio</label>
+                        <input
+                          type="text"
+                          required
+                          value={title}
+                          onChange={(e) => setTitle(e.target.value)}
+                          placeholder="Ej. Moderna Villa con alberca en Marina Mazatlán"
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
+                        />
+                      </div>
 
-                      {/* SHORT_RENT Card */}
-                      <button
-                        type="button"
-                        onClick={() => toggleMode('SHORT_RENT')}
-                        className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between h-[108px] ${
-                          selectedModes.includes('SHORT_RENT') 
-                            ? 'border-brand-accent bg-brand-accent/[0.02] ring-2 ring-brand-accent/25 shadow-md' 
-                            : 'border-brand-gray-200 hover:border-brand-gray-400 bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-brand-accent/5 flex items-center justify-center shrink-0">
-                            <Home className="w-3.5 h-3.5 text-brand-accent" />
-                          </div>
-                          <span className="text-xs font-bold text-brand-black">Renta Temporal (Airbnb style)</span>
-                        </div>
-                        <p className="text-[10px] text-brand-gray-500 leading-normal mt-1.5 flex-1">
-                          Renta por noche o semana. Excelente para nómadas digitales y estancias vacacionales.
-                        </p>
-                      </button>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-brand-gray-500">Subtítulo</label>
+                        <input
+                          type="text"
+                          value={subtitle}
+                          onChange={(e) => setSubtitle(e.target.value)}
+                          placeholder="Ej. Ideal para familias y nómadas digitales"
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
+                        />
+                      </div>
 
-                      {/* MONTHLY_RENT Card */}
-                      <button
-                        type="button"
-                        onClick={() => toggleMode('MONTHLY_RENT')}
-                        className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between h-[108px] ${
-                          selectedModes.includes('MONTHLY_RENT') 
-                            ? 'border-brand-accent bg-brand-accent/[0.02] ring-2 ring-brand-accent/25 shadow-md' 
-                            : 'border-brand-gray-200 hover:border-brand-gray-400 bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-brand-accent/5 flex items-center justify-center shrink-0">
-                            <Calendar className="w-3.5 h-3.5 text-brand-accent" />
-                          </div>
-                          <span className="text-xs font-bold text-brand-black">Renta Mensual Flexible</span>
-                        </div>
-                        <p className="text-[10px] text-brand-gray-500 leading-normal mt-1.5 flex-1">
-                          Alquiler de mediano plazo (mensual) con contratos digitales rápidos y mínimos depósitos.
-                        </p>
-                      </button>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-brand-gray-500">Nombre del Desarrollo / Residencial</label>
+                        <input
+                          type="text"
+                          value={developmentName}
+                          onChange={(e) => setDevelopmentName(e.target.value)}
+                          placeholder="Ej. Marina Gardens, La Primavera"
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
+                        />
+                      </div>
 
-                      {/* SALE Card */}
-                      <button
-                        type="button"
-                        onClick={() => toggleMode('SALE')}
-                        className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between h-[108px] ${
-                          selectedModes.includes('SALE') 
-                            ? 'border-brand-accent bg-brand-accent/[0.02] ring-2 ring-brand-accent/25 shadow-md' 
-                            : 'border-brand-gray-200 hover:border-brand-gray-400 bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-brand-accent/5 flex items-center justify-center shrink-0">
-                            <DollarSign className="w-3.5 h-3.5 text-brand-accent" />
-                          </div>
-                          <span className="text-xs font-bold text-brand-black">Venta</span>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-brand-gray-500">Descripción Corta</label>
+                        <input
+                          type="text"
+                          value={shortDescription}
+                          onChange={(e) => setShortDescription(e.target.value)}
+                          placeholder="Resumen ejecutivo del espacio (máx. 160 caracteres)"
+                          maxLength={160}
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-brand-gray-500">Descripción Completa</label>
+                        <textarea
+                          rows={4}
+                          required
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          placeholder="Detalla la distribución del espacio, recámaras, accesos y cercanía..."
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent resize-none"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Tipo de Propiedad</label>
+                          <select
+                            value={type}
+                            onChange={(e) => setType(e.target.value as UIType)}
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
+                          >
+                            <option value="Departamento">Departamento</option>
+                            <option value="Casa">Casa</option>
+                            <option value="Penthouse">Penthouse</option>
+                            <option value="Villa">Villa</option>
+                            <option value="Loft">Loft</option>
+                          </select>
                         </div>
-                        <p className="text-[10px] text-brand-gray-500 leading-normal mt-1.5 flex-1">
-                          Publica tu propiedad para compradores interesados y recibe solicitudes directamente.
-                        </p>
-                      </button>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Categorización Premium</label>
+                          <select
+                            value={valueRating}
+                            onChange={(e) => setValueRating(e.target.value as any)}
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
+                          >
+                            <option value="Premium">Premium</option>
+                            <option value="Luxury">Luxury</option>
+                            <option value="Exclusive">Exclusive</option>
+                            <option value="Curated">Curated</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
                   </motion.div>
                 )}
 
-                {/* STEP 2: Basic Information */}
+                {/* STEP 2: Ubicación */}
                 {step === 2 && (
                   <motion.div
                     key="step2"
                     initial={{ opacity: 0, x: 15 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -15 }}
-                    className="flex flex-col gap-3"
+                    className="flex flex-col gap-4"
                   >
                     <div>
                       <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
-                        <Info className="w-4 h-4" />
-                        <span>Paso 2: Información Básica</span>
+                        <MapPin className="w-4 h-4" />
+                        <span>Paso 2: Ubicación Geográfica</span>
                       </h4>
-                      <h3 className="text-lg font-bold text-brand-black mt-1">Hablemos de tu alojamiento</h3>
-                      <p className="text-xs text-brand-gray-500 mt-0.5">Ingresa los datos descriptivos iniciales de tu espacio.</p>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Ingresa la localización exacta e indica qué mostrar públicamente.</p>
                     </div>
 
                     <div className="flex flex-col gap-3">
-                      {/* Title Input */}
                       <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider">Título del anuncio</label>
-                          <button
-                            type="button"
-                            onClick={handleImproveTitle}
-                            disabled={!title.trim() || isImprovingTitle}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-bold tracking-wide uppercase transition-all duration-200 ${
-                              isImprovingTitle
-                                ? 'bg-brand-gray-50 border-brand-gray-200 text-brand-gray-400 cursor-not-allowed'
-                                : !title.trim()
-                                ? 'bg-brand-gray-50 border-brand-gray-100 text-brand-gray-300 cursor-not-allowed opacity-50'
-                                : 'bg-brand-accent/5 border-brand-accent/20 hover:border-brand-accent text-brand-accent hover:bg-brand-accent/10 active:scale-95 cursor-pointer'
-                            }`}
-                          >
-                            {isImprovingTitle ? (
-                              <>
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                <span>Generando opciones...</span>
-                              </>
-                            ) : (
-                              <span>✨ Mejorar con IA</span>
-                            )}
-                          </button>
-                        </div>
+                        <label className="text-xs font-bold text-brand-gray-500">Búsqueda rápida o Ciudad</label>
                         <input
                           type="text"
                           required
-                          value={title}
-                          onChange={(e) => setTitle(e.target.value)}
-                          placeholder="Penthouse con vista al bosque en las lomas..."
-                          className="w-full p-3.5 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent transition-colors"
+                          value={location}
+                          onChange={(e) => setLocation(e.target.value)}
+                          placeholder="Ej. Culiacán, Sinaloa"
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
                         />
-                        {titleOptions.length > 0 && (
-                          <div className="mt-1.5 p-3.5 bg-brand-accent/[0.02] border border-brand-accent/15 rounded-xl flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-black text-brand-accent uppercase tracking-wider">
-                                {language === 'es' ? 'Selecciona un título mejorado por IA:' : 'Select an AI-enhanced title:'}
-                              </span>
-                              <button 
-                                type="button" 
-                                onClick={() => setTitleOptions([])} 
-                                className="text-[10px] text-brand-gray-500 hover:text-brand-black font-bold uppercase tracking-wider cursor-pointer"
-                              >
-                                {language === 'es' ? 'Omitir' : 'Skip'}
-                              </button>
-                            </div>
-                            <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
-                              {titleOptions.map((opt, i) => (
-                                <button
-                                  key={i}
-                                  type="button"
-                                  onClick={() => handleSelectTitleOption(opt)}
-                                  className="text-left text-xs p-3 bg-white border border-brand-gray-200 hover:border-brand-accent hover:bg-brand-accent/[0.01] rounded-xl transition-all font-semibold text-brand-black shadow-xs flex gap-2.5 items-center cursor-pointer hover:translate-x-0.5 duration-200"
-                                >
-                                  <span className="text-[10px] font-black text-brand-accent bg-brand-accent/5 border border-brand-accent/10 w-6 h-6 rounded-full flex items-center justify-center shrink-0">
-                                    {i + 1}
-                                  </span>
-                                  <span className="flex-1 leading-normal">{opt}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
 
-                      {/* Grid for Property Type, Location */}
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider">Tipo de propiedad</label>
-                          <select
-                            value={type}
-                            onChange={(e) => setType(e.target.value as UIType)}
-                            className="w-full p-3.5 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent transition-colors"
-                          >
-                            {UI_TYPES.map(tOption => (
-                              <option key={tOption} value={tOption}>{tOption}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider">Ciudad / Destino</label>
-                          <input
-                            type="text"
-                            required
-                            value={location}
-                            onChange={(e) => setLocation(e.target.value)}
-                            placeholder="CDMX, Miami, etc."
-                            className="w-full p-3.5 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent transition-colors"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Country & Address Address */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider">País</label>
+                          <label className="text-xs font-bold text-brand-gray-500">País</label>
                           <input
                             type="text"
                             required
                             value={country}
                             onChange={(e) => setCountry(e.target.value)}
-                            placeholder="México, Estados Unidos..."
-                            className="w-full p-3.5 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent transition-colors"
+                            placeholder="Ej. Mexico"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
                           />
                         </div>
 
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider">Dirección Completa</label>
+                          <label className="text-xs font-bold text-brand-gray-500">Colonia / Fraccionamiento</label>
                           <input
                             type="text"
-                            ref={autocompleteInputRef}
-                            value={address}
-                            onChange={(e) => handleAddressChange(e.target.value)}
-                            placeholder="Calle, número, colonia, ciudad"
-                            className="w-full p-3.5 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent transition-colors"
+                            value={neighborhood}
+                            onChange={(e) => setNeighborhood(e.target.value)}
+                            placeholder="Ej. Tres Ríos"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
                           />
-                          {geometrySource === 'google_places' ? (
-                            <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 mt-0.5">
-                              ✓ Dirección validada por Google
-                            </span>
-                          ) : address ? (
-                            <span className="text-[10px] font-bold text-amber-600 flex items-center gap-1 mt-0.5">
-                              ⚠ Ubicación aproximada (Manual - no se mostrará en el mapa)
-                            </span>
-                          ) : null}
                         </div>
                       </div>
 
-                      {/* Mini Mapa de Vista Previa */}
-                      {latitude !== null && longitude !== null && (
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] font-black text-brand-gray-500 uppercase tracking-wider">
-                            Vista Previa de la Ubicación
-                          </label>
-                          <div 
-                            id="wizard-preview-map" 
-                            className="w-full h-40 rounded-2xl border border-brand-gray-200/60 overflow-hidden shadow-sm relative z-10 bg-brand-gray-100" 
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="flex flex-col gap-1.5 col-span-2">
+                          <label className="text-xs font-bold text-brand-gray-500">Calle y Número</label>
+                          <input
+                            type="text"
+                            value={streetName}
+                            onChange={(e) => setStreetName(e.target.value)}
+                            placeholder="Calle, Número exterior/interior"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
                           />
                         </div>
-                      )}
 
-                      {/* Description Textarea */}
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider">Descripción del alojamiento</label>
-                          <button
-                            type="button"
-                            onClick={handleImproveDescription}
-                            disabled={!description.trim() || isImprovingDescription}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-bold tracking-wide uppercase transition-all duration-200 ${
-                              isImprovingDescription
-                                ? 'bg-brand-gray-50 border-brand-gray-200 text-brand-gray-400 cursor-not-allowed'
-                                : !description.trim()
-                                ? 'bg-brand-gray-50 border-brand-gray-100 text-brand-gray-300 cursor-not-allowed opacity-50'
-                                : 'bg-brand-accent/5 border-brand-accent/20 hover:border-brand-accent text-brand-accent hover:bg-brand-accent/10 active:scale-95 cursor-pointer'
-                            }`}
-                          >
-                            {isImprovingDescription ? (
-                              <>
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                <span>Generando opciones...</span>
-                              </>
-                            ) : (
-                              <span>✨ Mejorar con IA</span>
-                            )}
-                          </button>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">C.P.</label>
+                          <input
+                            type="text"
+                            value={postalCode}
+                            onChange={(e) => setPostalCode(e.target.value)}
+                            placeholder="Código Postal"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
+                          />
                         </div>
-                        <textarea
-                          required
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          placeholder="Describe la arquitectura, el vecindario y las vistas de tu hogar..."
-                          className="w-full h-16 p-3 bg-brand-gray-50 border border-brand-gray-200 rounded-xl text-xs font-medium outline-none focus:border-brand-accent transition-colors resize-none leading-relaxed text-brand-black"
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-brand-gray-500">Referencias de Ubicación</label>
+                        <input
+                          type="text"
+                          value={locationReference}
+                          onChange={(e) => setLocationReference(e.target.value)}
+                          placeholder="Ej. Frente a parque municipal"
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
                         />
-                        {descriptionOptions.length > 0 && (
-                          <div className="mt-1.5 p-3.5 bg-brand-accent/[0.02] border border-brand-accent/15 rounded-xl flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-black text-brand-accent uppercase tracking-wider">
-                                {language === 'es' ? 'Selecciona una descripción mejorada por IA:' : 'Select an AI-enhanced description:'}
-                              </span>
-                              <button 
-                                type="button" 
-                                onClick={() => setDescriptionOptions([])} 
-                                className="text-[10px] text-brand-gray-500 hover:text-brand-black font-bold uppercase tracking-wider cursor-pointer"
-                              >
-                                {language === 'es' ? 'Omitir' : 'Skip'}
-                              </button>
-                            </div>
-                            <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
-                              {descriptionOptions.map((opt, i) => (
-                                <button
-                                  key={i}
-                                  type="button"
-                                  onClick={() => handleSelectDescriptionOption(opt)}
-                                  className="text-left text-xs p-3 bg-white border border-brand-gray-200 hover:border-brand-accent hover:bg-brand-accent/[0.01] rounded-xl transition-all font-semibold text-brand-black shadow-xs flex gap-2.5 items-start cursor-pointer hover:translate-x-0.5 duration-200"
-                                >
-                                  <span className="text-[10px] font-black text-brand-accent bg-brand-accent/5 border border-brand-accent/10 w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-                                    {i + 1}
-                                  </span>
-                                  <span className="flex-1 leading-relaxed">{opt}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-2">
+                        <input
+                          type="checkbox"
+                          id="showPublicAddress"
+                          checked={showPublicAddress}
+                          onChange={(e) => setShowPublicAddress(e.target.checked)}
+                          className="w-4 h-4 accent-brand-accent cursor-pointer"
+                        />
+                        <label htmlFor="showPublicAddress" className="text-xs font-semibold text-brand-gray-600 cursor-pointer">
+                          Mostrar dirección completa públicamente (sino se mostrará aproximada).
+                        </label>
                       </div>
                     </div>
                   </motion.div>
                 )}
 
-                {/* STEP 3: Specs & Amenities Selection */}
+                {/* STEP 3: Modalidad y Precios */}
                 {step === 3 && (
                   <motion.div
                     key="step3"
                     initial={{ opacity: 0, x: 15 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -15 }}
-                    className="flex flex-col gap-5"
+                    className="flex flex-col gap-4"
                   >
                     <div>
                       <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
-                        <Shield className="w-4 h-4" />
-                        <span>Paso 3: Características</span>
+                        <DollarSign className="w-4 h-4" />
+                        <span>Paso 3: Operación y Comercialización</span>
                       </h4>
-                      <h3 className="text-lg font-bold text-brand-black mt-1">Detalles de habitabilidad</h3>
-                      <p className="text-xs text-brand-gray-500 mt-0.5">Ingresa los números de habitaciones, baños, camas y selecciona las amenidades.</p>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Selecciona y configura las modalidades activas de este inmueble.</p>
                     </div>
 
-                    <div className="flex flex-col gap-3">
-                      {/* Specs Row — always: bedrooms, bathrooms, half bathrooms */}
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider text-center">Habitaciones</label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="10"
-                            value={bedrooms}
-                            onChange={(e) => setBedrooms(parseInt(e.target.value) || 1)}
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent transition-colors text-center"
-                          />
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider text-center">Baños Completos</label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="10"
-                            value={bathrooms}
-                            onChange={(e) => setBathrooms(parseInt(e.target.value) || 0)}
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent transition-colors text-center"
-                          />
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider text-center">Medios Baños</label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="5"
-                            value={halfBathrooms}
-                            onChange={(e) => setHalfBathrooms(parseInt(e.target.value) || 0)}
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent transition-colors text-center"
-                          />
-                        </div>
+                    <div className="flex flex-col gap-4">
+                      {/* Checkbox selectors */}
+                      <div className="grid grid-cols-4 gap-2">
+                        {(['SALE', 'RENT', 'SWAP'] as const).map(mode => {
+                          const isActive = selectedModes.includes(mode as any);
+                          return (
+                            <button
+                              key={mode}
+                              type="button"
+                              onClick={() => toggleMode(mode as any)}
+                              className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer text-xs font-bold ${
+                                isActive 
+                                  ? 'bg-brand-black border-brand-black text-white shadow-premium' 
+                                  : 'bg-white border-brand-gray-200 text-brand-gray-500 hover:bg-brand-gray-50'
+                              }`}
+                            >
+                              {mode === 'SALE' ? 'Venta' : mode === 'RENT' ? 'Renta' : 'Swap'}
+                            </button>
+                          );
+                        })}
                       </div>
 
-                      {/* Guests capacity — only for rental and SWAP modes */}
-                      {selectedModes.some(m => m === 'SWAP' || m === 'SHORT_RENT' || m === 'MONTHLY_RENT') && (
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="flex flex-col gap-1.5 col-span-1">
-                            <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider text-center">Huéspedes Máx.</label>
-                            <input
-                              type="number"
-                              min="1"
-                              max="20"
-                              value={maxGuests}
-                              onChange={(e) => setMaxGuests(parseInt(e.target.value) || 1)}
-                              className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent transition-colors text-center"
-                            />
+                      {/* Config Form based on selected checkmarks */}
+                      <div className="flex flex-col gap-3.5 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
+                        {/* SALE config details */}
+                        {selectedModes.includes('SALE' as any) && (
+                          <div className="border border-brand-accent/20 bg-brand-accent/[0.01] rounded-2xl p-4 flex flex-col gap-3">
+                            <span className="text-[10px] font-black uppercase text-brand-accent">Comercialización de Venta</span>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-brand-gray-500">Precio de Venta</label>
+                                <input
+                                  type="number"
+                                  value={salePrice}
+                                  onChange={(e) => setSalePrice(Number(e.target.value) || 0)}
+                                  className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-brand-gray-500">Moneda</label>
+                                <select
+                                  value={saleCurrency}
+                                  onChange={(e) => setSaleCurrency(e.target.value)}
+                                  className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                                >
+                                  <option value="MXN">MXN ($)</option>
+                                  <option value="USD">USD ($)</option>
+                                </select>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Amenities Options Selector */}
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider">Amenidades disponibles</label>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1">
-                          {AMENITY_OPTIONS.map(amenity => {
-                            const isSelected = selectedAmenities.includes(amenity);
-                            return (
-                              <button
-                                key={amenity}
-                                type="button"
-                                onClick={() => toggleAmenity(amenity)}
-                                className={`p-2.5 rounded-xl border text-[10px] font-bold text-left transition-all cursor-pointer flex items-center justify-between ${
-                                  isSelected 
-                                    ? 'border-brand-accent bg-brand-accent/5 text-brand-black'
-                                    : 'border-brand-gray-200 bg-white text-brand-gray-500 hover:border-brand-gray-300'
-                                }`}
-                              >
-                                <span>{amenity}</span>
-                                {isSelected && <Check className="w-3 h-3 text-brand-accent" />}
-                              </button>
-                            );
-                          })}
-                        </div>
+                        {/* RENT config details */}
+                        {selectedModes.includes('RENT' as any) && (
+                          <div className="border border-brand-accent/20 bg-brand-accent/[0.01] rounded-2xl p-4 flex flex-col gap-3">
+                            <span className="text-[10px] font-black uppercase text-brand-accent">Comercialización de Renta</span>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-brand-gray-500">Precio Mensual</label>
+                                <input
+                                  type="number"
+                                  value={monthlyPrice}
+                                  onChange={(e) => setMonthlyPrice(Number(e.target.value) || 0)}
+                                  className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                                />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-brand-gray-500">Depósito Requerido</label>
+                                <input
+                                  type="number"
+                                  value={monthlyDeposit}
+                                  onChange={(e) => setMonthlyDeposit(Number(e.target.value) || 0)}
+                                  className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* SWAP config details */}
+                        {selectedModes.includes('SWAP' as any) && (
+                          <div className="border border-brand-accent/20 bg-brand-accent/[0.01] rounded-2xl p-4 flex flex-col gap-3">
+                            <span className="text-[10px] font-black uppercase text-brand-accent">Comercialización de Swap / Permuta</span>
+                            <div className="flex flex-col gap-1">
+                              <label className="text-[10px] font-bold text-brand-gray-500">Propiedad Buscada / Intercambio deseado</label>
+                              <input
+                                type="text"
+                                value={swapPreferences}
+                                onChange={(e) => setSwapPreferences(e.target.value)}
+                                placeholder="Ej. Busco departamento vacacional frente al mar en Mazatlán"
+                                className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </motion.div>
                 )}
 
-                {/* STEP 4: Media, Photos and Tour Link */}
+                {/* STEP 4: Características */}
                 {step === 4 && (
                   <motion.div
                     key="step4"
                     initial={{ opacity: 0, x: 15 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -15 }}
-                    className="flex flex-col gap-5"
+                    className="flex flex-col gap-4"
                   >
                     <div>
                       <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
-                        <Camera className="w-4 h-4" />
-                        <span>Paso 4: Multimedia y Galería</span>
+                        <Sliders className="w-4 h-4" />
+                        <span>Paso 4: Ficha Técnica y Superficies</span>
                       </h4>
-                      <h3 className="text-lg font-bold text-brand-black mt-1">Presentación visual de tu hogar</h3>
-                      <p className="text-xs text-brand-gray-500 mt-0.5">Sube fotografías de alta resolución y añade enlaces para recorridos tridimensionales.</p>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Ingresa las características constructivas y medidas en metros cuadrados.</p>
                     </div>
 
-                    <div className="flex flex-col gap-4">
-                      {/* Image Upload Component */}
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider">Fotografías de la propiedad</label>
-                        <ImageUploadDropzone 
-                          images={images} 
-                          onChange={setImages} 
-                          imagesMetadata={imagesMetadata}
-                          onMetadataChange={setImagesMetadata}
-                        />
+                    <div className="flex flex-col gap-3 max-h-[360px] overflow-y-auto pr-1 no-scrollbar">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-brand-gray-500">Recámaras</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={bedrooms}
+                            onChange={(e) => setBedrooms(Number(e.target.value) || 1)}
+                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-brand-gray-500">Baños Completos</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={bathrooms}
+                            onChange={(e) => setBathrooms(Number(e.target.value) || 1)}
+                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-brand-gray-500">Medios Baños</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={halfBathrooms}
+                            onChange={(e) => setHalfBathrooms(Number(e.target.value) || 0)}
+                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          />
+                        </div>
                       </div>
 
-                      {/* Video Link */}
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider flex items-center gap-1">
-                          <Play className="w-3 h-3" />
-                          <span>Video promocional (Opcional - link de YouTube/Vimeo)</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={videoPlaceholder}
-                          onChange={(e) => setVideoPlaceholder(e.target.value)}
-                          placeholder="https://youtube.com/watch?v=..."
-                          className="w-full p-3.5 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent transition-colors"
-                        />
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-brand-gray-500">Cajones Estac.</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={parkingSpaces}
+                            onChange={(e) => setParkingSpaces(Number(e.target.value) || 0)}
+                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-brand-gray-500">Niveles totales</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={levelsCount}
+                            onChange={(e) => setLevelsCount(Number(e.target.value) || 1)}
+                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-brand-gray-500">Edad (Años)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={constructionAge}
+                            onChange={(e) => setConstructionAge(e.target.value === '' ? '' : Number(e.target.value))}
+                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          />
+                        </div>
                       </div>
 
-                      {/* 3D Virtual Tour */}
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500 uppercase tracking-wider flex items-center gap-1">
-                          <Eye className="w-3 h-3" />
-                          <span>Recorrido virtual 3D (Opcional - Matterport link)</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={virtualTourPlaceholder}
-                          onChange={(e) => setVirtualTourPlaceholder(e.target.value)}
-                          placeholder="https://my.matterport.com/show/?m=..."
-                          className="w-full p-3.5 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent transition-colors"
-                        />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-brand-gray-500">Estilo Arquitectura</label>
+                          <select
+                            value={constructionType}
+                            onChange={(e) => setConstructionType(e.target.value)}
+                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          >
+                            <option value="Modern">Moderna</option>
+                            <option value="Contemporary">Contemporánea</option>
+                            <option value="Classic">Clásica</option>
+                            <option value="Minimalist">Minimalista</option>
+                            <option value="Rustic">Rústica</option>
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-brand-gray-500">Estado de Conservación</label>
+                          <select
+                            value={conservationState}
+                            onChange={(e) => setConservationState(e.target.value)}
+                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          >
+                            <option value="Excellent">Excelente</option>
+                            <option value="Good">Bueno</option>
+                            <option value="Fair">Regular</option>
+                            <option value="Remodelado">Remodelado</option>
+                            <option value="Para remodelar">Requiere remodelación</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-brand-gray-100">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-brand-gray-500">Terreno M² (Superficie Total)</label>
+                          <input
+                            type="number"
+                            value={surfaceTotal}
+                            onChange={(e) => setSurfaceTotal(e.target.value === '' ? '' : Number(e.target.value))}
+                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-brand-gray-500">Construcción M² (Superficie Útil)</label>
+                          <input
+                            type="number"
+                            value={surfaceBuilt}
+                            onChange={(e) => setSurfaceBuilt(e.target.value === '' ? '' : Number(e.target.value))}
+                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-brand-gray-500">Frente del Terreno (m)</label>
+                          <input
+                            type="number"
+                            value={surfaceFront}
+                            onChange={(e) => setSurfaceFront(e.target.value === '' ? '' : Number(e.target.value))}
+                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-bold text-brand-gray-500">Fondo del Terreno (m)</label>
+                          <input
+                            type="number"
+                            value={surfaceDepth}
+                            onChange={(e) => setSurfaceDepth(e.target.value === '' ? '' : Number(e.target.value))}
+                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-2 pt-1">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[9px] font-bold text-brand-gray-500">Jardín M²</label>
+                          <input
+                            type="number"
+                            value={surfaceGarden}
+                            onChange={(e) => setSurfaceGarden(Number(e.target.value) || 0)}
+                            className="w-full p-2 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[9px] font-bold text-brand-gray-500">Terraza M²</label>
+                          <input
+                            type="number"
+                            value={surfaceTerrace}
+                            onChange={(e) => setSurfaceTerrace(Number(e.target.value) || 0)}
+                            className="w-full p-2 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[9px] font-bold text-brand-gray-500">Roof G. M²</label>
+                          <input
+                            type="number"
+                            value={surfaceRoofGarden}
+                            onChange={(e) => setSurfaceRoofGarden(Number(e.target.value) || 0)}
+                            className="w-full p-2 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[9px] font-bold text-brand-gray-500">Patio M²</label>
+                          <input
+                            type="number"
+                            value={surfacePatio}
+                            onChange={(e) => setSurfacePatio(Number(e.target.value) || 0)}
+                            className="w-full p-2 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                          />
+                        </div>
                       </div>
                     </div>
                   </motion.div>
                 )}
 
-                {/* STEP 5: Dynamic Configuration fields based on selected offerings */}
+                {/* STEP 5: Amenidades */}
                 {step === 5 && (
                   <motion.div
                     key="step5"
                     initial={{ opacity: 0, x: 15 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -15 }}
-                    className="flex flex-col gap-5"
+                    className="flex flex-col gap-4"
+                  >
+                    <div>
+                      <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
+                        <Award className="w-4 h-4" />
+                        <span>Paso 5: Amenidades del Inmueble</span>
+                      </h4>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Selecciona el equipamiento y amenidades activas en el espacio.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
+                      {AMENITY_OPTIONS.map(amenity => {
+                        const isChecked = selectedAmenities.includes(amenity);
+                        return (
+                          <button
+                            key={amenity}
+                            type="button"
+                            onClick={() => toggleAmenity(amenity)}
+                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer text-xs font-bold flex items-center justify-between ${
+                              isChecked 
+                                ? 'bg-brand-black border-brand-black text-white shadow-premium' 
+                                : 'bg-white border-brand-gray-200 text-brand-gray-500 hover:bg-brand-gray-50'
+                            }`}
+                          >
+                            <span>{amenity}</span>
+                            {isChecked && <Check className="w-4 h-4 text-brand-accent" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* STEP 6: Información Legal */}
+                {step === 6 && (
+                  <motion.div
+                    key="step6"
+                    initial={{ opacity: 0, x: 15 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -15 }}
+                    className="flex flex-col gap-4"
+                  >
+                    <div>
+                      <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
+                        <FileText className="w-4 h-4" />
+                        <span>Paso 6: Información Legal</span>
+                      </h4>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Indica las condiciones jurídicas del expediente de la propiedad.</p>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                          <input
+                            type="checkbox"
+                            id="legalDebtFree"
+                            checked={legalDebtFree}
+                            onChange={(e) => setLegalDebtFree(e.target.checked)}
+                            className="w-4 h-4 accent-brand-accent cursor-pointer"
+                          />
+                          <label htmlFor="legalDebtFree" className="text-xs font-bold text-brand-black cursor-pointer">
+                            Libre de Gravamen
+                          </label>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                          <input
+                            type="checkbox"
+                            id="legalPublicDeed"
+                            checked={legalPublicDeed}
+                            onChange={(e) => setLegalPublicDeed(e.target.checked)}
+                            className="w-4 h-4 accent-brand-accent cursor-pointer"
+                          />
+                          <label htmlFor="legalPublicDeed" className="text-xs font-bold text-brand-black cursor-pointer">
+                            Escritura Pública
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                          <input
+                            type="checkbox"
+                            id="legalTaxCurrent"
+                            checked={legalTaxCurrent}
+                            onChange={(e) => setLegalTaxCurrent(e.target.checked)}
+                            className="w-4 h-4 accent-brand-accent cursor-pointer"
+                          />
+                          <label htmlFor="legalTaxCurrent" className="text-xs font-bold text-brand-black cursor-pointer">
+                            Predial al Corriente
+                          </label>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                          <input
+                            type="checkbox"
+                            id="legalIsMortgaged"
+                            checked={legalIsMortgaged}
+                            onChange={(e) => setLegalIsMortgaged(e.target.checked)}
+                            className="w-4 h-4 accent-brand-accent cursor-pointer"
+                          />
+                          <label htmlFor="legalIsMortgaged" className="text-xs font-bold text-brand-black cursor-pointer">
+                            ¿Tiene Hipoteca activa?
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5 mt-2">
+                        <label className="text-xs font-bold text-brand-gray-500">Régimen de Propiedad</label>
+                        <select
+                          value={legalOwnerType}
+                          onChange={(e) => setLegalOwnerType(e.target.value)}
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
+                        >
+                          <option value="Privada">Propiedad Privada (Escriturada)</option>
+                          <option value="Ejidal">Ejidal / Posesión</option>
+                          <option value="Fideicomiso">Fideicomiso Bancario</option>
+                        </select>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* STEP 7: Multimedia */}
+                {step === 7 && (
+                  <motion.div
+                    key="step7"
+                    initial={{ opacity: 0, x: 15 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -15 }}
+                    className="flex flex-col gap-4"
+                  >
+                    <div>
+                      <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
+                        <Image className="w-4 h-4" />
+                        <span>Paso 7: Galería y Multimedia</span>
+                      </h4>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Agrega las fotos oficiales y enlaces a recorridos virtuales 3D.</p>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-black text-brand-gray-500 uppercase tracking-wider">Imágenes</span>
+                        <ImageUploadDropzone
+                          images={images}
+                          onChange={setImages}
+                          imagesMetadata={imagesMetadata}
+                          onMetadataChange={setImagesMetadata}
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-brand-gray-500">Enlace a Video Recorrido</label>
+                        <input
+                          type="text"
+                          value={videoPlaceholder}
+                          onChange={(e) => setVideoPlaceholder(e.target.value)}
+                          placeholder="Ej. https://youtube.com/watch?v=..."
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-brand-gray-500">Recorrido Virtual 3D (Matterport)</label>
+                        <input
+                          type="text"
+                          value={virtualTourPlaceholder}
+                          onChange={(e) => setVirtualTourPlaceholder(e.target.value)}
+                          placeholder="Ej. https://my.matterport.com/show/?m=..."
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* STEP 8: Información Comercial & SEO */}
+                {step === 8 && (
+                  <motion.div
+                    key="step8"
+                    initial={{ opacity: 0, x: 15 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -15 }}
+                    className="flex flex-col gap-4"
+                  >
+                    <div>
+                      <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
+                        <Briefcase className="w-4 h-4" />
+                        <span>Paso 8: Comercial & SEO</span>
+                      </h4>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Configura exclusivas, comisiones de red y meta etiquetas para buscadores.</p>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                        <input
+                          type="checkbox"
+                          id="isExclusive"
+                          checked={isExclusive}
+                          onChange={(e) => setIsExclusive(e.target.checked)}
+                          className="w-4 h-4 accent-brand-accent cursor-pointer"
+                        />
+                        <label htmlFor="isExclusive" className="text-xs font-bold text-brand-black cursor-pointer">
+                          Ficha en Exclusiva
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Comisión Total (%)</label>
+                          <input
+                            type="number"
+                            value={commissionTotalPct}
+                            onChange={(e) => setCommissionTotalPct(e.target.value === '' ? '' : Number(e.target.value))}
+                            placeholder="Ej. 5%"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Comisión Compartida (%)</label>
+                          <input
+                            type="number"
+                            value={commissionSharedPct}
+                            onChange={(e) => setCommissionSharedPct(e.target.value === '' ? '' : Number(e.target.value))}
+                            placeholder="Ej. 2.5%"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-brand-gray-500">Meta Title SEO</label>
+                        <input
+                          type="text"
+                          value={metaTitle}
+                          onChange={(e) => setMetaTitle(e.target.value)}
+                          placeholder="Ej. Mansión en Renta Culiacán Tres Ríos"
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-brand-gray-500">Meta Description SEO</label>
+                        <input
+                          type="text"
+                          value={metaDescription}
+                          onChange={(e) => setMetaDescription(e.target.value)}
+                          placeholder="Descripción breve para motores de búsqueda..."
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* STEP 9: Vista Previa y Publicación */}
+                {step === 9 && (
+                  <motion.div
+                    key="step9"
+                    initial={{ opacity: 0, x: 15 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -15 }}
+                    className="flex flex-col gap-4"
                   >
                     <div>
                       <h4 className="text-sm font-black text-brand-black uppercase tracking-wider flex items-center gap-1.5 text-brand-accent">
                         <Sparkles className="w-4 h-4" />
-                        <span>Paso 5: Configuración de Ofertas</span>
+                        <span>Paso 9: Vista Previa</span>
                       </h4>
-                      <h3 className="text-lg font-bold text-brand-black mt-1">Detalles comerciales específicos</h3>
-                      <p className="text-xs text-brand-gray-500 mt-0.5">Configura las particularidades financieras para cada una de las modalidades elegidas.</p>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Valida el resumen técnico del anuncio antes de guardarlo en base de datos.</p>
                     </div>
 
-                    {selectedModes.length > 1 && (
-                      <div className="flex flex-wrap gap-2 border-b border-brand-gray-100 pb-2 mb-4 shrink-0">
-                        {selectedModes.map(mode => (
-                          <button
-                            key={mode}
-                            type="button"
-                            onClick={() => setActiveConfigTab(mode)}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                              activeConfigTab === mode
-                                ? 'bg-brand-accent text-white shadow-xs'
-                                : 'bg-brand-gray-50 text-brand-gray-500 hover:bg-brand-gray-100'
-                            }`}
-                          >
-                            {mode === 'SWAP' ? 'Swap' : mode === 'SHORT_RENT' ? 'Renta Corta' : mode === 'MONTHLY_RENT' ? 'Renta Mensual' : 'Venta'}
-                          </button>
-                        ))}
+                    <div className="border border-brand-gray-200 rounded-2xl p-4 bg-brand-gray-50/50 flex flex-col gap-3">
+                      <div className="flex justify-between items-center pb-2 border-b">
+                        <span className="text-xs font-black text-brand-black truncate">{title || 'Sin Título'}</span>
+                        <span className="text-[10px] font-black uppercase text-brand-accent bg-brand-accent/5 px-2.5 py-1 rounded">
+                          {type}
+                        </span>
                       </div>
-                    )}
 
-                    <div className="flex flex-col gap-4">
-                      {/* DYNAMIC BLOCK: SWAP */}
-                      {selectedModes.includes('SWAP') && (activeConfigTab === 'SWAP' || selectedModes.length === 1) && (
-                        <div className="border border-brand-accent/20 bg-brand-accent/[0.01] rounded-2xl p-4 flex flex-col gap-4">
-                          <div className="flex items-center gap-2 border-b border-brand-accent/10 pb-2">
-                            <Calendar className="w-3.5 h-3.5 text-brand-accent" />
-                            <span className="text-xs font-black uppercase text-brand-accent tracking-wider">Configuración de Intercambio (SWAP)</span>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-xs font-bold text-brand-gray-500">Tier de valoración</label>
-                              <select
-                                value={swapValueTier}
-                                onChange={(e) => setSwapValueTier(e.target.value as any)}
-                                className="w-full p-3 rounded-xl bg-white border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
-                              >
-                                <option value="Premium">Premium</option>
-                                <option value="Luxury">Luxury</option>
-                                <option value="Exclusive">Exclusive</option>
-                                <option value="Curated">Curated</option>
-                              </select>
-                            </div>
-
-                            <div className="flex flex-col gap-1.5 font-semibold text-brand-gray-500 text-xs">
-                              <label className="text-xs font-bold text-brand-gray-500">Disponibilidad de intercambio</label>
-                              <div className="flex gap-2 items-center">
-                                <input
-                                  type="date"
-                                  value={swapAvailableStart}
-                                  onChange={(e) => setSwapAvailableStart(e.target.value)}
-                                  className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-[10px]"
-                                />
-                                <span className="text-brand-gray-400">a</span>
-                                <input
-                                  type="date"
-                                  value={swapAvailableEnd}
-                                  onChange={(e) => setSwapAvailableEnd(e.target.value)}
-                                  className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-[10px]"
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-bold text-brand-gray-500">Preferencias de intercambio de destino</label>
-                            <input
-                              type="text"
-                              value={swapPreferences}
-                              onChange={(e) => setSwapPreferences(e.target.value)}
-                              placeholder="Ej. Casa frente al mar en Costa Rica, apartamento céntrico en París..."
-                              className="w-full p-3 rounded-xl bg-white border border-brand-gray-200 text-xs font-medium"
-                            />
-                          </div>
+                      <div className="grid grid-cols-2 gap-3 text-xs leading-normal">
+                        <div>
+                          <p className="text-brand-gray-400 font-bold">Ubicación</p>
+                          <p className="font-semibold text-brand-black">{location || 'No especificada'}</p>
                         </div>
-                      )}
-
-                      {/* DYNAMIC BLOCK: SHORT_RENT */}
-                      {selectedModes.includes('SHORT_RENT') && (activeConfigTab === 'SHORT_RENT' || selectedModes.length === 1) && (
-                        <div className="border border-emerald-200/80 bg-emerald-50/5 rounded-2xl p-4 flex flex-col gap-4">
-                          <div className="flex items-center gap-2 border-b border-emerald-100 pb-2">
-                            <Home className="w-3.5 h-3.5 text-emerald-700" />
-                            <span className="text-xs font-black uppercase text-emerald-700 tracking-wider">Configuración de Renta Temporal</span>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-xs font-bold text-brand-gray-500">Precio por noche ($ USD)</label>
-                              <input
-                                type="number"
-                                min="10"
-                                value={nightlyPrice}
-                                onChange={(e) => setNightlyPrice(parseInt(e.target.value) || 10)}
-                                className="w-full p-3 rounded-xl bg-white border border-brand-gray-200 text-xs font-semibold"
-                              />
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-xs font-bold text-brand-gray-500">Precio por semana ($ USD)</label>
-                              <input
-                                type="number"
-                                min="50"
-                                value={weeklyPrice}
-                                onChange={(e) => setWeeklyPrice(parseInt(e.target.value) || 50)}
-                                className="w-full p-3 rounded-xl bg-white border border-brand-gray-200 text-xs font-semibold"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-xs font-bold text-brand-gray-500">Estancia mínima (Noches)</label>
-                              <input
-                                type="number"
-                                min="1"
-                                value={shortMinNights}
-                                onChange={(e) => setShortMinNights(parseInt(e.target.value) || 1)}
-                                className="w-full p-3 rounded-xl bg-white border border-brand-gray-200 text-xs font-semibold"
-                              />
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-xs font-bold text-brand-gray-500">Depósito de garantía ($ USD)</label>
-                              <input
-                                type="number"
-                                min="0"
-                                value={shortDeposit}
-                                onChange={(e) => setShortDeposit(parseInt(e.target.value) || 0)}
-                                className="w-full p-3 rounded-xl bg-white border border-brand-gray-200 text-xs font-semibold"
-                              />
-                            </div>
-                          </div>
+                        <div>
+                          <p className="text-brand-gray-400 font-bold">Habitabilidad</p>
+                          <p className="font-semibold text-brand-black">{bedrooms} Rec • {bathrooms} Baños • {parkingSpaces} Est</p>
                         </div>
-                      )}
+                      </div>
 
-                      {/* DYNAMIC BLOCK: MONTHLY_RENT */}
-                      {selectedModes.includes('MONTHLY_RENT') && (activeConfigTab === 'MONTHLY_RENT' || selectedModes.length === 1) && (
-                        <div className="border border-sky-200/80 bg-sky-50/5 rounded-2xl p-4 flex flex-col gap-4">
-                          <div className="flex items-center gap-2 border-b border-sky-100 pb-2">
-                            <Calendar className="w-3.5 h-3.5 text-sky-700" />
-                            <span className="text-xs font-black uppercase text-sky-700 tracking-wider">Configuración de Renta Mensual</span>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-xs font-bold text-brand-gray-500">Precio mensual ($ USD)</label>
-                              <input
-                                type="number"
-                                min="100"
-                                value={monthlyPrice}
-                                onChange={(e) => setMonthlyPrice(parseInt(e.target.value) || 100)}
-                                className="w-full p-3 rounded-xl bg-white border border-brand-gray-200 text-xs font-semibold"
-                              />
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-xs font-bold text-brand-gray-500">Depósito de seguridad ($ USD)</label>
-                              <input
-                                type="number"
-                                min="0"
-                                value={monthlyDeposit}
-                                onChange={(e) => setMonthlyDeposit(parseInt(e.target.value) || 0)}
-                                className="w-full p-3 rounded-xl bg-white border border-brand-gray-200 text-xs font-semibold"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 mt-1">
-                            <input
-                              type="checkbox"
-                              id="monthlyContract"
-                              checked={monthlyContract}
-                              onChange={(e) => setMonthlyContract(e.target.checked)}
-                              className="w-4 h-4 accent-brand-accent cursor-pointer"
-                            />
-                            <label htmlFor="monthlyContract" className="text-xs font-semibold text-brand-gray-600 cursor-pointer">
-                              Requiere firma de contrato de arrendamiento formal.
-                            </label>
-                          </div>
+                      <div className="text-xs leading-normal pt-2 border-t">
+                        <p className="text-brand-gray-400 font-bold">Modalidades seleccionadas</p>
+                        <div className="flex gap-2.5 mt-1">
+                          {selectedModes.map(m => (
+                            <span key={m} className="px-2 py-0.5 rounded bg-brand-black text-white text-[9px] font-bold">
+                              {m === 'SALE' ? 'Venta' : (m === 'MONTHLY_RENT' || m === 'SHORT_RENT') ? 'Renta' : 'Swap'}
+                            </span>
+                          ))}
                         </div>
-                      )}
-
-                      {/* DYNAMIC BLOCK: SALE */}
-                      {selectedModes.includes('SALE') && (activeConfigTab === 'SALE' || selectedModes.length === 1) && (
-                        <div className="border border-amber-200 bg-amber-50/5 rounded-2xl p-4 flex flex-col gap-4">
-                          <div className="flex items-center gap-2 border-b border-amber-100 pb-2">
-                            <DollarSign className="w-3.5 h-3.5 text-amber-700" />
-                            <span className="text-xs font-black uppercase text-amber-700 tracking-wider">Configuración de Venta</span>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-xs font-bold text-brand-gray-500">Precio de venta comercial</label>
-                              <input
-                                type="text"
-                                value={salePrice ? `$${salePrice.toLocaleString('en-US')}.00` : '$0.00'}
-                                onChange={(e) => setSalePrice(parseCurrency(e.target.value))}
-                                className="w-full p-3 rounded-xl bg-white border border-brand-gray-200 text-xs font-semibold"
-                              />
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-xs font-bold text-brand-gray-500">Moneda del listado</label>
-                              <select
-                                value={saleCurrency}
-                                onChange={(e) => setSaleCurrency(e.target.value)}
-                                className="w-full p-3 rounded-xl bg-white border border-brand-gray-200 text-xs font-semibold"
-                              >
-                                <option value="USD">USD ($)</option>
-                                <option value="EUR">EUR (€)</option>
-                                <option value="MXN">MXN ($)</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 mt-1">
-                            <input
-                              type="checkbox"
-                              id="saleAcceptsOffers"
-                              checked={saleAcceptsOffers}
-                              onChange={(e) => setSaleAcceptsOffers(e.target.checked)}
-                              className="w-4 h-4 accent-brand-accent cursor-pointer"
-                            />
-                            <label htmlFor="saleAcceptsOffers" className="text-xs font-semibold text-brand-gray-600 cursor-pointer">
-                              Acepta ofertas y contrapropuestas de compradores validados.
-                            </label>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Danger Zone when editing */}
-                      {initialData && onDelete && (
-                        <div className="border border-brand-rose/25 bg-brand-rose/[0.02] rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-8">
-                          <div>
-                            <h4 className="text-xs font-black text-brand-rose uppercase tracking-wider flex items-center gap-1.5">
-                              <AlertTriangle className="w-3.5 h-3.5" />
-                              <span>{language === 'es' ? 'Zona de Peligro' : 'Danger Zone'}</span>
-                            </h4>
-                            <p className="text-[10px] text-brand-gray-500 font-medium mt-1 leading-normal max-w-sm">
-                              {language === 'es' 
-                                ? 'Elimina permanentemente esta propiedad de AuraSwap. Se cancelarán las negociaciones de swaps.' 
-                                : 'Permanently remove this property from AuraSwap. Active swap proposals will be cancelled.'}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setLocalDeleteConfirm(true)}
-                            className="px-4 py-2 border border-brand-rose text-brand-rose hover:bg-brand-rose hover:text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer"
-                          >
-                            {t('dashboard.deleteProperty') || 'Eliminar Propiedad'}
-                          </button>
-                        </div>
-                      )}
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -1868,7 +2065,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                 <span>Atrás</span>
               </button>
 
-              {step === 5 ? (
+              {step === 9 ? (
                 <button
                   type="button"
                   onClick={handlePublish}
@@ -1882,11 +2079,14 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                   type="button"
                   onClick={handleNext}
                   disabled={
-                    (step === 1 && selectedModes.length === 0) ||
-                    (step === 2 && (!title || !location || !country || !description))
+                    (step === 1 && (!title || !description)) ||
+                    (step === 2 && (!location || !country)) ||
+                    (step === 3 && selectedModes.length === 0)
                   }
                   className={`px-6 py-3 bg-brand-black hover:bg-brand-black/90 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 ${
-                    ((step === 1 && selectedModes.length === 0) || (step === 2 && (!title || !location || !country || !description)))
+                    ((step === 1 && (!title || !description)) ||
+                     (step === 2 && (!location || !country)) ||
+                     (step === 3 && selectedModes.length === 0))
                       ? 'opacity-40 cursor-not-allowed shadow-none'
                       : ''
                   }`}

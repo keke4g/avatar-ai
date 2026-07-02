@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-type StepType = 1 | 2 | 3;
+type StepType = 0 | 1 | 2 | 3;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -19,7 +19,10 @@ export default function OnboardingPage() {
   const { currentUser, completeOnboardingMock } = useSwap();
 
   // Active Wizard Step
-  const [step, setStep] = useState<StepType>(1);
+  const [step, setStep] = useState<StepType>(0);
+  
+  // Profile Type selection (Fase 0)
+  const [profileType, setProfileType] = useState<'OWNER' | 'AGENT' | 'PROPERTY_MANAGER'>('OWNER');
 
   // STEP 1 FIELDS: Destinations
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
@@ -84,7 +87,7 @@ export default function OnboardingPage() {
 
   const handleFinishOnboarding = () => {
     // 1. Save data mock-reactively in SwapContext
-    completeOnboardingMock(selectedCities, bio, avatarUrl);
+    completeOnboardingMock(selectedCities, bio, avatarUrl, profileType);
 
     // 2. Play beautiful confetti fireworks
     confetti({
@@ -113,7 +116,24 @@ export default function OnboardingPage() {
       <div className="absolute bottom-10 left-10 w-80 h-80 rounded-full bg-brand-rose/5 filter blur-3xl pointer-events-none -z-10" />
 
       {/* Progress Wizard Steps Head */}
-      <div className="flex items-center justify-between mb-8 max-w-md mx-auto w-full">
+      <div className="flex items-center justify-between mb-8 max-w-lg mx-auto w-full">
+        <div className="flex flex-col items-center gap-1.5 relative z-10">
+          <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-xs font-black transition-all ${
+            step >= 0 ? 'bg-brand-black text-white border-brand-black shadow-premium' : 'bg-white border-brand-gray-300 text-brand-gray-400'
+          }`}>
+            {step > 0 ? <Check className="w-4 h-4 stroke-[3]" /> : '0'}
+          </div>
+          <span className="text-[8px] font-black uppercase tracking-wider text-brand-gray-400">{language === 'es' ? 'Rol' : 'Role'}</span>
+        </div>
+
+        <div className="flex-1 h-0.5 bg-brand-gray-200 mx-2 relative -top-3">
+          <motion.div 
+            className="h-full bg-brand-black" 
+            initial={{ width: '0%' }}
+            animate={{ width: step > 0 ? '100%' : '0%' }}
+          />
+        </div>
+
         <div className="flex flex-col items-center gap-1.5 relative z-10">
           <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-xs font-black transition-all ${
             step >= 1 ? 'bg-brand-black text-white border-brand-black shadow-premium' : 'bg-white border-brand-gray-300 text-brand-gray-400'
@@ -163,6 +183,118 @@ export default function OnboardingPage() {
         
         <AnimatePresence mode="wait">
           
+          {/* STEP 0: Role Selection */}
+          {step === 0 && (
+            <motion.div
+              key="step0"
+              initial={{ opacity: 0, x: 15 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -15 }}
+              className="flex flex-col gap-6"
+            >
+              <div>
+                <span className="text-[9px] uppercase font-black tracking-widest text-brand-accent flex items-center gap-1">
+                  <User className="w-3.5 h-3.5" />
+                  <span>{language === 'es' ? 'Paso 0: Rol' : 'Step 0: Role'}</span>
+                </span>
+                <h2 className="text-xl font-black text-brand-black tracking-tight mt-1 mb-2">
+                  {language === 'es' ? '¿Cómo deseas utilizar AuraSwap?' : 'How do you want to use AuraSwap?'}
+                </h2>
+                <p className="text-xs text-brand-gray-500 font-semibold leading-relaxed">
+                  {language === 'es' 
+                    ? 'Selecciona la opción que mejor te represente para adaptar el panel de administración, contratos y distribución legal.' 
+                    : 'Select the option that best represents you to adapt the management panel, contracts and legal distribution.'}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3.5">
+                <button
+                  type="button"
+                  onClick={() => setProfileType('OWNER')}
+                  className={`w-full text-left p-4 rounded-2xl border transition-all cursor-pointer flex gap-4 ${
+                    profileType === 'OWNER' 
+                      ? 'border-brand-accent bg-brand-accent/[0.02] shadow-sm' 
+                      : 'border-brand-gray-200 hover:border-brand-gray-400 bg-white'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-brand-accent/5 flex items-center justify-center shrink-0">
+                    <User className="w-5 h-5 text-brand-accent" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-brand-black block">
+                      {language === 'es' ? 'Soy Propietario' : 'I am an Owner'}
+                    </span>
+                    <span className="text-[10px] text-brand-gray-500 leading-normal mt-0.5 block">
+                      {language === 'es' 
+                        ? 'Intercambio o vendo mis propios inmuebles de forma directa y autónoma.' 
+                        : 'I exchange or sell my own properties directly and autonomously.'}
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setProfileType('AGENT')}
+                  className={`w-full text-left p-4 rounded-2xl border transition-all cursor-pointer flex gap-4 ${
+                    profileType === 'AGENT' 
+                      ? 'border-brand-accent bg-brand-accent/[0.02] shadow-sm' 
+                      : 'border-brand-gray-200 hover:border-brand-gray-400 bg-white'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-brand-accent/5 flex items-center justify-center shrink-0">
+                    <Compass className="w-5 h-5 text-brand-accent" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-brand-black block">
+                      {language === 'es' ? 'Soy Asesor / Broker Inmobiliario' : 'I am a Real Estate Advisor / Broker'}
+                    </span>
+                    <span className="text-[10px] text-brand-gray-500 leading-normal mt-0.5 block">
+                      {language === 'es' 
+                        ? 'Represento a clientes y comercializo múltiples propiedades inmobiliarias.' 
+                        : 'I represent clients and market multiple real estate properties.'}
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setProfileType('PROPERTY_MANAGER')}
+                  className={`w-full text-left p-4 rounded-2xl border transition-all cursor-pointer flex gap-4 ${
+                    profileType === 'PROPERTY_MANAGER' 
+                      ? 'border-brand-accent bg-brand-accent/[0.02] shadow-sm' 
+                      : 'border-brand-gray-200 hover:border-brand-gray-400 bg-white'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-brand-accent/5 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-5 h-5 text-brand-accent" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-brand-black block">
+                      {language === 'es' ? 'Soy Administrador de Propiedades' : 'I am a Property Manager'}
+                    </span>
+                    <span className="text-[10px] text-brand-gray-500 leading-normal mt-0.5 block">
+                      {language === 'es' 
+                        ? 'Gestiono propiedades de terceros para renta vacacional, renta tradicional o administración patrimonial.' 
+                        : 'I manage third-party properties for vacation rental, traditional rental, or asset management.'}
+                    </span>
+                  </div>
+                </button>
+              </div>
+
+              {/* Progress and control buttons */}
+              <div className="flex justify-end pt-6 border-t border-brand-gray-100 mt-4">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="py-3 px-6 rounded-full bg-brand-black hover:bg-brand-black/90 text-white font-bold text-xs tracking-wider uppercase transition-colors cursor-pointer flex items-center gap-1.5 shadow-premium"
+                >
+                  <span>{t('onboarding.nextBtn')}</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-brand-accent" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
           {/* STEP 1: Cities preferences selection */}
           {step === 1 && (
             <motion.div
@@ -218,8 +350,18 @@ export default function OnboardingPage() {
               </div>
 
               {/* Progress and control buttons */}
-              <div className="flex justify-end pt-6 border-t border-brand-gray-100 mt-4">
+              <div className="flex justify-between pt-6 border-t border-brand-gray-100 mt-4">
                 <button
+                  type="button"
+                  onClick={() => setStep(0)}
+                  className="py-3 px-6 rounded-full border border-brand-gray-200 hover:bg-brand-gray-50 text-brand-black font-bold text-xs tracking-wider uppercase transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 text-brand-gray-400" />
+                  <span>{t('onboarding.backBtn')}</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setStep(2)}
                   disabled={selectedCities.length === 0}
                   className="py-3 px-6 rounded-full bg-brand-black hover:bg-brand-black/90 text-white font-bold text-xs tracking-wider uppercase transition-colors cursor-pointer flex items-center gap-1.5 shadow-premium disabled:opacity-40"

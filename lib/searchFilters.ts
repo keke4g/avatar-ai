@@ -124,7 +124,11 @@ export function filterAndSortProperties({
   endDate = '',
   guestsCount = 0,
   budget,
-}: PropertySearchFilters): Property[] {
+  amenityCategories,
+  viewTypeId,
+  constructionAgeMin,
+  constructionAgeMax,
+}: any): Property[] {
   const published = properties
     .map(ensurePropertyOfferings)
     .filter(p => p.isPublished !== false);
@@ -154,6 +158,38 @@ export function filterAndSortProperties({
 
     if (guestsCount > 0 && property.maxGuests < guestsCount) {
       return false;
+    }
+
+    // New filters check
+    if (amenityCategories && amenityCategories.length > 0) {
+      const propertyAmenities = property.amenities || [];
+      const hasAllAmenities = amenityCategories.every((amenity: string) => 
+        propertyAmenities.some((pa: string) => pa.toLowerCase() === amenity.toLowerCase())
+      );
+      if (!hasAllAmenities) {
+        return false;
+      }
+    }
+
+    if (viewTypeId) {
+      const pView = property.viewTypeId || (property as any).viewType || '';
+      if (pView.toLowerCase() !== viewTypeId.toLowerCase()) {
+        return false;
+      }
+    }
+
+    if (constructionAgeMin !== undefined && constructionAgeMin !== null) {
+      const age = property.constructionAge || 0;
+      if (age < constructionAgeMin) {
+        return false;
+      }
+    }
+
+    if (constructionAgeMax !== undefined && constructionAgeMax !== null) {
+      const age = property.constructionAge || 0;
+      if (age > constructionAgeMax) {
+        return false;
+      }
     }
 
     if (budget !== undefined && budget > 0) {
