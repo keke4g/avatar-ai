@@ -70,6 +70,11 @@ export interface SpeechRecognitionInstance {
   onend: (() => void) | null;
   onerror: ((event: { error: string }) => void) | null;
   onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onnomatch: (() => void) | null;
+  onaudiostart: (() => void) | null;
+  onaudioend: (() => void) | null;
+  onspeechstart: (() => void) | null;
+  onspeechend: (() => void) | null;
 }
 
 export type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
@@ -200,6 +205,17 @@ export function useEternaVoice({
   });
   const [isListening, setIsListening] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
+
+  const loggedSetVoiceMode = useCallback((val: boolean | ((prev: boolean) => boolean), reason: string) => {
+    setVoiceMode((prev) => {
+      const next = typeof val === 'function' ? (val as Function)(prev) : val;
+      const stack = new Error().stack || 'n/a';
+      const msg = `[VOICE MODE CHANGE] from: ${prev} to: ${next} reason: ${reason} stack: ${stack}`;
+      console.log(msg);
+      addVoiceDebugLog(msg);
+      return next;
+    });
+  }, []);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [partialTranscript, setPartialTranscript] = useState('');
 
@@ -217,6 +233,7 @@ export function useEternaVoice({
   const voiceStateRef = useRef<VoiceModeState>('disabled');
 
   const transitionToState = (newState: VoiceModeState) => {
+    addVoiceDebugLog(`[CALL] transitionToState to: ${newState}`);
     setVoiceState(newState);
     voiceStateRef.current = newState;
     console.log(`[VOICE STATE] ${newState.toUpperCase()}`);
@@ -476,9 +493,10 @@ export function useEternaVoice({
   }, []);
 
   const startConversationMode = useCallback(() => {
+    addVoiceDebugLog(`[CALL] startConversationMode`);
     addVoiceDebugLog(`startConversationMode called. voiceMode before: ${voiceModeRef.current}`);
     console.log("[MOBILE TAP] startConversationMode before: voiceMode =", voiceModeRef.current);
-    setVoiceMode(true);
+    loggedSetVoiceMode(true, "startConversationMode");
     voiceModeRef.current = true; // Synchronously update ref to avoid React state batching delays
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -499,9 +517,10 @@ export function useEternaVoice({
   }, []);
 
   const stopConversationMode = useCallback(() => {
+    addVoiceDebugLog(`[CALL] stopConversationMode`);
     addVoiceDebugLog(`stopConversationMode called. voiceMode before: ${voiceModeRef.current}`);
     console.log("[MOBILE TAP] stopConversationMode before: voiceMode =", voiceModeRef.current);
-    setVoiceMode(false);
+    loggedSetVoiceMode(false, "stopConversationMode");
     voiceModeRef.current = false; // Synchronously update ref
     transitionToState('disabled');
     setIsListening(false);
@@ -617,6 +636,7 @@ export function useEternaVoice({
         recInstance = rec;
 
         rec.onstart = () => {
+          addVoiceDebugLog("[EVENT] SpeechRecognition.onstart");
           console.log("[Eterna Voice Console] recognition.onstart triggered. isListening:", isListeningRef.current);
           if (!active) return;
           setIsListening(true);
@@ -626,6 +646,7 @@ export function useEternaVoice({
         };
         
         rec.onend = () => {
+          addVoiceDebugLog("[EVENT] SpeechRecognition.onend");
           console.log("[VOICE STATE] recognition ended");
           setIsListening(false);
           isListeningRef.current = false;
@@ -660,12 +681,33 @@ export function useEternaVoice({
         };
 
         rec.onerror = (event) => {
+          addVoiceDebugLog(`[EVENT] SpeechRecognition.onerror: ${event.error}`);
           console.log("[Eterna Voice Console] recognition.onerror triggered. Error details:", event.error);
           if (!active) return;
           console.warn('[Eterna Voice] SpeechRecognition error:', event.error);
           if (event.error === 'not-allowed') {
-            setVoiceMode(false);
+            loggedSetVoiceMode(false, "recognition.onerror: not-allowed");
           }
+        };
+
+        rec.onnomatch = () => {
+          addVoiceDebugLog("[EVENT] SpeechRecognition.onnomatch");
+        };
+
+        rec.onaudiostart = () => {
+          addVoiceDebugLog("[EVENT] SpeechRecognition.onaudiostart");
+        };
+
+        rec.onaudioend = () => {
+          addVoiceDebugLog("[EVENT] SpeechRecognition.onaudioend");
+        };
+
+        rec.onspeechstart = () => {
+          addVoiceDebugLog("[EVENT] SpeechRecognition.onspeechstart");
+        };
+
+        rec.onspeechend = () => {
+          addVoiceDebugLog("[EVENT] SpeechRecognition.onspeechend");
         };
 
         rec.onresult = (event: SpeechRecognitionEvent) => {
@@ -759,6 +801,40 @@ export function useEternaVoice({
       if (typeof window !== 'undefined' && window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      addVoiceDebugLog(`[EVENT] document.visibilitychange. hidden=${document.hidden}`);
+    };
+    const handleBlur = () => {
+      addVoiceDebugLog("[EVENT] window.blur");
+    };
+    const handleFocus = () => {
+      addVoiceDebugLog("[EVENT] window.focus");
+    };
+    const handlePageHide = () => {
+      addVoiceDebugLog("[EVENT] pagehide");
+    };
+    const handleBeforeUnload = () => {
+      addVoiceDebugLog("[EVENT] beforeunload");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
 
