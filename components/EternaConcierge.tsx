@@ -285,11 +285,19 @@ export default function EternaConcierge() {
         addDebugLog(`__eternaStartVoice invoked. voiceMode: ${voiceMode}, speechRecognitionSupported: ${speechRecognitionSupported}`);
         console.log("[MOBILE TAP] __eternaStartVoice handler fired, voiceMode before:", voiceMode);
         
+        // 1. Abrir inmediatamente el modo conversación
+        setIsOpen(true);
+        
+        // 2. Mostrar el estado: "Solicitando acceso al micrófono..."
+        setSimulatedText(language === 'es' ? 'Solicitando acceso al micrófono...' : 'Requesting microphone access...');
+        setSimulatedStatus('thinking');
+
+        // 3. Sólo entonces solicitar el permiso
         const permission = await checkMicPermission();
         addDebugLog(`__eternaStartVoice [PERMISSION] state: ${permission}`);
 
         if (permission === 'granted') {
-          setIsOpen(true);
+          setSimulatedText('');
           if (voiceMode) {
             stopVoiceMode();
           } else {
@@ -298,16 +306,20 @@ export default function EternaConcierge() {
         } else if (permission === 'prompt') {
           const allowed = await requestMicPermission();
           if (allowed) {
-            setIsOpen(true);
+            setSimulatedText('');
             if (voiceMode) {
               stopVoiceMode();
             } else {
               handleVoiceButtonClick();
             }
           } else {
+            setSimulatedText('');
+            setSimulatedStatus('idle');
             setMicPermissionDeniedOpen(true);
           }
         } else {
+          setSimulatedText('');
+          setSimulatedStatus('idle');
           setMicPermissionDeniedOpen(true);
         }
         addDebugLog("__eternaStartVoice completed");
@@ -319,7 +331,7 @@ export default function EternaConcierge() {
         delete (window as any).__eternaStartVoice;
       }
     };
-  }, [voiceMode, handleVoiceButtonClick, stopVoiceMode, speechRecognitionSupported, addDebugLog, checkMicPermission, requestMicPermission]);
+  }, [voiceMode, handleVoiceButtonClick, stopVoiceMode, speechRecognitionSupported, addDebugLog, checkMicPermission, requestMicPermission, language, setSimulatedText, setSimulatedStatus]);
 
   // Re-check microphone permission when the page regains focus or visibility (returning from browser Settings)
   useEffect(() => {

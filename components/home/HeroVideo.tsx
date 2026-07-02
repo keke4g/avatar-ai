@@ -78,6 +78,42 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
     addDebugLog("[ACTIVATE] finished");
   }, [startVoice, addDebugLog]);
 
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const touchCancelledRef = useRef<boolean>(false);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    touchCancelledRef.current = false;
+    addDebugLog("TouchStart: saved initial X,Y");
+  }, [addDebugLog]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartPosRef.current || touchCancelledRef.current) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartPosRef.current.x;
+    const dy = touch.clientY - touchStartPosRef.current.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance > 12) {
+      touchCancelledRef.current = true;
+      addDebugLog(`TouchMove: gesture cancelled (moved ${distance.toFixed(1)}px > 12px)`);
+    }
+  }, [addDebugLog]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent, source: string) => {
+    if (!touchStartPosRef.current) return;
+    touchStartPosRef.current = null;
+    
+    if (touchCancelledRef.current) {
+      addDebugLog("TouchEnd: ignored (scroll or drag detected)");
+      return;
+    }
+
+    addDebugLog(`TouchEnd: confirmed TAP via ${source}`);
+    e.stopPropagation();
+    activateConversation(`TAP (${source})`);
+  }, [activateConversation, addDebugLog]);
+
   const getRandomTalkingVideo = useCallback(() => {
     const filtered = TALKING_VIDEOS.filter(v => v !== lastTalkingVideoRef.current);
     const selected = filtered[Math.floor(Math.random() * filtered.length)];
@@ -170,13 +206,10 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
       onPointerDown={(e) => {
         addDebugLog(`PointerDown fired (Outer). pointerType: ${(e.nativeEvent as any).pointerType || 'n/a'}`);
         console.log("[MOBILE TAP] HeroVideo onPointerDown");
-        activateConversation("PointerDown (Outer)");
       }}
-      onTouchStart={() => {
-        addDebugLog("TouchStart fired (Outer)");
-        console.log("[MOBILE TAP] HeroVideo onTouchStart");
-        activateConversation("TouchStart (Outer)");
-      }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={(e) => handleTouchEnd(e, "Outer")}
       className="relative flex items-center justify-center select-none w-full max-w-[340px] sm:max-w-[360px] mx-auto rounded-[32px] p-[3px] transition-all duration-300 ease-in-out mt-2 lg:mt-4 cursor-pointer"
       style={{ 
         height: "calc(100vh - 140px)",
@@ -221,13 +254,20 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
             addDebugLog(`PointerDown fired (Overlay). pointerType: ${pType}`);
             console.log("[MOBILE TAP] HeroVideo onPointerDown (Overlay)");
             e.stopPropagation();
-            activateConversation("PointerDown (Overlay)");
           }}
           onTouchStart={(e) => {
             addDebugLog("TouchStart fired (Overlay)");
             console.log("[MOBILE TAP] HeroVideo onTouchStart (Overlay)");
             e.stopPropagation();
-            activateConversation("TouchStart (Overlay)");
+            handleTouchStart(e);
+          }}
+          onTouchMove={(e) => {
+            e.stopPropagation();
+            handleTouchMove(e);
+          }}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            handleTouchEnd(e, "Overlay");
           }}
           className="absolute inset-0 z-20 cursor-pointer bg-transparent"
         />
