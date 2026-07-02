@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  X, ChevronLeft, ChevronRight, ChevronDown, Sparkles, Check, Info, Loader2,
+  X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sparkles, Check, Info, Loader2,
   Home, DollarSign, Calendar, MessageSquareCode, Award, Shield, User, Building, Briefcase, Camera, Play, Eye, AlertTriangle,
   MapPin, Sliders, FileText, Image
 } from 'lucide-react';
@@ -236,10 +236,58 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
   const [step, setStep] = useState<WizardStep>(0);
   const [localDeleteConfirm, setLocalDeleteConfirm] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  
+
   // Swap limits
   const [swapMinValue, setSwapMinValue] = useState<number | ''>('');
   const [swapMaxValue, setSwapMaxValue] = useState<number | ''>('');
+
+  // ── Scroll Navigation ──────────────────────────────────────────────────────
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const [scrollInfo, setScrollInfo] = useState({
+    canScrollUp: false,
+    canScrollDown: false,
+    scrollPct: 0,
+    hasOverflow: false,
+  });
+  const [hasReviewedAll, setHasReviewedAll] = useState(false);
+
+  // Reset scroll state & position on step change
+  useEffect(() => {
+    setHasReviewedAll(false);
+    const el = scrollAreaRef.current;
+    if (el) el.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+  }, [step]);
+
+  // Track scroll position and overflow
+  useEffect(() => {
+    const el = scrollAreaRef.current;
+    if (!el) return;
+
+    const update = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const maxScroll = Math.max(0, scrollHeight - clientHeight);
+      const pct = maxScroll > 0 ? scrollTop / maxScroll : 1;
+      const atBottom = scrollTop >= maxScroll - 12;
+      setScrollInfo({
+        canScrollUp: scrollTop > 8,
+        canScrollDown: !atBottom && maxScroll > 8,
+        scrollPct: pct,
+        hasOverflow: maxScroll > 8,
+      });
+      if (atBottom && maxScroll > 8) setHasReviewedAll(true);
+    };
+
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    // also observe children in case content is added dynamically
+    Array.from(el.children).forEach(c => ro.observe(c));
+    return () => {
+      el.removeEventListener('scroll', update);
+      ro.disconnect();
+    };
+  }, [step]);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     if (typeof document === 'undefined') return;
@@ -1324,29 +1372,53 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     .slice(currentActiveIndex + 1)
     .reduce((sum, s) => sum + s.estTimeMinutes, 0);
 
+  // Auto-scroll to the first field with a validation error
+  const scrollToError = () => {
+    const el = scrollAreaRef.current;
+    if (!el) return;
+    const errorEl = el.querySelector<HTMLElement>('[data-error="true"]');
+    if (errorEl) {
+      errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
   const handleNext = () => {
     setValidationError(null);
+
+    // ── Smart scroll gate: if user hasn't reached the bottom yet, scroll them there
+    if (scrollInfo.hasOverflow && !hasReviewedAll) {
+      scrollAreaRef.current?.scrollTo({
+        top: scrollAreaRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+      setValidationError('Revisa los campos restantes antes de continuar ↓');
+      return;
+    }
 
     // Validation checks per step
     if (step === 1) {
       if (!title.trim()) {
         setValidationError("Por favor, ingresa el título del anuncio.");
+        setTimeout(scrollToError, 80);
         return;
       }
       if (!shortDescription.trim()) {
         setValidationError("Por favor, ingresa el resumen / descripción de la propiedad.");
+        setTimeout(scrollToError, 80);
         return;
       }
     }
     if (step === 2) {
       if (!location || !country) {
         setValidationError("Por favor, selecciona una ubicación válida usando el buscador.");
+        setTimeout(scrollToError, 80);
         return;
       }
     }
     if (step === 3) {
       if (selectedModes.length === 0) {
         setValidationError("Por favor, selecciona al menos una modalidad comercial.");
+        setTimeout(scrollToError, 80);
         return;
       }
     }
@@ -1772,7 +1844,15 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
 
           {/* RIGHT COLUMN: Form Controls (7 cols) */}
           <div className="flex-1 md:col-span-7 flex flex-col overflow-hidden justify-between h-full md:min-h-0">
-            <div className="overflow-y-auto pr-1 flex-1 py-1 no-scrollbar min-h-0">
+
+            {/* Scroll area wrapper — relative so overlays can position against it */}
+            <div className="relative flex flex-1 min-h-0 gap-2">
+
+              {/* Main scrollable form area */}
+              <div
+                ref={scrollAreaRef}
+                className="overflow-y-auto pr-1 flex-1 py-1 no-scrollbar min-h-0"
+              >
               <AnimatePresence mode="wait">
                 {/* STEP 0: Publisher Identity Selection */}
                 {step === 0 && (
@@ -3102,7 +3182,120 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
+              </div>{/* end scroll area */}
+
+              {/* ── Desktop Scroll Sidebar ─────────────────────────────── */}
+              <AnimatePresence>
+                {scrollInfo.hasOverflow && (
+                  <motion.div
+                    key="scroll-sidebar"
+                    initial={{ opacity: 0, x: 8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 8 }}
+                    transition={{ duration: 0.2 }}
+                    className="hidden md:flex flex-col items-center gap-1.5 py-1 shrink-0 w-7"
+                  >
+                    {/* Scroll Up button */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        scrollAreaRef.current?.scrollBy({ top: -160, behavior: 'smooth' })
+                      }
+                      disabled={!scrollInfo.canScrollUp}
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all border ${
+                        scrollInfo.canScrollUp
+                          ? 'border-brand-gray-200 text-brand-gray-500 hover:bg-brand-gray-100 hover:text-brand-black cursor-pointer'
+                          : 'border-brand-gray-100 text-brand-gray-200 cursor-not-allowed'
+                      }`}
+                    >
+                      <ChevronUp className="w-3 h-3" />
+                    </button>
+
+                    {/* Progress bar track */}
+                    <div className="flex-1 w-1.5 rounded-full bg-brand-gray-100 relative overflow-hidden min-h-0">
+                      {/* Track fill */}
+                      <motion.div
+                        className="absolute top-0 left-0 w-full rounded-full bg-brand-accent/40"
+                        animate={{ height: `${Math.round(scrollInfo.scrollPct * 100)}%` }}
+                        transition={{ duration: 0.1, ease: 'linear' }}
+                      />
+                      {/* Thumb */}
+                      <motion.div
+                        className="absolute left-0 w-full h-3 rounded-full bg-brand-accent shadow-sm"
+                        animate={{ top: `calc(${Math.round(scrollInfo.scrollPct * 100)}% - 6px)` }}
+                        transition={{ duration: 0.1, ease: 'linear' }}
+                      />
+                    </div>
+
+                    {/* Scroll Down button */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        scrollAreaRef.current?.scrollBy({ top: 160, behavior: 'smooth' })
+                      }
+                      disabled={!scrollInfo.canScrollDown}
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all border ${
+                        scrollInfo.canScrollDown
+                          ? 'border-brand-gray-200 text-brand-gray-500 hover:bg-brand-gray-100 hover:text-brand-black cursor-pointer'
+                          : 'border-brand-gray-100 text-brand-gray-200 cursor-not-allowed'
+                      }`}
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* ── Bottom Fade + Animated Arrow (absolute, inside scroll wrapper) ── */}
+              <AnimatePresence>
+                {scrollInfo.canScrollDown && (
+                  <motion.div
+                    key="scroll-fade"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="pointer-events-none absolute bottom-0 left-0 right-7 h-20 flex flex-col items-center justify-end pb-1"
+                    style={{
+                      background:
+                        'linear-gradient(to bottom, transparent 0%, rgba(255,255,255,0.92) 60%, rgba(255,255,255,1) 100%)',
+                    }}
+                  >
+                    <span className="text-[10px] font-bold text-brand-gray-400 tracking-wide flex flex-col items-center gap-0.5">
+                      <motion.span
+                        animate={{ y: [0, 4, 0] }}
+                        transition={{ repeat: Infinity, duration: 1.4, ease: 'easeInOut' }}
+                      >
+                        <ChevronDown className="w-4 h-4 text-brand-accent" />
+                      </motion.span>
+                      Más campos
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* ── Mobile Floating Scroll Button ─────────────────────── */}
+              <AnimatePresence>
+                {scrollInfo.canScrollDown && (
+                  <motion.button
+                    key="mobile-scroll-btn"
+                    type="button"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    transition={{ duration: 0.2 }}
+                    onClick={() =>
+                      scrollAreaRef.current?.scrollBy({ top: 160, behavior: 'smooth' })
+                    }
+                    className="md:hidden absolute bottom-2 right-2 z-20 flex items-center gap-1 px-3 py-1.5 bg-brand-black/85 backdrop-blur text-white rounded-full text-[10px] font-bold shadow-lg cursor-pointer"
+                  >
+                    <ChevronDown className="w-3 h-3" />
+                    Más campos
+                  </motion.button>
+                )}
+              </AnimatePresence>
+
+            </div>{/* end scroll wrapper */}
 
             {/* Inline Validation Alert */}
             {validationError && (
