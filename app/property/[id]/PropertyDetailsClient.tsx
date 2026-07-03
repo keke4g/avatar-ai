@@ -874,13 +874,13 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             const label = getResponsibleLabel(property, language);
 
             return (
-              <div className="bg-brand-gray-50 border border-brand-gray-200/60 rounded-3xl p-6 flex flex-col md:flex-row gap-5 items-center justify-between shadow-xs">
+              <div className="bg-white border border-brand-gray-200/80 rounded-3xl p-5 flex flex-col md:flex-row gap-5 items-center justify-between shadow-xs transition-all duration-300 hover:shadow-sm">
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
                   <div className="relative">
                     <img
                       src={broker.photo}
                       alt={broker.name}
-                      className="w-16 h-16 rounded-full object-cover border-2 border-brand-accent shadow-sm"
+                      className="w-16 h-16 rounded-full object-cover border-2 border-brand-accent/20 p-0.5 shadow-xs"
                     />
                     {property.hostVerified && (
                       <span className="absolute bottom-0 right-0 bg-brand-accent text-white p-0.5 rounded-full border-2 border-white shadow-xs">
@@ -889,10 +889,12 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     )}
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-brand-accent uppercase tracking-widest">{label}</span>
-                    <h3 className="text-lg font-black text-brand-black mt-0.5">{broker.name}</h3>
-                    <span className="text-xs font-bold text-brand-gray-600 mt-0.5">{broker.position} • {broker.company}</span>
-                    <span className="text-[10px] text-brand-gray-400 font-semibold mt-1">⚡ Tiempo de respuesta: {broker.responseTime}</span>
+                    <span className="inline-block self-center sm:self-start bg-brand-accent/10 text-brand-accent px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">{label}</span>
+                    <h3 className="text-lg font-black text-brand-black mt-1.5">{broker.name}</h3>
+                    <span className="text-xs font-bold text-brand-gray-600 mt-0.5">{broker.position} • <span className="text-brand-gray-400">{broker.company}</span></span>
+                    <span className="text-[10px] text-brand-gray-400 font-semibold mt-1 flex items-center gap-1 justify-center sm:justify-start">
+                      ⚡ Tiempo de respuesta: <span className="text-brand-accent font-bold">{broker.responseTime}</span>
+                    </span>
                   </div>
                 </div>
 
@@ -902,7 +904,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                       href={`https://wa.me/${broker.whatsapp}?text=Hola%20${encodeURIComponent(broker.name)},%20estoy%20interesado%20en%20la%20propiedad%20"${encodeURIComponent(property.title)}"%20con%20ID%20${property.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 sm:flex-none px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                      className="flex-1 sm:flex-none px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs hover:scale-[1.02] active:scale-[0.98] duration-200"
                     >
                       💬 WhatsApp
                     </a>
@@ -910,7 +912,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   {broker.phone && (
                     <a
                       href={`tel:${broker.phone}`}
-                      className="flex-1 sm:flex-none px-4 py-2 bg-white hover:bg-brand-gray-50 border border-brand-gray-200 text-brand-black rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                      className="flex-1 sm:flex-none px-4 py-2 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200/80 text-brand-black rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs hover:scale-[1.02] active:scale-[0.98] duration-200"
                     >
                       📞 Llamar
                     </a>
@@ -918,14 +920,14 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   {broker.email && (
                     <a
                       href={`mailto:${broker.email}?subject=Interés en propiedad AuraSwap: ${encodeURIComponent(property.title)}`}
-                      className="flex-1 sm:flex-none px-4 py-2 bg-white hover:bg-brand-gray-50 border border-brand-gray-200 text-brand-black rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                      className="flex-1 sm:flex-none px-4 py-2 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200/80 text-brand-black rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs hover:scale-[1.02] active:scale-[0.98] duration-200"
                     >
                       ✉️ Correo
                     </a>
                   )}
                   <button
                     onClick={() => router.push(`/profile/${property.hostId || 'current-user'}`)}
-                    className="flex-1 sm:flex-none px-4 py-2 bg-brand-black hover:bg-brand-black/90 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                    className="flex-1 sm:flex-none px-4 py-2 bg-brand-black hover:bg-brand-black/90 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs hover:scale-[1.02] active:scale-[0.98] duration-200"
                   >
                     👤 Perfil
                   </button>
@@ -972,16 +974,27 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           {/* 2. Expediente Jurídico */}
           {(() => {
             const legalStatus = PropertyEligibilityEngine.getLegalStatus(property);
-            const statusColors = {
-              GREEN: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-              YELLOW: 'bg-amber-50 border-amber-200 text-amber-800',
-              RED: 'bg-rose-50 border-rose-200 text-rose-800'
+            const statusConfig = {
+              GREEN: {
+                bg: 'bg-emerald-50/60 border-emerald-200/60',
+                dot: 'bg-emerald-500 ring-emerald-100',
+                text: 'text-emerald-950',
+                badgeBg: 'bg-emerald-100/80 text-emerald-800 border-emerald-200/50'
+              },
+              YELLOW: {
+                bg: 'bg-amber-50/60 border-amber-200/60',
+                dot: 'bg-amber-500 ring-amber-100',
+                text: 'text-amber-950',
+                badgeBg: 'bg-amber-100/80 text-amber-800 border-amber-200/50'
+              },
+              RED: {
+                bg: 'bg-rose-50/60 border-rose-200/60',
+                dot: 'bg-rose-500 ring-rose-100',
+                text: 'text-rose-950',
+                badgeBg: 'bg-rose-100/80 text-rose-800 border-rose-200/50'
+              }
             };
-            const statusIcons = {
-              GREEN: '🟢',
-              YELLOW: '🟡',
-              RED: '🔴'
-            };
+            const config = statusConfig[legalStatus.status];
 
             return (
               <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
@@ -990,14 +1003,16 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   <span>{language === 'es' ? 'Expediente Jurídico' : 'Legal Dossier'}</span>
                 </h3>
 
-                {/* Semáforo Jurídico Banner */}
-                <div className={`p-4 rounded-2xl border ${statusColors[legalStatus.status]} flex gap-3 shadow-xs`}>
-                  <span className="text-xl leading-none">{statusIcons[legalStatus.status]}</span>
+                {/* Semáforo Jurídico Banner Premium */}
+                <div className={`p-4 rounded-2xl border ${config.bg} flex gap-3 shadow-xs transition-all duration-300 hover:shadow-sm`}>
+                  <div className="pt-1">
+                    <span className={`flex w-3.5 h-3.5 rounded-full ${config.dot} ring-4 animate-pulse`} />
+                  </div>
                   <div>
-                    <h4 className="text-xs font-black uppercase tracking-wider">{language === 'es' ? `Semáforo: ${legalStatus.label}` : `Traffic Light: ${legalStatus.label}`}</h4>
-                    <p className="text-xs mt-1 leading-normal font-semibold opacity-90">{legalStatus.explanation}</p>
+                    <h4 className={`text-xs font-black uppercase tracking-wider ${config.text}`}>{language === 'es' ? `Semáforo: ${legalStatus.label}` : `Traffic Light: ${legalStatus.label}`}</h4>
+                    <p className={`text-xs mt-1 leading-normal font-semibold ${config.text} opacity-90`}>{legalStatus.explanation}</p>
                     {legalStatus.warnings.length > 0 && (
-                      <ul className="list-disc list-inside text-[11px] mt-2 flex flex-col gap-1.5 font-bold">
+                      <ul className={`list-disc list-inside text-[11px] mt-2 flex flex-col gap-1.5 font-bold ${config.text}`}>
                         {legalStatus.warnings.map((w, idx) => (
                           <li key={idx} className="leading-snug">{w}</li>
                         ))}
@@ -1006,44 +1021,56 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   </div>
                 </div>
 
-                {/* Dossier Table */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm text-brand-gray-500 font-semibold">
-                  <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                    <span className="text-brand-gray-400">{language === 'es' ? 'Escrituras' : 'Public Deeds'}</span>
-                    <span className="text-brand-black">{property.legalPublicDeed ? (language === 'es' ? 'Escritura Pública Inscrita' : 'Public Deed Registered') : (language === 'es' ? 'Sin Escrituras' : 'No Public Deed')}</span>
+                {/* Dossier Table Premium List */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-brand-gray-500 font-semibold mt-1">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200/40">
+                    <span className="text-brand-gray-400 font-bold">{language === 'es' ? 'Escrituras:' : 'Public Deeds:'}</span>
+                    <span className={`px-2.5 py-0.5 rounded-lg border text-[10px] font-black ${
+                      property.legalPublicDeed 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' 
+                        : 'bg-rose-50 text-rose-700 border-rose-200/50'
+                    }`}>
+                      {property.legalPublicDeed ? (language === 'es' ? 'Escritura Pública Inscrita' : 'Public Deed Registered') : (language === 'es' ? 'Sin Escrituras' : 'No Public Deed')}
+                    </span>
                   </div>
-                  <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                    <span className="text-brand-gray-400">{language === 'es' ? 'Predial' : 'Property Tax'}</span>
-                    <span className="text-brand-black">{property.legalTaxCurrent ? (language === 'es' ? 'Al corriente' : 'Up to date') : (language === 'es' ? 'Con adeudo' : 'With debts')}</span>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200/40">
+                    <span className="text-brand-gray-400 font-bold">{language === 'es' ? 'Predial:' : 'Property Tax:'}</span>
+                    <span className={`px-2.5 py-0.5 rounded-lg border text-[10px] font-black ${
+                      property.legalTaxCurrent 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' 
+                        : 'bg-rose-50 text-rose-700 border-rose-200/50'
+                    }`}>
+                      {property.legalTaxCurrent ? (language === 'es' ? 'Al corriente' : 'Up to date') : (language === 'es' ? 'Con adeudo' : 'With debts')}
+                    </span>
                   </div>
                   {property.legalRegime && (
-                    <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                      <span className="text-brand-gray-400">{language === 'es' ? 'Régimen' : 'Regime'}</span>
-                      <span className="text-brand-black">{property.legalRegime}</span>
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200/40">
+                      <span className="text-brand-gray-400 font-bold">{language === 'es' ? 'Régimen:' : 'Regime:'}</span>
+                      <span className="text-brand-black font-extrabold">{property.legalRegime}</span>
                     </div>
                   )}
                   {property.legalLandUse && (
-                    <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                      <span className="text-brand-gray-400">{language === 'es' ? 'Uso de suelo' : 'Land Use'}</span>
-                      <span className="text-brand-black">{property.legalLandUse}</span>
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200/40">
+                      <span className="text-brand-gray-400 font-bold">{language === 'es' ? 'Uso de suelo:' : 'Land Use:'}</span>
+                      <span className="text-brand-black font-extrabold">{property.legalLandUse}</span>
                     </div>
                   )}
                   {property.legalJuridicalResponsible && (
-                    <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                      <span className="text-brand-gray-400">{language === 'es' ? 'Responsable jurídico' : 'Juridical Responsible'}</span>
-                      <span className="text-brand-black">{property.legalJuridicalResponsible}</span>
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200/40">
+                      <span className="text-brand-gray-400 font-bold">{language === 'es' ? 'Responsable jurídico:' : 'Juridical Responsible:'}</span>
+                      <span className="text-brand-black font-extrabold">{property.legalJuridicalResponsible}</span>
                     </div>
                   )}
                   {property.legalLastUpdate && (
-                    <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                      <span className="text-brand-gray-400">{language === 'es' ? 'Última actualización' : 'Last update'}</span>
-                      <span className="text-brand-black">{property.legalLastUpdate}</span>
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200/40">
+                      <span className="text-brand-gray-400 font-bold">{language === 'es' ? 'Última actualización:' : 'Last update:'}</span>
+                      <span className="text-brand-black font-extrabold">{property.legalLastUpdate}</span>
                     </div>
                   )}
                   {property.legalRestrictions && (
-                    <div className="col-span-2 flex flex-col gap-1 border-b border-brand-gray-100 pb-1.5">
-                      <span className="text-brand-gray-400">{language === 'es' ? 'Restricciones / Afectaciones' : 'Restrictions'}</span>
-                      <span className="text-brand-black leading-snug">{property.legalRestrictions}</span>
+                    <div className="col-span-2 flex flex-col gap-1 p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200/40">
+                      <span className="text-brand-gray-400 font-bold">{language === 'es' ? 'Restricciones / Afectaciones:' : 'Restrictions:'}</span>
+                      <span className="text-brand-black leading-relaxed font-bold">{property.legalRestrictions}</span>
                     </div>
                   )}
                 </div>
@@ -1253,120 +1280,122 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             </div>
           </div>
 
-          {/* 7. Multimedia Avanzada (Pestañas) */}
-          <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
-            <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
-              <Compass className="w-5 h-5 text-brand-accent" />
-              <span>{language === 'es' ? 'Multimedia y Recorridos' : 'Multimedia & Tours'}</span>
-            </h3>
+          {/* 7. Multimedia Avanzada (Pestañas) - Only show if video, tour, or blueprints exist */}
+          {!!(property.metadata?.videoPlaceholder || property.metadata?.videoUrl || property.metadata?.virtualTourPlaceholder || property.metadata?.blueprintsUrl) && (
+            <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
+              <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
+                <Compass className="w-5 h-5 text-brand-accent" />
+                <span>{language === 'es' ? 'Multimedia y Recorridos' : 'Multimedia & Tours'}</span>
+              </h3>
 
-            {/* Tab Header */}
-            <div className="flex border-b border-brand-gray-100 bg-brand-gray-100 p-1 rounded-2xl">
-              <button
-                type="button"
-                onClick={() => setActiveMediaTab('photos')}
-                className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'photos' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
-              >
-                🖼️ {language === 'es' ? 'Fotos' : 'Photos'} ({property.images.length})
-              </button>
-              {(property.metadata?.videoPlaceholder || property.metadata?.videoUrl) && (
+              {/* Tab Header */}
+              <div className="flex border-b border-brand-gray-100 bg-brand-gray-100 p-1 rounded-2xl">
                 <button
                   type="button"
-                  onClick={() => setActiveMediaTab('video')}
-                  className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'video' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                  onClick={() => setActiveMediaTab('photos')}
+                  className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'photos' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
                 >
-                  📹 {language === 'es' ? 'Video / Drone' : 'Video / Drone'}
+                  🖼️ {language === 'es' ? 'Fotos' : 'Photos'} ({property.images.length})
                 </button>
-              )}
-              {property.metadata?.virtualTourPlaceholder && (
-                <button
-                  type="button"
-                  onClick={() => setActiveMediaTab('virtual')}
-                  className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'virtual' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
-                >
-                  🕶️ {language === 'es' ? 'Tour 3D' : '3D Tour'}
-                </button>
-              )}
-              {property.metadata?.blueprintsUrl && (
-                <button
-                  type="button"
-                  onClick={() => setActiveMediaTab('blueprints')}
-                  className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'blueprints' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
-                >
-                  📐 {language === 'es' ? 'Planos' : 'Blueprints'}
-                </button>
-              )}
+                {(property.metadata?.videoPlaceholder || property.metadata?.videoUrl) && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveMediaTab('video')}
+                    className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'video' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                  >
+                    📹 {language === 'es' ? 'Video / Drone' : 'Video / Drone'}
+                  </button>
+                )}
+                {property.metadata?.virtualTourPlaceholder && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveMediaTab('virtual')}
+                    className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'virtual' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                  >
+                    🕶️ {language === 'es' ? 'Tour 3D' : '3D Tour'}
+                  </button>
+                )}
+                {property.metadata?.blueprintsUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveMediaTab('blueprints')}
+                    className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'blueprints' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                  >
+                    📐 {language === 'es' ? 'Planos' : 'Blueprints'}
+                  </button>
+                )}
+              </div>
+
+              {/* Tab Content */}
+              <div className="relative rounded-2xl overflow-hidden bg-brand-gray-100 aspect-video flex items-center justify-center border border-brand-gray-200/50 shadow-inner">
+                {activeMediaTab === 'photos' && (
+                  <div 
+                    onClick={() => setIsGalleryOpen(true)}
+                    className="w-full h-full relative cursor-pointer group"
+                  >
+                    <img
+                      src={property.images[0]}
+                      alt={property.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    />
+                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="bg-white text-brand-black px-5 py-2.5 rounded-full text-xs font-black shadow-lg">
+                        Ver todas las fotos
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {activeMediaTab === 'video' && (
+                  <div className="w-full h-full bg-brand-black flex items-center justify-center relative">
+                    <div className="flex flex-col items-center gap-3 text-white text-center p-6">
+                      <div className="w-16 h-16 rounded-full bg-brand-accent/90 flex items-center justify-center text-white text-xl animate-pulse cursor-pointer shadow-md hover:scale-105 transition-transform">
+                        ▶
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black">{language === 'es' ? 'Video Descriptivo y Tomas con Drone' : 'Walkthrough Video & Drone Footage'}</h4>
+                        <p className="text-[10px] text-brand-gray-400 font-semibold mt-1">
+                          {property.metadata?.videoPlaceholder || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeMediaTab === 'virtual' && (
+                  <div className="w-full h-full bg-brand-black flex items-center justify-center relative">
+                    <div className="flex flex-col items-center gap-3 text-white text-center p-6">
+                      <div className="w-16 h-16 rounded-full bg-amber-500/90 flex items-center justify-center text-white text-xl cursor-pointer hover:scale-105 transition-transform shadow-md">
+                        🕶️
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black">{language === 'es' ? 'Recorrido Virtual Interactivo 3D (Matterport)' : '3D Matterport Interactive Tour'}</h4>
+                        <p className="text-[10px] text-brand-gray-400 font-semibold mt-1">
+                          {property.metadata?.virtualTourPlaceholder}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeMediaTab === 'blueprints' && (
+                  <div className="w-full h-full bg-white flex items-center justify-center p-6 relative">
+                    <div className="flex flex-col items-center gap-3 text-brand-black text-center">
+                      <div className="w-14 h-14 rounded-2xl bg-brand-gray-100 flex items-center justify-center text-xl shadow-xs">
+                        📐
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black">{language === 'es' ? 'Plano Arquitectónico Oficial' : 'Official Architectural Blueprint'}</h4>
+                        <p className="text-[10px] text-brand-gray-500 font-semibold mt-1">
+                          Escala 1:100 • Plantas de distribución y fachadas
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-
-            {/* Tab Content */}
-            <div className="relative rounded-2xl overflow-hidden bg-brand-gray-100 aspect-video flex items-center justify-center border border-brand-gray-200/50 shadow-inner">
-              {activeMediaTab === 'photos' && (
-                <div 
-                  onClick={() => setIsGalleryOpen(true)}
-                  className="w-full h-full relative cursor-pointer group"
-                >
-                  <img
-                    src={property.images[0]}
-                    alt={property.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                  />
-                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="bg-white text-brand-black px-5 py-2.5 rounded-full text-xs font-black shadow-lg">
-                      Ver todas las fotos
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {activeMediaTab === 'video' && (
-                <div className="w-full h-full bg-brand-black flex items-center justify-center relative">
-                  <div className="flex flex-col items-center gap-3 text-white text-center p-6">
-                    <div className="w-16 h-16 rounded-full bg-brand-accent/90 flex items-center justify-center text-white text-xl animate-pulse cursor-pointer shadow-md hover:scale-105 transition-transform">
-                      ▶
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black">{language === 'es' ? 'Video Descriptivo y Tomas con Drone' : 'Walkthrough Video & Drone Footage'}</h4>
-                      <p className="text-[10px] text-brand-gray-400 font-semibold mt-1">
-                        {property.metadata?.videoPlaceholder || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeMediaTab === 'virtual' && (
-                <div className="w-full h-full bg-brand-black flex items-center justify-center relative">
-                  <div className="flex flex-col items-center gap-3 text-white text-center p-6">
-                    <div className="w-16 h-16 rounded-full bg-amber-500/90 flex items-center justify-center text-white text-xl cursor-pointer hover:scale-105 transition-transform shadow-md">
-                      🕶️
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black">{language === 'es' ? 'Recorrido Virtual Interactivo 3D (Matterport)' : '3D Matterport Interactive Tour'}</h4>
-                      <p className="text-[10px] text-brand-gray-400 font-semibold mt-1">
-                        {property.metadata?.virtualTourPlaceholder}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeMediaTab === 'blueprints' && (
-                <div className="w-full h-full bg-white flex items-center justify-center p-6 relative">
-                  <div className="flex flex-col items-center gap-3 text-brand-black text-center">
-                    <div className="w-14 h-14 rounded-2xl bg-brand-gray-100 flex items-center justify-center text-xl shadow-xs">
-                      📐
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black">{language === 'es' ? 'Plano Arquitectónico Oficial' : 'Official Architectural Blueprint'}</h4>
-                      <p className="text-[10px] text-brand-gray-500 font-semibold mt-1">
-                        Escala 1:100 • Plantas de distribución y fachadas
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          )}
 
           {/* 8. Ubicación y Mapa */}
           {property.latitude !== null && property.longitude !== null && (
@@ -1412,81 +1441,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             </div>
           )}
 
-          {/* 9. Expediente de Documentos */}
-          <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
-            <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
-              <FileText className="w-5 h-5 text-brand-accent" />
-              <span>{language === 'es' ? 'Documentos del Listado' : 'Listing Documents'}</span>
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <a 
-                href="/docs/Brochure_Propiedad.pdf" 
-                download
-                className="flex items-center justify-between p-3.5 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200/60 rounded-2xl text-xs font-bold text-brand-black shadow-xs transition-colors"
-                onClick={(e) => { e.preventDefault(); alert(language === 'es' ? 'Descargando Ficha Comercial / Brochure PDF de la propiedad...' : 'Downloading Property Brochure PDF...'); }}
-              >
-                <div className="flex items-center gap-2">
-                  <span>📄</span>
-                  <div className="flex flex-col">
-                    <span>{language === 'es' ? 'Brochure del Inmueble' : 'Property Brochure'}</span>
-                    <span className="text-[9px] text-brand-gray-400 font-semibold mt-0.5">PDF • 4.2 MB</span>
-                  </div>
-                </div>
-                <Download className="w-4 h-4 text-brand-gray-400" />
-              </a>
-
-              <a 
-                href="/docs/Reglamento_Condominio.pdf" 
-                download
-                className="flex items-center justify-between p-3.5 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200/60 rounded-2xl text-xs font-bold text-brand-black shadow-xs transition-colors"
-                onClick={(e) => { e.preventDefault(); alert(language === 'es' ? 'Descargando Reglamento del Condominio...' : 'Downloading Condo Regulations...'); }}
-              >
-                <div className="flex items-center gap-2">
-                  <span>📜</span>
-                  <div className="flex flex-col">
-                    <span>{language === 'es' ? 'Reglamento de Condominio' : 'Condo Regulations'}</span>
-                    <span className="text-[9px] text-brand-gray-400 font-semibold mt-0.5">PDF • 1.8 MB</span>
-                  </div>
-                </div>
-                <Download className="w-4 h-4 text-brand-gray-400" />
-              </a>
-
-              <a 
-                href="/docs/Plano_Arquitectonico.pdf" 
-                download
-                className="flex items-center justify-between p-3.5 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200/60 rounded-2xl text-xs font-bold text-brand-black shadow-xs transition-colors"
-                onClick={(e) => { e.preventDefault(); alert(language === 'es' ? 'Descargando Planos Arquitectónicos...' : 'Downloading Blueprints...'); }}
-              >
-                <div className="flex items-center gap-2">
-                  <span>📐</span>
-                  <div className="flex flex-col">
-                    <span>{language === 'es' ? 'Planos Oficiales' : 'Official Blueprints'}</span>
-                    <span className="text-[9px] text-brand-gray-400 font-semibold mt-0.5">PDF • 6.5 MB</span>
-                  </div>
-                </div>
-                <Download className="w-4 h-4 text-brand-gray-400" />
-              </a>
-
-              {property.legalPublicDeed && (
-                <a 
-                  href="/docs/Escritura_Publica.pdf" 
-                  download
-                  className="flex items-center justify-between p-3.5 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200/60 rounded-2xl text-xs font-bold text-brand-black shadow-xs transition-colors"
-                  onClick={(e) => { e.preventDefault(); alert(language === 'es' ? 'Descargando copia simple pública de Escrituras...' : 'Downloading simple public copy of Deeds...'); }}
-                >
-                  <div className="flex items-center gap-2">
-                    <span>🏛️</span>
-                    <div className="flex flex-col">
-                      <span>{language === 'es' ? 'Escrituras Públicas (Copia Simple)' : 'Public Deeds (Simple Copy)'}</span>
-                      <span className="text-[9px] text-brand-gray-400 font-semibold mt-0.5">PDF • 8.9 MB</span>
-                    </div>
-                  </div>
-                  <Download className="w-4 h-4 text-brand-gray-400" />
-                </a>
-              )}
-            </div>
-          </div>
-
           {/* 10. Análisis Inmobiliario con IA (Eterna) */}
           <div className="bg-gradient-to-br from-brand-accent/5 to-white border border-brand-accent/20 rounded-3xl p-6 flex flex-col gap-4 shadow-sm mb-6">
             <h3 className="text-base font-black text-brand-black flex items-center gap-2 text-brand-accent uppercase tracking-wider">
@@ -1521,13 +1475,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             </div>
 
             <div className="border-t border-brand-gray-100 my-1" />
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="flex flex-col bg-brand-gray-50 p-2.5 rounded-xl border">
-                <span className="text-[8px] font-black uppercase text-brand-gray-400 tracking-wider">{language === 'es' ? 'Precio m² Recom.' : 'Recom. Price/m²'}</span>
-                <span className="text-xs font-extrabold text-brand-black mt-1">
-                  ${property.surfaceBuilt ? Math.round((property.appraisalAmount || 4500000) / property.surfaceBuilt).toLocaleString() : 'N/A'} MXN
-                </span>
-              </div>
+            <div className="grid grid-cols-2 gap-3 text-center">
               <div className="flex flex-col bg-brand-gray-50 p-2.5 rounded-xl border">
                 <span className="text-[8px] font-black uppercase text-brand-gray-400 tracking-wider">{language === 'es' ? 'Velocidad de Venta' : 'Liquidity Speed'}</span>
                 <span className="text-xs font-extrabold text-brand-black mt-1">
