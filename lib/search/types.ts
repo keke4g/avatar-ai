@@ -7,6 +7,7 @@ export interface PropertySearchFilters {
   type?: string;
   operation?: 'sale' | 'rent';
   budget?: number;
+  minBudget?: number;
   rooms?: number;
   sort?: SearchSort;
   amenityCategories?: string[];

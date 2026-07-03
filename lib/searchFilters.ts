@@ -124,6 +124,7 @@ export function filterAndSortProperties({
   endDate = '',
   guestsCount = 0,
   budget,
+  minBudget,
   amenityCategories,
   viewTypeId,
   constructionAgeMin,
@@ -198,6 +199,16 @@ export function filterAndSortProperties({
       const rentOffering = activeOfferings.find(o => o.mode === 'MONTHLY_RENT' || o.mode === 'SHORT_RENT');
       const price = saleOffering?.priceAmount ?? rentOffering?.priceAmount ?? (property as any).price ?? 0;
       if (price > 0 && price > budget) {
+        return false;
+      }
+    }
+
+    if (minBudget !== undefined && minBudget > 0) {
+      const activeOfferings = getActiveOfferings(property);
+      const saleOffering = activeOfferings.find(o => o.mode === 'SALE');
+      const rentOffering = activeOfferings.find(o => o.mode === 'MONTHLY_RENT' || o.mode === 'SHORT_RENT');
+      const price = saleOffering?.priceAmount ?? rentOffering?.priceAmount ?? (property as any).price ?? 0;
+      if (price > 0 && price < minBudget) {
         return false;
       }
     }

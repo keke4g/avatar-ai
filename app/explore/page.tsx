@@ -226,15 +226,17 @@ function ExploreContent() {
     const city = searchParams.get('search') || '';
     const offeringVal = searchParams.get('offering') || '';
     const budgetVal = searchParams.get('budget');
+    const minBudgetVal = searchParams.get('minBudget');
     const roomsVal = searchParams.get('rooms');
     const categoryVal = searchParams.get('category');
     const amenityVal = searchParams.get('amenity');
     const viewVal = searchParams.get('view');
     const ageVal = searchParams.get('age');
 
-    if (city || budgetVal || roomsVal || categoryVal || amenityVal || viewVal || ageVal) {
+    if (city || budgetVal || minBudgetVal || roomsVal || categoryVal || amenityVal || viewVal || ageVal) {
       const operation: 'sale' | 'rent' = offeringVal.toUpperCase() === 'SALE' ? 'sale' : 'rent';
       const parsedBudget = budgetVal ? parseFloat(budgetVal) : undefined;
+      const parsedMinBudget = minBudgetVal ? parseFloat(minBudgetVal) : undefined;
       const parsedRooms = roomsVal ? parseInt(roomsVal) : undefined;
 
       let matchedCategory = undefined;
@@ -267,6 +269,7 @@ function ExploreContent() {
         operation: operation,
         type: matchedCategory,
         budget: parsedBudget,
+        minBudget: parsedMinBudget,
         rooms: parsedRooms,
         sort: 'best_match',
         amenityCategories: amenityVal ? [amenityVal] : undefined,
@@ -319,11 +322,14 @@ function ExploreContent() {
       ageMin = 10;
     }
 
+    const minBudget = activeSearch?.filters?.minBudget || (searchParams.get('minBudget') ? parseFloat(searchParams.get('minBudget')!) : undefined);
+
     const currentFilters: PropertySearchFilters = {
       city: searchQuery.trim() || undefined,
       operation,
       type,
       budget,
+      minBudget,
       rooms: searchParams.get('rooms') ? parseInt(searchParams.get('rooms')!) : undefined,
       sort: (sortBy === 'capacity' ? 'featured' : sortBy === 'rating' ? 'featured' : 'best_match') as SearchSort,
       amenityCategories: selectedAmenityCategory !== 'All' ? [selectedAmenityCategory] : undefined,

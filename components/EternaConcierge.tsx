@@ -38,7 +38,7 @@ import { useNavigationActions } from '../lib/eterna/actions/NavigationActions';
 import { useGeneralActions } from '../lib/eterna/actions/GeneralActions';
 import { Property } from '../lib/types';
 import { ServiceFactory } from '../lib/services/ServiceFactory';
-import { parseBudgetToNumber } from '../lib/search/SearchEngine';
+import { parseBudgetToNumber, parseBudgetRange } from '../lib/search/SearchEngine';
 import { PropertySearchFilters } from '../lib/search/types';
 import { searchLogger } from '../lib/search/searchLogger';
 import { DoubleBufferVideoPlayer } from './DoubleBufferVideoPlayer';
@@ -948,13 +948,13 @@ Do not invent any other routes. If the user asks you to go to a section, politel
 
   const determineOperation = (memory: ConversationMemory, promptHistory: string): 'sale' | 'rent' | undefined => {
     const clean = promptHistory.toLowerCase();
-    if (/\b(intercambio|intercambiar|swap|swaps|trueque|exchange|intercambio reciproco)\b/i.test(clean)) {
+    if (/\b(intercambiar|intercambio|hacer swap|swap|swaps|permutar|permuta|acepto intercambio|trueque|exchange)\b/i.test(clean)) {
       return undefined;
     }
-    if (/\b(renta|rentar|alquiler|alquilar|mensual|mensuales|mes|rent|rental|monthly|lease|rentar una casa)\b/i.test(clean)) {
+    if (/\b(renta|rentar|alquilar|alquiler|busco renta|arrendar|arriendo|mensual|mes|rent|rental|monthly|lease)\b/i.test(clean)) {
       return 'rent';
     }
-    if (/\b(comprar|compra|adquirir|venta|buy|purchase|sale|inversion|invertir)\b/i.test(clean)) {
+    if (/\b(comprar|compra|adquirir|busco comprar|me interesa comprar|adquisicion|venta|buy|purchase|sale|inversion)\b/i.test(clean)) {
       return 'sale';
     }
     if (memory.budget?.value) {
@@ -969,13 +969,13 @@ Do not invent any other routes. If the user asks you to go to a section, politel
 
   const determineOfferingMode = (memory: ConversationMemory, promptHistory: string): 'SALE' | 'RENT' | 'SWAP' => {
     const clean = promptHistory.toLowerCase();
-    if (/\b(intercambio|intercambiar|swap|swaps|trueque|exchange|intercambio reciproco)\b/i.test(clean)) {
+    if (/\b(intercambiar|intercambio|hacer swap|swap|swaps|permutar|permuta|acepto intercambio|trueque|exchange)\b/i.test(clean)) {
       return 'SWAP';
     }
-    if (/\b(renta|rentar|alquiler|alquilar|mensual|mensuales|mes|rent|rental|monthly|lease|rentar una casa)\b/i.test(clean)) {
+    if (/\b(renta|rentar|alquilar|alquiler|busco renta|arrendar|arriendo|mensual|mes|rent|rental|monthly|lease)\b/i.test(clean)) {
       return 'RENT';
     }
-    if (/\b(comprar|compra|adquirir|venta|buy|purchase|sale|inversion|invertir)\b/i.test(clean)) {
+    if (/\b(comprar|compra|adquirir|busco comprar|me interesa comprar|adquisicion|venta|buy|purchase|sale|inversion)\b/i.test(clean)) {
       return 'SALE';
     }
     const purpose = memory.purpose?.value || 'vivir';
@@ -984,10 +984,10 @@ Do not invent any other routes. If the user asks you to go to a section, politel
 
   const determinePropertyType = (memory: ConversationMemory, promptHistory: string): 'Casas' | 'Departamentos' | undefined => {
     const clean = promptHistory.toLowerCase();
-    if (/\b(departamento|departamentos|depto|deptos|condo|condominio|apartment|apartments|flat)\b/i.test(clean)) {
+    if (/\b(departamento|departamentos|depa|depas|depto|deptos|condo|condominio|apartment|apartments|flat|apartamento|apartamentos)\b/i.test(clean)) {
       return 'Departamentos';
     }
-    if (/\b(casa|casas|residencia|residencial|home|house|houses|villa)\b/i.test(clean)) {
+    if (/\b(casa|casas|hogar|hogares|vivienda|viviendas|residencia|residencias|residencial|home|house|houses|villa)\b/i.test(clean)) {
       return 'Casas';
     }
     return undefined;
@@ -1118,7 +1118,12 @@ Do not invent any other routes. If the user asks you to go to a section, politel
     const offeringMode = determineOfferingMode(searchMemory, promptHistory);
     const operation = offeringMode === 'SALE' ? 'sale' : (offeringMode === 'RENT' ? 'rent' : undefined);
     const type = determinePropertyType(searchMemory, promptHistory);
-    const budgetVal = searchMemory.budget?.value ? parseBudgetToNumber(searchMemory.budget.value, operation || 'rent') : undefined;
+    
+    // Parse budget and minBudget ranges
+    const range = searchMemory.budget?.value ? parseBudgetRange(searchMemory.budget.value) : {};
+    const budgetVal = range.max;
+    const minBudgetVal = range.min;
+    
     const roomsVal = searchMemory.rooms?.value;
 
     const amenityCategories = [];
@@ -1127,10 +1132,28 @@ Do not invent any other routes. If the user asks you to go to a section, politel
 
     const viewTypeId = searchMemory.oceanView?.value ? 'Vista al mar' : undefined;
 
+    // Detect zone/colonia from the prompt history
+    const cleanPrompt = promptHistory.toLowerCase();
+    let zone = undefined;
+    if (cleanPrompt.includes('tres rios') || cleanPrompt.includes('tres ríos')) {
+      zone = 'Tres Ríos';
+    } else if (cleanPrompt.includes('la primavera')) {
+      zone = 'La Primavera';
+    } else if (cleanPrompt.includes('montebello')) {
+      zone = 'Montebello';
+    } else if (cleanPrompt.includes('marina mazatlan') || cleanPrompt.includes('marina mazatlán')) {
+      zone = 'Marina Mazatlán';
+    } else if (cleanPrompt.includes('zona dorada')) {
+      zone = 'Zona Dorada';
+    } else if (cleanPrompt.includes('malecon') || cleanPrompt.includes('malecón')) {
+      zone = 'Malecón';
+    }
+
     const filters: PropertySearchFilters = {
-      city: city || undefined,
+      city: zone || city || undefined, // Search in zone first if detected
       operation,
       budget: budgetVal,
+      minBudget: minBudgetVal,
       rooms: roomsVal,
       sort: 'best_match',
       amenityCategories: amenityCategories.length > 0 ? amenityCategories : undefined,
@@ -1160,19 +1183,75 @@ Do not invent any other routes. If the user asks you to go to a section, politel
     });
 
     try {
-      const searchResult = await ServiceFactory.getPropertyService().search(filters);
-      const results = searchResult.results || [];
-      const hasResults = results.length > 0;
+      let searchResult = await ServiceFactory.getPropertyService().search(filters);
+      let results = searchResult.results || [];
+      let finalFilters = filters;
+      let isAlternative = false;
+      let altType = null;
 
+      // Smart budget fallback if no properties match budget
+      if (results.length === 0 && (budgetVal !== undefined || minBudgetVal !== undefined)) {
+        // Fallback 1: search in the same zone/colonia without budget constraint
+        if (zone) {
+          const zoneFallbackFilters: PropertySearchFilters = {
+            ...filters,
+            city: zone
+          };
+          delete zoneFallbackFilters.budget;
+          delete zoneFallbackFilters.minBudget;
+
+          const zoneResult = await ServiceFactory.getPropertyService().search(zoneFallbackFilters);
+          if (zoneResult.results && zoneResult.results.length > 0) {
+            results = zoneResult.results;
+            searchResult = zoneResult;
+            finalFilters = zoneFallbackFilters;
+            isAlternative = true;
+            altType = 'zone';
+          }
+        }
+
+        // Fallback 2: search in the same city without budget constraint
+        if (results.length === 0) {
+          const cityFallbackFilters: PropertySearchFilters = {
+            ...filters,
+            city: city || undefined
+          };
+          delete cityFallbackFilters.budget;
+          delete cityFallbackFilters.minBudget;
+
+          const cityResult = await ServiceFactory.getPropertyService().search(cityFallbackFilters);
+          if (cityResult.results && cityResult.results.length > 0) {
+            results = cityResult.results;
+            searchResult = cityResult;
+            finalFilters = cityFallbackFilters;
+            isAlternative = true;
+            altType = 'city';
+          }
+        }
+      }
+
+      const hasResults = results.length > 0;
       let searchMsg = '';
       if (hasResults) {
-        searchMsg = language === 'es'
-          ? `¡Excelente! He encontrado propiedades interesantes en ${city} que se ajustan a tu presupuesto. Te muestro las opciones en el explorador.`
-          : `Excellent! I have found interesting properties in ${city} that match your budget. Showing you the options in the explorer.`;
+        if (isAlternative) {
+          if (altType === 'zone') {
+            searchMsg = language === 'es'
+              ? `No he encontrado propiedades por ese precio en ${zone}, pero te muestro las opciones disponibles en esa zona en el explorador.`
+              : `I did not find properties for that price in ${zone}, but I am showing you the options available in that area in the explorer.`;
+          } else {
+            searchMsg = language === 'es'
+              ? `No he encontrado propiedades por ese precio en ${city || 'esa ubicación'}, pero te muestro las alternativas en el explorador.`
+              : `I did not find properties for that price in ${city || 'that location'}, but I will show you the alternatives in the explorer.`;
+          }
+        } else {
+          searchMsg = language === 'es'
+            ? `¡Excelente! He encontrado propiedades interesantes en ${city} que se ajustan a tu presupuesto. Te muestro las opciones en el explorador.`
+            : `Excellent! I have found interesting properties in ${city} that match your budget. Showing you the options in the explorer.`;
+        }
       } else {
         searchMsg = language === 'es'
-          ? `No he encontrado coincidencias exactas para tu búsqueda en ${city}, pero te mostraré algunas alternativas en el explorador.`
-          : `I did not find exact matches for your search in ${city}, but I will show you some alternatives in the explorer.`;
+          ? `No he encontrado coincidencias para tu búsqueda en ${city}, pero te mostraré algunas alternativas en el explorador.`
+          : `I did not find matches for your search in ${city}, but I will show you some alternatives in the explorer.`;
       }
 
       setChatHistory(prev => [...prev, { role: 'assistant', content: searchMsg }]);
@@ -1185,7 +1264,7 @@ Intent detectado: SEARCH_PROPERTY
 ↓
 Filtros generados: ${JSON.stringify(filters, null, 2)}
 ↓
-Filtros aplicados: ${JSON.stringify(searchResult.filters, null, 2)}
+Filtros aplicados (finales): ${JSON.stringify(finalFilters, null, 2)}
 ↓
 PropertyService.search() completed
 ↓
@@ -1196,8 +1275,8 @@ Explore actualizado: Redirecting to /explore`);
       setActiveSearch({
         id: sessionId,
         origin: "eterna",
-        filters: searchResult.filters,
-        results: searchResult.results,
+        filters: finalFilters,
+        results: results,
         provider: searchResult.provider,
         createdAt: sessionStart,
         loading: false,
@@ -1206,12 +1285,16 @@ Explore actualizado: Redirecting to /explore`);
 
       speak(searchMsg);
 
-      let url = `/explore?search=${encodeURIComponent(city)}&offering=${offeringMode}`;
-      if (budgetVal !== undefined) {
-        url += `&budget=${budgetVal}`;
+      // Build URL with used filters. If budget was deleted, it won't be in finalFilters.
+      let url = `/explore?search=${encodeURIComponent(finalFilters.city || city)}&offering=${offeringMode}`;
+      if (finalFilters.budget !== undefined) {
+        url += `&budget=${finalFilters.budget}`;
       }
-      if (roomsVal !== undefined) {
-        url += `&rooms=${roomsVal}`;
+      if (finalFilters.minBudget !== undefined) {
+        url += `&minBudget=${finalFilters.minBudget}`;
+      }
+      if (finalFilters.rooms !== undefined) {
+        url += `&rooms=${finalFilters.rooms}`;
       }
       if (type) {
         url += `&category=${type.toLowerCase()}`;
@@ -1226,7 +1309,7 @@ Explore actualizado: Redirecting to /explore`);
       setExploreFilters({
         category: type || 'All',
         offeringTab: offeringMode,
-        query: city,
+        query: finalFilters.city || city,
         guests: 0,
         swapType: 'All',
         sortBy: 'match',

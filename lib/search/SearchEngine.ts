@@ -99,6 +99,17 @@ export function searchProperties(properties: Property[], filters: PropertySearch
         }
       }
     }
+
+    if (filters.minBudget !== undefined && filters.minBudget > 0) {
+      const price = activeOffering?.priceAmount ?? (prop as any).price ?? 0;
+      if (price > 0) {
+        if (price >= filters.minBudget) {
+          score += 2;
+        } else {
+          isExcluded = true; // Exclude if below minBudget
+        }
+      }
+    }
     // 6. Amenities Filter
     if (filters.amenityCategories && filters.amenityCategories.length > 0) {
       const propAmenities = prop.amenities || [];
@@ -181,22 +192,138 @@ export function searchProperties(properties: Property[], filters: PropertySearch
 export function parseBudgetToNumber(value: string, operation?: 'sale' | 'rent'): number {
   if (!value) return 0;
   
-  // Remove commas
-  const clean = value.toLowerCase().replace(/,/g, '');
-  
-  // Extract all numbers (including decimals)
-  const matches = clean.match(/[\d\.]+/);
-  if (!matches) return 0;
-  
-  let num = parseFloat(matches[0]);
-  if (isNaN(num)) return 0;
-  
-  // Apply multipliers
-  if (clean.includes('million') || clean.includes('millón') || clean.includes('millon') || clean.includes('millones')) {
-    num *= 1000000;
-  } else if (clean.includes('k') || clean.includes('mil') || clean.includes('thousand')) {
-    num *= 1000;
+  let clean = value.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/,/g, '')
+    .trim();
+
+  // Handle special fractional expressions first
+  if (clean.includes('medio millon') || clean.includes('medio m')) {
+    return 500000;
   }
+  if (clean.includes('3 cuartos de millon') || clean.includes('tres cuartos de millon') || clean.includes('tres cuartos de millon')) {
+    return 750000;
+  }
+  if (clean.includes('un cuarto de millon')) {
+    return 250000;
+  }
+
+  // Replace text representations of numbers at the beginning
+  const textNums = {
+    'un ': '1 ',
+    'uno ': '1 ',
+    'dos ': '2 ',
+    'tres ': '3 ',
+    'cuatro ': '4 ',
+    'cinco ': '5 ',
+    'seis ': '6 ',
+    'siete ': '7 ',
+    'ocho ': '8 ',
+    'nueve ': '9 ',
+    'diez ': '10 '
+  };
+  Object.keys(textNums).forEach(word => {
+    if (clean.startsWith(word)) {
+      clean = clean.replace(word, textNums[word]);
+    }
+  });
+  if (clean === 'un' || clean === 'uno' || clean === 'un millon' || clean === 'un millones') {
+    clean = clean.replace('un', '1');
+  }
+
+  // Translate written hundreds/thousands
+  const textHundreds = {
+    'quinientos mil': '500 mil',
+    'quinientos': '500',
+    'trescientos mil': '300 mil',
+    'trescientos': '300',
+    'doscientos mil': '200 mil',
+    'doscientos': '200',
+    'cuatrocientos mil': '400 mil',
+    'cuatrocientos': '400',
+    'ochocientos mil': '800 mil',
+    'ochocientos': '800',
+  };
+  Object.keys(textHundreds).forEach(word => {
+    clean = clean.replace(new RegExp(word, 'g'), textHundreds[word]);
+  });
+
+  // Check for expressions like "millon y medio" / "un millon y medio"
+  if (clean.startsWith('millon y medio') || clean.startsWith('1 millon y medio') || clean.startsWith('un millon y medio') || clean === '1 y medio' || clean === 'un y medio') {
+    return 1500000;
+  }
+
+  // Match: X millones Y mil
+  const millionRegex = /(\d+(?:\.\d+)?)\s*(?:millones|millon|m|mdp)\s*(?:(?:y|de)\s*)?(\d+)?\s*(mil|k)?/i;
+  const matchMillion = clean.match(millionRegex);
+  if (matchMillion) {
+    const baseMillions = parseFloat(matchMillion[1]);
+    let total = baseMillions * 1000000;
+    
+    if (matchMillion[2]) {
+      let rest = parseFloat(matchMillion[2]);
+      const hasMilSuffix = !!matchMillion[3];
+      if (!hasMilSuffix && rest < 1000) {
+        rest *= 1000; // 300 -> 300,000
+      }
+      total += rest * (hasMilSuffix ? 1000 : 1);
+    } else if (clean.includes('y medio') || clean.includes('y media')) {
+      total += 500000;
+    }
+    return total;
+  }
+
+  // Handle "850 mil" or "850k" or "850000"
+  const thousandsRegex = /(\d+(?:\.\d+)?)\s*(?:mil|k|thousand)/i;
+  const matchThousands = clean.match(thousandsRegex);
+  if (matchThousands) {
+    return parseFloat(matchThousands[1]) * 1000;
+  }
+
+  // Match raw number
+  const rawNumberRegex = /(\d+(?:\.\d+)?)/;
+  const matchRaw = clean.match(rawNumberRegex);
+  if (matchRaw) {
+    let val = parseFloat(matchRaw[0]);
+    if (val < 100) {
+      val *= 1000000; // Assume millions
+    }
+    return val;
+  }
+
+  return 0;
+}
+
+export function parseBudgetRange(value: string): { min?: number, max?: number } {
+  if (!value) return {};
   
-  return num;
+  const clean = value.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove accents
+    .trim();
+
+  // 1. Matches "entre X y Y", "de X a Y", "X a Y"
+  const rangeRegex = /(?:entre|de)\s+([^y\s]+(?:\s+[^y\s]+)*)\s+(?:y|a)\s+([^]+)/i;
+  const matchRange = clean.match(rangeRegex);
+  if (matchRange) {
+    const minVal = parseBudgetToNumber(matchRange[1]);
+    const maxVal = parseBudgetToNumber(matchRange[2]);
+    return { min: minVal, max: maxVal };
+  }
+
+  // 2. Matches "menos de X", "hasta X", "maximo X", "bajo X"
+  if (clean.includes('menos de') || clean.includes('hasta') || clean.includes('maximo') || clean.includes('bajo')) {
+    const maxVal = parseBudgetToNumber(clean);
+    return { max: maxVal };
+  }
+
+  // 3. Matches "mas de X", "desde X", "minimo X", "sobre X"
+  if (clean.includes('mas de') || clean.includes('desde') || clean.includes('minimo') || clean.includes('sobre')) {
+    const minVal = parseBudgetToNumber(clean);
+    return { min: minVal };
+  }
+
+  // Default: treat as max budget
+  return { max: parseBudgetToNumber(clean) };
 }
