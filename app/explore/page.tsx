@@ -190,8 +190,29 @@ function ExploreContent() {
     } else {
       setSelectedSwapType('All');
     }
+
+    const amenityVal = searchParams.get('amenity');
+    if (amenityVal) {
+      setSelectedAmenityCategory(amenityVal);
+    } else {
+      setSelectedAmenityCategory('All');
+    }
+
+    const viewVal = searchParams.get('view');
+    if (viewVal) {
+      setSelectedViewType(viewVal);
+    } else {
+      setSelectedViewType('All');
+    }
+
+    const ageVal = searchParams.get('age');
+    if (ageVal) {
+      setSelectedAgeRange(ageVal);
+    } else {
+      setSelectedAgeRange('All');
+    }
     
-    if (q || startVal || endVal || guestsVal || categoryVal || offeringVal || tierVal || budgetVal || roomsVal) {
+    if (q || startVal || endVal || guestsVal || categoryVal || offeringVal || tierVal || budgetVal || roomsVal || amenityVal || viewVal || ageVal) {
       setPageSize(12); // Show more results if filtered
     }
   }, [searchParams]);
@@ -206,17 +227,52 @@ function ExploreContent() {
     const offeringVal = searchParams.get('offering') || '';
     const budgetVal = searchParams.get('budget');
     const roomsVal = searchParams.get('rooms');
+    const categoryVal = searchParams.get('category');
+    const amenityVal = searchParams.get('amenity');
+    const viewVal = searchParams.get('view');
+    const ageVal = searchParams.get('age');
 
-    if (city || budgetVal || roomsVal) {
-      const operation = offeringVal.toUpperCase() === 'SALE' ? 'sale' : 'rent';
+    if (city || budgetVal || roomsVal || categoryVal || amenityVal || viewVal || ageVal) {
+      const operation: 'sale' | 'rent' = offeringVal.toUpperCase() === 'SALE' ? 'sale' : 'rent';
       const parsedBudget = budgetVal ? parseFloat(budgetVal) : undefined;
       const parsedRooms = roomsVal ? parseInt(roomsVal) : undefined;
 
+      let matchedCategory = undefined;
+      if (categoryVal) {
+        const properCased = {
+          'casas': 'Casas',
+          'departamentos': 'Departamentos',
+          'lofts': 'Lofts',
+          'terrenos': 'Terrenos',
+          'locales': 'Locales',
+          'oficinas': 'Oficinas'
+        };
+        matchedCategory = properCased[categoryVal.toLowerCase()];
+      }
+
+      let ageMin = undefined;
+      let ageMax = undefined;
+      if (ageVal === '0-2') {
+        ageMin = 0; ageMax = 2;
+      } else if (ageVal === '3-5') {
+        ageMin = 3; ageMax = 5;
+      } else if (ageVal === '6-10') {
+        ageMin = 6; ageMax = 10;
+      } else if (ageVal === '10+') {
+        ageMin = 10;
+      }
+
       const filters: PropertySearchFilters = {
         city: city || undefined,
-        operation: undefined,
+        operation: operation,
+        type: matchedCategory,
         budget: parsedBudget,
         rooms: parsedRooms,
+        sort: 'best_match',
+        amenityCategories: amenityVal ? [amenityVal] : undefined,
+        viewTypeId: viewVal || undefined,
+        constructionAgeMin: ageMin,
+        constructionAgeMax: ageMax,
       };
 
       const sessionId = `ss-${Date.now()}`;
@@ -277,6 +333,14 @@ function ExploreContent() {
     };
 
     const filtersKey = getCacheKey(currentFilters);
+    
+    // If activeSearch already has the finished results matching currentFilters,
+    // mark the cache key as searched and return to avoid duplicate loading/fetch.
+    if (activeSearch && !activeSearch.loading && getCacheKey(activeSearch.filters) === filtersKey) {
+      lastSearchedFiltersKeyRef.current = filtersKey;
+      return;
+    }
+
     if (lastSearchedFiltersKeyRef.current === filtersKey) {
       return;
     }
@@ -720,7 +784,7 @@ function ExploreContent() {
           onValueChange={(value) => {
             setSearchQuery(value);
             setPageSize(4);
-            if (!activeSearch) setActiveSearch(null);
+            if (activeSearch) setActiveSearch(null);
           }}
           selectedDates={selectedDates}
           hasFilteredGuests={hasFilteredGuests}
@@ -742,7 +806,7 @@ function ExploreContent() {
           onOperationChange={(op) => {
             setActiveOfferingTab(op);
             setPageSize(4);
-            if (!activeSearch) setActiveSearch(null);
+            if (activeSearch) setActiveSearch(null);
             
             // Sync URL search params
             if (typeof window !== 'undefined') {
@@ -762,7 +826,7 @@ function ExploreContent() {
           onPropertyTypeChange={(type) => {
             setActiveCategory(type);
             setPageSize(4);
-            if (!activeSearch) setActiveSearch(null);
+            if (activeSearch) setActiveSearch(null);
             
             // Sync URL search params
             if (typeof window !== 'undefined') {
@@ -779,7 +843,7 @@ function ExploreContent() {
           onBudgetChange={(b) => {
             setSearchBudget(b);
             setPageSize(4);
-            if (!activeSearch) setActiveSearch(null);
+            if (activeSearch) setActiveSearch(null);
             
             // Sync URL search params
             if (typeof window !== 'undefined') {
@@ -803,7 +867,7 @@ function ExploreContent() {
                 onChange={(e) => {
                   setSelectedSwapType(e.target.value);
                   setPageSize(4);
-                  if (!activeSearch) setActiveSearch(null);
+                  if (activeSearch) setActiveSearch(null);
                 }}
                 className="outline-none bg-transparent font-bold cursor-pointer"
               >
@@ -822,7 +886,7 @@ function ExploreContent() {
                 onChange={(e) => {
                   setSelectedViewType(e.target.value);
                   setPageSize(4);
-                  if (!activeSearch) setActiveSearch(null);
+                  if (activeSearch) setActiveSearch(null);
                 }}
                 className="outline-none bg-transparent font-bold cursor-pointer"
               >
@@ -841,7 +905,7 @@ function ExploreContent() {
                 onChange={(e) => {
                   setSelectedAgeRange(e.target.value);
                   setPageSize(4);
-                  if (!activeSearch) setActiveSearch(null);
+                  if (activeSearch) setActiveSearch(null);
                 }}
                 className="outline-none bg-transparent font-bold cursor-pointer"
               >
@@ -860,7 +924,7 @@ function ExploreContent() {
                 onChange={(e) => {
                   setSelectedAmenityCategory(e.target.value);
                   setPageSize(4);
-                  if (!activeSearch) setActiveSearch(null);
+                  if (activeSearch) setActiveSearch(null);
                 }}
                 className="outline-none bg-transparent font-bold cursor-pointer"
               >
@@ -880,7 +944,7 @@ function ExploreContent() {
                 value={sortBy}
                 onChange={(e) => {
                   setSortBy(e.target.value);
-                  if (!activeSearch) setActiveSearch(null);
+                  if (activeSearch) setActiveSearch(null);
                 }}
                 className="outline-none bg-transparent font-bold cursor-pointer"
               >
@@ -905,7 +969,7 @@ function ExploreContent() {
             setActiveCategory={(cat) => {
               setActiveCategory(cat);
               setPageSize(4);
-              if (!activeSearch) setActiveSearch(null);
+              if (activeSearch) setActiveSearch(null);
               
               // Sync URL search params
               if (typeof window !== 'undefined') {
@@ -933,7 +997,7 @@ function ExploreContent() {
                     onClick={() => {
                       setActiveOfferingTab(tab.id);
                       setPageSize(4);
-                      if (!activeSearch) setActiveSearch(null);
+                      if (activeSearch) setActiveSearch(null);
 
                       // Sync URL search params
                       if (typeof window !== 'undefined') {
@@ -1071,7 +1135,7 @@ function ExploreContent() {
             setStartDate(range?.start || '');
             setEndDate(range?.end || '');
             setPageSize(4);
-            if (!activeSearch) setActiveSearch(null);
+            if (activeSearch) setActiveSearch(null);
           }}
           onClose={() => setShowDatePicker(false)}
           position={pickerPosition}
@@ -1101,7 +1165,7 @@ function ExploreContent() {
             setHasFilteredGuests(true);
             setShowGuestPicker(false);
             setPageSize(4);
-            if (!activeSearch) setActiveSearch(null);
+            if (activeSearch) setActiveSearch(null);
           }}
         />
       )}

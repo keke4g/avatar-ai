@@ -99,6 +99,42 @@ export function searchProperties(properties: Property[], filters: PropertySearch
         }
       }
     }
+    // 6. Amenities Filter
+    if (filters.amenityCategories && filters.amenityCategories.length > 0) {
+      const propAmenities = prop.amenities || [];
+      const hasAll = filters.amenityCategories.every(a => 
+        propAmenities.some(pa => pa.toLowerCase() === a.toLowerCase())
+      );
+      if (hasAll) {
+        score += 3;
+      } else {
+        isExcluded = true;
+      }
+    }
+
+    // 7. View Type Filter
+    if (filters.viewTypeId) {
+      const pView = prop.viewTypeId || (prop as any).viewType || '';
+      if (pView.toLowerCase() === filters.viewTypeId.toLowerCase()) {
+        score += 3;
+      } else {
+        isExcluded = true;
+      }
+    }
+
+    // 8. Construction Age Filter
+    if (filters.constructionAgeMin !== undefined && filters.constructionAgeMin !== null) {
+      const age = prop.constructionAge || 0;
+      if (age < filters.constructionAgeMin) {
+        isExcluded = true;
+      }
+    }
+    if (filters.constructionAgeMax !== undefined && filters.constructionAgeMax !== null) {
+      const age = prop.constructionAge || 0;
+      if (age > filters.constructionAgeMax) {
+        isExcluded = true;
+      }
+    }
 
     return { prop, score, isExcluded };
   });

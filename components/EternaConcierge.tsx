@@ -982,13 +982,13 @@ Do not invent any other routes. If the user asks you to go to a section, politel
     return purpose === 'inversion' ? 'SALE' : 'SWAP';
   };
 
-  const determinePropertyType = (memory: ConversationMemory, promptHistory: string): 'house' | 'apartment' | undefined => {
+  const determinePropertyType = (memory: ConversationMemory, promptHistory: string): 'Casas' | 'Departamentos' | undefined => {
     const clean = promptHistory.toLowerCase();
     if (/\b(departamento|departamentos|depto|deptos|condo|condominio|apartment|apartments|flat)\b/i.test(clean)) {
-      return 'apartment';
+      return 'Departamentos';
     }
     if (/\b(casa|casas|residencia|residencial|home|house|houses|villa)\b/i.test(clean)) {
-      return 'house';
+      return 'Casas';
     }
     return undefined;
   };
@@ -1113,15 +1113,6 @@ Do not invent any other routes. If the user asks you to go to a section, politel
   };
 
   const runSearchAndRedirect = useCallback(async (searchMemory: ConversationMemory, userPrompt: string) => {
-    const cityStr = searchMemory.city?.value || '';
-    const searchMsg = language === 'es'
-      ? `¡Excelente! He encontrado propiedades interesantes en ${cityStr} que se ajustan a tu presupuesto. Te muestro las opciones en el explorador.`
-      : `Excellent! I have found interesting properties in ${cityStr} that match your budget. Showing you the options in the explorer.`;
-
-    setThinkingContext('property_search');
-    setChatHistory(prev => [...prev, { role: 'assistant', content: searchMsg }]);
-    setSimulatedStatus('talking');
-
     const city = searchMemory.city?.value || '';
     const promptHistory = chatHistory.filter(h => h.role === 'user').map(h => h.content).join(' ') + ' ' + userPrompt;
     const offeringMode = determineOfferingMode(searchMemory, promptHistory);
@@ -1130,15 +1121,27 @@ Do not invent any other routes. If the user asks you to go to a section, politel
     const budgetVal = searchMemory.budget?.value ? parseBudgetToNumber(searchMemory.budget.value, operation || 'rent') : undefined;
     const roomsVal = searchMemory.rooms?.value;
 
+    const amenityCategories = [];
+    if (searchMemory.pool?.value) amenityCategories.push('Alberca');
+    if (searchMemory.garden?.value) amenityCategories.push('Jardín');
+
+    const viewTypeId = searchMemory.oceanView?.value ? 'Vista al mar' : undefined;
+
     const filters: PropertySearchFilters = {
-      city,
+      city: city || undefined,
       operation,
       budget: budgetVal,
       rooms: roomsVal,
+      sort: 'best_match',
+      amenityCategories: amenityCategories.length > 0 ? amenityCategories : undefined,
+      viewTypeId,
     };
     if (type) {
       filters.type = type;
     }
+
+    setThinkingContext('property_search');
+    setSimulatedStatus('thinking');
 
     const sessionId = `session-${Date.now()}`;
     const sessionStart = Date.now();
@@ -1156,54 +1159,99 @@ Do not invent any other routes. If the user asks you to go to a section, politel
       error: null
     });
 
-    // Run search asynchronously
-    ServiceFactory.getPropertyService().search(filters)
-      .then((searchResult) => {
-        setActiveSearch({
-          id: sessionId,
-          origin: "eterna",
-          filters: searchResult.filters,
-          results: searchResult.results,
-          provider: searchResult.provider,
-          createdAt: sessionStart,
-          loading: false,
-          error: null
-        });
-      })
-      .catch((err) => {
-        searchLogger.error("[Eterna Concierge] Error performing activeSearch:", err);
-        setActiveSearch({
-          id: sessionId,
-          origin: "eterna",
-          filters,
-          results: [],
-          provider: providerName,
-          createdAt: sessionStart,
-          loading: false,
-          error: err.message || 'Error searching properties'
-        });
+    try {
+      const searchResult = await ServiceFactory.getPropertyService().search(filters);
+      const results = searchResult.results || [];
+      const hasResults = results.length > 0;
+
+      let searchMsg = '';
+      if (hasResults) {
+        searchMsg = language === 'es'
+          ? `¡Excelente! He encontrado propiedades interesantes en ${city} que se ajustan a tu presupuesto. Te muestro las opciones en el explorador.`
+          : `Excellent! I have found interesting properties in ${city} that match your budget. Showing you the options in the explorer.`;
+      } else {
+        searchMsg = language === 'es'
+          ? `No he encontrado coincidencias exactas para tu búsqueda en ${city}, pero te mostraré algunas alternativas en el explorador.`
+          : `I did not find exact matches for your search in ${city}, but I will show you some alternatives in the explorer.`;
+      }
+
+      setChatHistory(prev => [...prev, { role: 'assistant', content: searchMsg }]);
+      setSimulatedStatus('talking');
+
+      console.log(`[SEARCH]
+Query original: "${userPrompt}"
+↓
+Intent detectado: SEARCH_PROPERTY
+↓
+Filtros generados: ${JSON.stringify(filters, null, 2)}
+↓
+Filtros aplicados: ${JSON.stringify(searchResult.filters, null, 2)}
+↓
+PropertyService.search() completed
+↓
+Cantidad de resultados: ${results.length}
+↓
+Explore actualizado: Redirecting to /explore`);
+
+      setActiveSearch({
+        id: sessionId,
+        origin: "eterna",
+        filters: searchResult.filters,
+        results: searchResult.results,
+        provider: searchResult.provider,
+        createdAt: sessionStart,
+        loading: false,
+        error: null
       });
 
-    // Speak and redirect instantly
-    speak(searchMsg);
-    
-    const url = `/explore?search=${encodeURIComponent(city)}&offering=${offeringMode}`;
-    
-    setExploreFilters({
-      category: 'All',
-      offeringTab: offeringMode,
-      query: city,
-      guests: 0,
-      swapType: 'All',
-      sortBy: 'match',
-    });
+      speak(searchMsg);
 
-    router.push(url);
-    if (window.innerWidth < 768) {
-      setIsCompact(true);
-      setIsOpen(true);
-    } else {
-      setIsOpen(false);
+      let url = `/explore?search=${encodeURIComponent(city)}&offering=${offeringMode}`;
+      if (budgetVal !== undefined) {
+        url += `&budget=${budgetVal}`;
+      }
+      if (roomsVal !== undefined) {
+        url += `&rooms=${roomsVal}`;
+      }
+      if (type) {
+        url += `&category=${type.toLowerCase()}`;
+      }
+      if (amenityCategories.length > 0) {
+        url += `&amenity=${encodeURIComponent(amenityCategories[0])}`;
+      }
+      if (viewTypeId) {
+        url += `&view=${encodeURIComponent(viewTypeId)}`;
+      }
+
+      setExploreFilters({
+        category: type || 'All',
+        offeringTab: offeringMode,
+        query: city,
+        guests: 0,
+        swapType: 'All',
+        sortBy: 'match',
+      });
+
+      router.push(url);
+      if (window.innerWidth < 768) {
+        setIsCompact(true);
+        setIsOpen(true);
+      } else {
+        setIsOpen(false);
+      }
+    } catch (err) {
+      searchLogger.error("[Eterna Concierge] Error performing activeSearch:", err);
+      setActiveSearch({
+        id: sessionId,
+        origin: "eterna",
+        filters,
+        results: [],
+        provider: providerName,
+        createdAt: sessionStart,
+        loading: false,
+        error: err.message || 'Error searching properties'
+      });
+      router.push(`/explore?search=${encodeURIComponent(city)}&offering=${offeringMode}`);
     }
 
     const resetSession: ConversationSession = {
@@ -1230,7 +1278,8 @@ Do not invent any other routes. If the user asks you to go to a section, politel
     setExploreFilters,
     router,
     setIsCompact,
-    setIsOpen
+    setIsOpen,
+    setConversationalSession
   ]);
 
   // ────────────────────────────────────────────────
@@ -1424,116 +1473,8 @@ Do not invent any other routes. If the user asks you to go to a section, politel
         const isReject = /\b(no|incorrecto|cambiar|modificar|corregir|modify|change|correct|edit)\b/i.test(cleanPrompt);
 
         if (isConfirm) {
-          // Flow completed successfully!
-          const searchMsg = language === 'es'
-            ? 'Excelente. Buscando propiedades en el catálogo...'
-            : 'Excellent. Searching properties in the catalog...';
-
-          setThinkingContext('property_search');
-          setChatHistory(prev => [...prev, { role: 'assistant', content: searchMsg }]);
-          setSimulatedStatus('talking');
-
-          const city = memory.city?.value || '';
-          const promptHistory = chatHistory.filter(h => h.role === 'user').map(h => h.content).join(' ') + ' ' + prompt;
-          const offeringMode = determineOfferingMode(memory, promptHistory);
-          const operation = offeringMode === 'SALE' ? 'sale' : (offeringMode === 'RENT' ? 'rent' : undefined);
-          const type = determinePropertyType(memory, promptHistory);
-          const budgetVal = memory.budget?.value ? parseBudgetToNumber(memory.budget.value, operation || 'rent') : undefined;
-          const roomsVal = memory.rooms?.value;
-
-          const filters: PropertySearchFilters = {
-            city,
-            operation,
-            budget: budgetVal,
-            rooms: roomsVal,
-          };
-          if (type) {
-            filters.type = type;
-          }
-
-          const sessionId = `session-${Date.now()}`;
-          const sessionStart = Date.now();
-          const providerName = ServiceFactory.getPropertyService().getCapabilities().supportsRealtime ? 'supabase' : 'mock';
-
-          // Set activeSearch state to loading
-          setActiveSearch({
-            id: sessionId,
-            origin: "eterna",
-            filters,
-            results: [],
-            provider: providerName,
-            createdAt: sessionStart,
-            loading: true,
-            error: null
-          });
-
-          // Run search asynchronously
-          ServiceFactory.getPropertyService().search(filters)
-            .then((searchResult) => {
-              setActiveSearch({
-                id: sessionId,
-                origin: "eterna",
-                filters: searchResult.filters,
-                results: searchResult.results,
-                provider: searchResult.provider,
-                createdAt: sessionStart,
-                loading: false,
-                error: null
-              });
-            })
-            .catch((err) => {
-              searchLogger.error("[Eterna Concierge] Error performing activeSearch:", err);
-              setActiveSearch({
-                id: sessionId,
-                origin: "eterna",
-                filters,
-                results: [],
-                provider: providerName,
-                createdAt: sessionStart,
-                loading: false,
-                error: err.message || 'Error searching properties'
-              });
-            });
-
-          speak(searchMsg, () => {
-            setSimulatedStatus('idle');
-            
-            const url = `/explore?search=${encodeURIComponent(city)}&offering=${offeringMode}`;
-            
-            setExploreFilters({
-              category: 'All',
-              offeringTab: offeringMode,
-              query: city,
-              guests: 0,
-              swapType: 'All',
-              sortBy: 'match',
-            });
-
-            setTimeout(() => {
-              router.push(url);
-              if (window.innerWidth < 768) {
-                setIsCompact(true);
-                setIsOpen(true);
-              } else {
-                setIsOpen(false);
-              }
-            }, 500);
-          });
-
-          const resetSession: ConversationSession = {
-            activeIntent: ConversationIntent.NONE,
-            status: ConversationStatus.IDLE,
-            step: 'purpose',
-            memory: {},
-            createdAt: Date.now(),
-            updatedAt: Date.now()
-          };
-          setConversationalSession(resetSession);
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('eterna_conversation_session');
-          }
+          await runSearchAndRedirect(memory, prompt);
           return;
-
         } else if (isReject) {
           // Check if they named a specific field to correct
           let fieldToClear: keyof ConversationMemory | null = null;
