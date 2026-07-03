@@ -874,9 +874,9 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             const label = getResponsibleLabel(property, language);
 
             return (
-              <div className="bg-white border border-brand-gray-200/80 rounded-3xl p-5 flex flex-col md:flex-row gap-5 items-center justify-between shadow-xs transition-all duration-300 hover:shadow-sm">
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
-                  <div className="relative">
+              <div className="bg-white border border-brand-gray-200 rounded-3xl p-6 flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between shadow-xs transition-all duration-300 hover:shadow-sm">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left w-full lg:w-auto">
+                  <div className="relative shrink-0">
                     <img
                       src={broker.photo}
                       alt={broker.name}
@@ -888,48 +888,53 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-col">
-                    <span className="inline-block self-center sm:self-start bg-brand-accent/10 text-brand-accent px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">{label}</span>
-                    <h3 className="text-lg font-black text-brand-black mt-1.5">{broker.name}</h3>
-                    <span className="text-xs font-bold text-brand-gray-600 mt-0.5">{broker.position} • <span className="text-brand-gray-400">{broker.company}</span></span>
-                    <span className="text-[10px] text-brand-gray-400 font-semibold mt-1 flex items-center gap-1 justify-center sm:justify-start">
-                      ⚡ Tiempo de respuesta: <span className="text-brand-accent font-bold">{broker.responseTime}</span>
-                    </span>
+                  <div className="flex flex-col gap-1 w-full text-left">
+                    <div>
+                      <span className="inline-block bg-brand-accent/10 text-brand-accent px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">{label}</span>
+                    </div>
+                    <h3 className="text-xl font-black text-brand-black mt-1 leading-tight">{broker.name}</h3>
+                    <p className="text-xs font-bold text-brand-gray-650">
+                      {broker.position} <span className="text-brand-gray-300 mx-1">•</span> <span className="text-brand-gray-400">{broker.company}</span>
+                    </p>
+                    <p className="text-xs text-brand-gray-500 font-semibold mt-1 flex items-center gap-1.5 justify-start">
+                      <span>⚡</span>
+                      <span>{language === 'es' ? 'Tiempo de respuesta:' : 'Response time:'} <span className="text-brand-accent font-black">{broker.responseTime}</span></span>
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-center">
+                <div className="grid grid-cols-2 gap-2.5 w-full lg:w-80 shrink-0">
                   {broker.whatsapp && (
                     <a
                       href={`https://wa.me/${broker.whatsapp}?text=Hola%20${encodeURIComponent(broker.name)},%20estoy%20interesado%20en%20la%20propiedad%20"${encodeURIComponent(property.title)}"%20con%20ID%20${property.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 sm:flex-none px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs hover:scale-[1.02] active:scale-[0.98] duration-200"
+                      className="h-11 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
                     >
-                      💬 WhatsApp
+                      WhatsApp
                     </a>
                   )}
                   {broker.phone && (
                     <a
                       href={`tel:${broker.phone}`}
-                      className="flex-1 sm:flex-none px-4 py-2 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200/80 text-brand-black rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs hover:scale-[1.02] active:scale-[0.98] duration-200"
+                      className="h-11 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-300 text-brand-black rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
                     >
-                      📞 Llamar
+                      Llamar
                     </a>
                   )}
                   {broker.email && (
                     <a
                       href={`mailto:${broker.email}?subject=Interés en propiedad AuraSwap: ${encodeURIComponent(property.title)}`}
-                      className="flex-1 sm:flex-none px-4 py-2 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200/80 text-brand-black rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs hover:scale-[1.02] active:scale-[0.98] duration-200"
+                      className="h-11 bg-brand-gray-50 hover:bg-brand-gray-155 border border-brand-gray-300 text-brand-black rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
                     >
-                      ✉️ Correo
+                      Correo
                     </a>
                   )}
                   <button
                     onClick={() => router.push(`/profile/${property.hostId || 'current-user'}`)}
-                    className="flex-1 sm:flex-none px-4 py-2 bg-brand-black hover:bg-brand-black/90 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs hover:scale-[1.02] active:scale-[0.98] duration-200"
+                    className="h-11 bg-brand-black hover:bg-brand-black/90 text-white rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
                   >
-                    👤 Perfil
+                    Ver Perfil
                   </button>
                 </div>
               </div>
@@ -1023,53 +1028,53 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
                 {/* Dossier Table Premium List */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-brand-gray-500 font-semibold mt-1">
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200/40">
-                    <span className="text-brand-gray-400 font-bold">{language === 'es' ? 'Escrituras:' : 'Public Deeds:'}</span>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
+                    <span className="text-brand-gray-500 font-bold">{language === 'es' ? 'Escrituras:' : 'Public Deeds:'}</span>
                     <span className={`px-2.5 py-0.5 rounded-lg border text-[10px] font-black ${
                       property.legalPublicDeed 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' 
-                        : 'bg-rose-50 text-rose-700 border-rose-200/50'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
+                        : 'bg-rose-50 text-rose-700 border-rose-300'
                     }`}>
                       {property.legalPublicDeed ? (language === 'es' ? 'Escritura Pública Inscrita' : 'Public Deed Registered') : (language === 'es' ? 'Sin Escrituras' : 'No Public Deed')}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200/40">
-                    <span className="text-brand-gray-400 font-bold">{language === 'es' ? 'Predial:' : 'Property Tax:'}</span>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
+                    <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Predial:' : 'Property Tax:'}</span>
                     <span className={`px-2.5 py-0.5 rounded-lg border text-[10px] font-black ${
                       property.legalTaxCurrent 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' 
-                        : 'bg-rose-50 text-rose-700 border-rose-200/50'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
+                        : 'bg-rose-50 text-rose-700 border-rose-300'
                     }`}>
                       {property.legalTaxCurrent ? (language === 'es' ? 'Al corriente' : 'Up to date') : (language === 'es' ? 'Con adeudo' : 'With debts')}
                     </span>
                   </div>
                   {property.legalRegime && (
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200/40">
-                      <span className="text-brand-gray-400 font-bold">{language === 'es' ? 'Régimen:' : 'Regime:'}</span>
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
+                      <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Régimen:' : 'Regime:'}</span>
                       <span className="text-brand-black font-extrabold">{property.legalRegime}</span>
                     </div>
                   )}
                   {property.legalLandUse && (
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200/40">
-                      <span className="text-brand-gray-400 font-bold">{language === 'es' ? 'Uso de suelo:' : 'Land Use:'}</span>
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
+                      <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Uso de suelo:' : 'Land Use:'}</span>
                       <span className="text-brand-black font-extrabold">{property.legalLandUse}</span>
                     </div>
                   )}
                   {property.legalJuridicalResponsible && (
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200/40">
-                      <span className="text-brand-gray-400 font-bold">{language === 'es' ? 'Responsable jurídico:' : 'Juridical Responsible:'}</span>
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
+                      <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Responsable jurídico:' : 'Juridical Responsible:'}</span>
                       <span className="text-brand-black font-extrabold">{property.legalJuridicalResponsible}</span>
                     </div>
                   )}
                   {property.legalLastUpdate && (
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200/40">
-                      <span className="text-brand-gray-400 font-bold">{language === 'es' ? 'Última actualización:' : 'Last update:'}</span>
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
+                      <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Última actualización:' : 'Last update:'}</span>
                       <span className="text-brand-black font-extrabold">{property.legalLastUpdate}</span>
                     </div>
                   )}
                   {property.legalRestrictions && (
-                    <div className="col-span-2 flex flex-col gap-1 p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200/40">
-                      <span className="text-brand-gray-400 font-bold">{language === 'es' ? 'Restricciones / Afectaciones:' : 'Restrictions:'}</span>
+                    <div className="col-span-2 flex flex-col gap-1 p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
+                      <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Restricciones / Afectaciones:' : 'Restrictions:'}</span>
                       <span className="text-brand-black leading-relaxed font-bold">{property.legalRestrictions}</span>
                     </div>
                   )}
