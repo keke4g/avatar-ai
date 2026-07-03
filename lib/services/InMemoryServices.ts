@@ -28,8 +28,135 @@ const setStorageItem = <T>(key: string, value: T): void => {
   localStorage.setItem(key, JSON.stringify(value));
 };
 
+function enrichMockPropertiesWithLegalInfo(p: Property): Property {
+  p.legalJuridicalResponsible = p.legalJuridicalResponsible || 'Lic. Alejandro Ruiz';
+  p.legalLastUpdate = p.legalLastUpdate || '2026-06-25';
+
+  if (p.id === 'prop-1' || p.id === 'user-prop-1') {
+    p.legalDebtFree = p.legalDebtFree ?? true;
+    p.legalPublicDeed = p.legalPublicDeed ?? true;
+    p.legalTaxCurrent = p.legalTaxCurrent ?? true;
+    p.legalServicesPaid = p.legalServicesPaid ?? true;
+    p.legalDocumentationComplete = p.legalDocumentationComplete ?? true;
+    p.legalRegime = p.legalRegime || 'Propiedad Privada';
+    p.legalLandUse = p.legalLandUse || 'Residencial';
+    p.legalRestrictions = p.legalRestrictions || 'Ninguna. Libre de afectaciones viales.';
+    p.appraisalAmount = p.appraisalAmount || 8900000;
+    p.appraisalDate = p.appraisalDate || '2026-05-12';
+    p.appraisalExpert = p.appraisalExpert || 'Ing. Carlos Mendoza (Reg. 3942)';
+    p.appraisalValidity = p.appraisalValidity || '2026-11-12';
+    p.appreciationLevel = p.appreciationLevel || 'Alta';
+    p.commercialStatus = p.commercialStatus || 'Disponible';
+    p.priceHistory = p.priceHistory || {
+      initialPrice: 9200000,
+      currentPrice: 8900000,
+      lastModificationDate: '2026-06-19',
+      trend: 'DOWN'
+    };
+  } else if (p.id === 'prop-2') {
+    p.legalDebtFree = p.legalDebtFree ?? false;
+    p.legalLienType = p.legalLienType || 'Banco';
+    p.legalLienObservations = p.legalLienObservations || 'Crédito hipotecario activo con saldo pendiente por liquidar de $1,200,000 MXN.';
+    p.legalPublicDeed = p.legalPublicDeed ?? true;
+    p.legalTaxCurrent = p.legalTaxCurrent ?? true;
+    p.legalServicesPaid = p.legalServicesPaid ?? true;
+    p.legalDocumentationComplete = p.legalDocumentationComplete ?? true;
+    p.legalRegime = p.legalRegime || 'Condominal';
+    p.legalLandUse = p.legalLandUse || 'Residencial';
+    p.legalRestrictions = p.legalRestrictions || 'Sujeto a reglamento del condominio histórico.';
+    p.appraisalAmount = p.appraisalAmount || 6500000;
+    p.appraisalDate = p.appraisalDate || '2026-04-18';
+    p.appraisalExpert = p.appraisalExpert || 'Arq. Marie Dubois';
+    p.appraisalValidity = p.appraisalValidity || '2026-10-18';
+    p.appreciationLevel = p.appreciationLevel || 'Media';
+    p.commercialStatus = p.commercialStatus || 'En negociación';
+    p.priceHistory = p.priceHistory || {
+      initialPrice: 6500000,
+      currentPrice: 6500000,
+      lastModificationDate: '2026-04-18',
+      trend: 'STABLE'
+    };
+  } else if (p.id === 'prop-3') {
+    p.legalDebtFree = p.legalDebtFree ?? false;
+    p.legalLienType = p.legalLienType || 'Infonavit';
+    p.legalLienObservations = p.legalLienObservations || 'Saldo de crédito Infonavit por liquidar de $340,000 MXN en la firma.';
+    p.legalPublicDeed = p.legalPublicDeed ?? true;
+    p.legalTaxCurrent = p.legalTaxCurrent ?? true;
+    p.legalServicesPaid = p.legalServicesPaid ?? true;
+    p.legalDocumentationComplete = p.legalDocumentationComplete ?? true;
+    p.legalRegime = p.legalRegime || 'Condominal';
+    p.legalLandUse = p.legalLandUse || 'Residencial';
+    p.legalRestrictions = p.legalRestrictions || 'Ninguna.';
+    p.appraisalAmount = p.appraisalAmount || 3800000;
+    p.appraisalDate = p.appraisalDate || '2026-05-30';
+    p.appraisalExpert = p.appraisalExpert || 'Lic. Jaime Soto';
+    p.appraisalValidity = p.appraisalValidity || '2026-11-30';
+    p.appreciationLevel = p.appreciationLevel || 'Alta';
+    p.commercialStatus = p.commercialStatus || 'Bajo Oferta';
+    p.priceHistory = p.priceHistory || {
+      initialPrice: 3600000,
+      currentPrice: 3800000,
+      lastModificationDate: '2026-05-30',
+      trend: 'UP'
+    };
+  } else if (p.id === 'prop-4' || p.id === 'user-prop-2') {
+    p.legalDebtFree = p.legalDebtFree ?? false;
+    p.legalLienType = p.legalLienType || 'Particular';
+    p.legalLienObservations = p.legalLienObservations || 'Hipoteca privada con acreedor particular activa por $150,000 USD.';
+    p.legalPublicDeed = p.legalPublicDeed ?? false;
+    p.legalTaxCurrent = p.legalTaxCurrent ?? false;
+    p.legalServicesPaid = p.legalServicesPaid ?? false;
+    p.legalDocumentationComplete = p.legalDocumentationComplete ?? false;
+    p.legalRegime = p.legalRegime || 'Ejidal';
+    p.legalLandUse = p.legalLandUse || 'Residencial';
+    p.legalRestrictions = p.legalRestrictions || 'Derechos ejidales sujetos a la asamblea ejidal de Ubud. Sin título de propiedad inscrito en registro público.';
+    p.appraisalAmount = p.appraisalAmount || 1800000;
+    p.appraisalDate = p.appraisalDate || '2026-01-10';
+    p.appraisalExpert = p.appraisalExpert || 'Ing. Made Sukra';
+    p.appraisalValidity = p.appraisalValidity || '2026-07-10';
+    p.appreciationLevel = p.appreciationLevel || 'En desarrollo';
+    p.commercialStatus = p.commercialStatus || 'Bajo Oferta';
+    p.priceHistory = p.priceHistory || {
+      initialPrice: 1950000,
+      currentPrice: 1800000,
+      lastModificationDate: '2026-06-01',
+      trend: 'DOWN'
+    };
+  } else {
+    p.legalDebtFree = p.legalDebtFree ?? true;
+    p.legalPublicDeed = p.legalPublicDeed ?? true;
+    p.legalTaxCurrent = p.legalTaxCurrent ?? true;
+    p.legalServicesPaid = p.legalServicesPaid ?? true;
+    p.legalDocumentationComplete = p.legalDocumentationComplete ?? true;
+    p.legalRegime = p.legalRegime || 'Propiedad Privada';
+    p.legalLandUse = p.legalLandUse || 'Residencial';
+    p.legalRestrictions = p.legalRestrictions || 'Ninguna.';
+    p.appraisalAmount = p.appraisalAmount || 4500000;
+    p.appraisalDate = p.appraisalDate || '2026-06-01';
+    p.appraisalExpert = p.appraisalExpert || 'Perito Valuador Autorizado';
+    p.appraisalValidity = p.appraisalValidity || '2026-12-01';
+    p.appreciationLevel = p.appreciationLevel || 'Media';
+    p.commercialStatus = p.commercialStatus || 'Disponible';
+  }
+
+  if (!p.brokerProfile) {
+    p.brokerProfile = {
+      photo: p.hostAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+      name: p.hostName || 'Agente Responsable',
+      company: 'AuraSwap Elite Estates',
+      position: p.id === 'prop-1' ? 'Directora Comercial Premium' : 'Asesor Inmobiliario Senior',
+      responseTime: 'Menos de 15 minutos',
+      phone: '+52 667 392 4829',
+      whatsapp: '526673924829',
+      email: 'contacto@auraswap.com'
+    };
+  }
+
+  return p;
+}
+
 export class InMemoryPropertyService implements IPropertyService {
-  private properties: Property[] = [...USER_PROPERTIES, ...MOCK_PROPERTIES].map(ensurePropertyOfferings);
+  private properties: Property[] = [...USER_PROPERTIES, ...MOCK_PROPERTIES].map(ensurePropertyOfferings).map(enrichMockPropertiesWithLegalInfo);
 
   async getAll(): Promise<Property[]> {
     searchLogger.debug('[InMemoryPropertyService] getAll() called, returning', this.properties.length, 'properties');
@@ -44,6 +171,7 @@ export class InMemoryPropertyService implements IPropertyService {
   async create(property: Partial<Property> & { title: string; hostId: string }): Promise<Property> {
     // Auto-fill verified host metadata from administrator settings
     const newProperty: Property = {
+      ...property,
       id: `prop-${Date.now()}`,
       title: property.title,
       description: property.description || '',

@@ -6,8 +6,9 @@ import { useTranslation } from '../../../lib/context/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { 
   Star, ShieldCheck, Heart, Share, Calendar, MapPin, Sparkles, AlertCircle,
-  BedDouble, Bath, Users, ArrowRight, 
-  Wifi, Waves, Coffee, Monitor, Wind, Key, Flame, Compass, MessageSquareCode
+  BedDouble, Bath, Users, ArrowRight, ChevronLeft, ChevronRight,
+  Wifi, Waves, Coffee, Monitor, Wind, Key, Flame, Compass, MessageSquareCode,
+  ZoomIn, ZoomOut, Maximize, Download, ExternalLink, Play, FileText, Info, ShieldAlert, Award, TrendingUp, BarChart2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -15,6 +16,7 @@ import { LeadType, Property, PropertyOffering, PropertyOfferingMode } from '../.
 import { MOCK_USERS } from '../../../lib/mockData';
 import { getActiveOfferings, getOfferingsByMode } from '../../../lib/propertyOfferings';
 import { useLiveContext } from '../../../lib/context/LiveContext';
+import { PropertyEligibilityEngine } from '../../../lib/services/PropertyEligibilityEngine';
 
 interface PropertyDetailsClientProps {
   id: string;
@@ -100,6 +102,79 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   const detailsMarkerRef = useRef<any>(null);
   const [detailsLeafletLoaded, setDetailsLeafletLoaded] = useState(false);
 
+  // Premium Lightbox Gallery States
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [zoomScale, setZoomScale] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  // Financing Calculator States
+  const [downPaymentPct, setDownPaymentPct] = useState(20);
+  const [financingTermYears, setFinancingTermYears] = useState(20);
+
+  // Multimedia Tab States
+  const [activeMediaTab, setActiveMediaTab] = useState<'photos' | 'video' | 'virtual' | 'blueprints'>('photos');
+  // Keyboard and helper functions for Premium Gallery
+  const handlePrevImage = () => {
+    if (!property?.images) return;
+    setIsZoomed(false);
+    setZoomScale(1);
+    setPanOffset({ x: 0, y: 0 });
+    setGalleryIndex((prev) => (prev === 0 ? property.images.length - 1 : prev - 1));
+  };
+
+  const handleNextImage = () => {
+    if (!property?.images) return;
+    setIsZoomed(false);
+    setZoomScale(1);
+    setPanOffset({ x: 0, y: 0 });
+    setGalleryIndex((prev) => (prev === property.images.length - 1 ? 0 : prev + 1));
+  };
+
+  useEffect(() => {
+    if (!isGalleryOpen || !property?.images) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsGalleryOpen(false);
+      } else if (e.key === 'ArrowLeft') {
+        handlePrevImage();
+      } else if (e.key === 'ArrowRight') {
+        handleNextImage();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isGalleryOpen, galleryIndex, property]);
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!isGalleryOpen) return;
+    const newScale = zoomScale + (e.deltaY < 0 ? 0.25 : -0.25);
+    const clampedScale = Math.max(1, Math.min(4, newScale));
+    setZoomScale(clampedScale);
+    setIsZoomed(clampedScale > 1);
+    if (clampedScale === 1) {
+      setPanOffset({ x: 0, y: 0 });
+    }
+  };
+
+  const handleDoubleClick = () => {
+    if (isZoomed) {
+      setIsZoomed(false);
+      setZoomScale(1);
+      setPanOffset({ x: 0, y: 0 });
+    } else {
+      setIsZoomed(true);
+      setZoomScale(2.5);
+    }
+  };
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!property || property.latitude === null || property.longitude === null) return;
@@ -702,17 +777,25 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
       </div>
 
       {/* 2. Premium Image Grid (Apple/Airbnb Inspired) */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 rounded-2xl overflow-hidden shadow-premium mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 rounded-2xl overflow-hidden shadow-premium mb-10 cursor-pointer">
         {/* Left main large image */}
-        <div className="md:col-span-2 aspect-[4/3] md:aspect-square relative overflow-hidden bg-brand-gray-100">
+        <div 
+          onClick={() => { setGalleryIndex(0); setIsGalleryOpen(true); }}
+          className="md:col-span-2 aspect-[4/3] md:aspect-square relative overflow-hidden bg-brand-gray-100 group"
+        >
           <img
             src={getImageUrl(0)}
             alt={property.title}
             onError={() => handleImageError(0)}
-            className="w-full h-full object-cover hover:scale-[1.02] transition-transform duration-500 ease-out"
+            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500 ease-out"
             loading="lazy"
             decoding="async"
           />
+          <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+            <span className="bg-white/95 text-brand-black text-xs font-black px-4 py-2 rounded-full shadow-md flex items-center gap-1.5 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+              🔍 Ver galería
+            </span>
+          </div>
         </div>
         
         {/* Right sub-images grid */}
@@ -728,15 +811,24 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               );
             }
             return (
-              <div key={index} className="aspect-square relative overflow-hidden bg-brand-gray-100">
+              <div 
+                key={index} 
+                onClick={() => { setGalleryIndex(index); setIsGalleryOpen(true); }}
+                className="aspect-square relative overflow-hidden bg-brand-gray-100 group"
+              >
                 <img
                   src={getImageUrl(index)}
                   alt={`${property.title} gallery ${index}`}
                   onError={() => handleImageError(index)}
-                  className="w-full h-full object-cover hover:scale-[1.03] transition-transform duration-500 ease-out"
+                  className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
                   loading="lazy"
                   decoding="async"
                 />
+                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                  <span className="bg-white/95 text-brand-black text-[10px] font-black px-3 py-1.5 rounded-full shadow-sm">
+                    Ver más
+                  </span>
+                </div>
               </div>
             );
           })}
@@ -749,28 +841,98 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
         {/* Left Column: Specifications & Descriptions */}
         <div className="flex-1 flex flex-col gap-8 w-full">
           
-          {/* Host profile card banner */}
-          <div className="flex items-center justify-between border-b border-brand-gray-200/80 pb-6">
-            <div>
-              <h2 className="text-xl font-bold text-brand-black tracking-tight flex items-center gap-1.5">
-                <span>{language === 'es' ? `Anfitrión: ${property.hostName}` : `Hosted by ${property.hostName}`}</span>
-                {property.hostVerified && (
-                  <ShieldCheck className="w-5 h-5 text-brand-accent fill-brand-accent/10" />
-                )}
-              </h2>
-              <p className="text-xs text-brand-gray-500 font-medium mt-1">
-                {t('details.responseRate')}
-              </p>
-            </div>
-            
-            <img
-              src={property.hostAvatar}
-              alt={property.hostName}
-              className="w-12 h-12 rounded-full object-cover border border-brand-gray-200 shadow-sm"
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
+          {/* Responsable Comercial Card (Premium design) */}
+          {(() => {
+            const broker = property.brokerProfile || {
+              photo: property.hostAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+              name: property.hostName || 'Agente Responsable',
+              company: 'AuraSwap Elite Estates',
+              position: 'Asesor Inmobiliario Senior',
+              responseTime: 'Menos de 15 minutos',
+              phone: '+52 667 392 4829',
+              whatsapp: '526673924829',
+              email: 'contacto@auraswap.com'
+            };
+
+            const getResponsibleLabel = (prop: Property, lang: string) => {
+              const pubType = prop.metadata?.publisherType;
+              if (pubType === 'developer' || prop.companyId) {
+                return lang === 'es' ? 'Inmobiliaria Responsable' : 'Responsible Developer';
+              }
+              if (pubType === 'agent') {
+                return lang === 'es' ? 'Asesor Comercial' : 'Commercial Advisor';
+              }
+              if (prop.primaryOperation === 'SALE') {
+                return lang === 'es' ? 'Propietario / Asesor' : 'Owner / Advisor';
+              } else if (prop.primaryOperation === 'RENT') {
+                return lang === 'es' ? 'Responsable de Propiedad' : 'Property Manager';
+              } else {
+                return lang === 'es' ? 'Propietario' : 'Property Owner';
+              }
+            };
+
+            const label = getResponsibleLabel(property, language);
+
+            return (
+              <div className="bg-brand-gray-50 border border-brand-gray-200/60 rounded-3xl p-6 flex flex-col md:flex-row gap-5 items-center justify-between shadow-xs">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
+                  <div className="relative">
+                    <img
+                      src={broker.photo}
+                      alt={broker.name}
+                      className="w-16 h-16 rounded-full object-cover border-2 border-brand-accent shadow-sm"
+                    />
+                    {property.hostVerified && (
+                      <span className="absolute bottom-0 right-0 bg-brand-accent text-white p-0.5 rounded-full border-2 border-white shadow-xs">
+                        <ShieldCheck className="w-3.5 h-3.5 fill-white" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-brand-accent uppercase tracking-widest">{label}</span>
+                    <h3 className="text-lg font-black text-brand-black mt-0.5">{broker.name}</h3>
+                    <span className="text-xs font-bold text-brand-gray-600 mt-0.5">{broker.position} • {broker.company}</span>
+                    <span className="text-[10px] text-brand-gray-400 font-semibold mt-1">⚡ Tiempo de respuesta: {broker.responseTime}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-center">
+                  {broker.whatsapp && (
+                    <a
+                      href={`https://wa.me/${broker.whatsapp}?text=Hola%20${encodeURIComponent(broker.name)},%20estoy%20interesado%20en%20la%20propiedad%20"${encodeURIComponent(property.title)}"%20con%20ID%20${property.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 sm:flex-none px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                    >
+                      💬 WhatsApp
+                    </a>
+                  )}
+                  {broker.phone && (
+                    <a
+                      href={`tel:${broker.phone}`}
+                      className="flex-1 sm:flex-none px-4 py-2 bg-white hover:bg-brand-gray-50 border border-brand-gray-200 text-brand-black rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                    >
+                      📞 Llamar
+                    </a>
+                  )}
+                  {broker.email && (
+                    <a
+                      href={`mailto:${broker.email}?subject=Interés en propiedad AuraSwap: ${encodeURIComponent(property.title)}`}
+                      className="flex-1 sm:flex-none px-4 py-2 bg-white hover:bg-brand-gray-50 border border-brand-gray-200 text-brand-black rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                    >
+                      ✉️ Correo
+                    </a>
+                  )}
+                  <button
+                    onClick={() => router.push(`/profile/${property.hostId || 'current-user'}`)}
+                    className="flex-1 sm:flex-none px-4 py-2 bg-brand-black hover:bg-brand-black/90 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                  >
+                    👤 Perfil
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Core specs highlights */}
           <div className="grid grid-cols-3 gap-4 border-b border-brand-gray-200/80 pb-6">
@@ -799,18 +961,243 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             </div>
           </div>
 
-          {/* Description */}
+          {/* 1. Descripción */}
           <div className="border-b border-brand-gray-200/80 pb-6">
             <h3 className="text-base font-bold text-brand-black mb-3">{t('details.aboutSpace')}</h3>
-            <p className="text-sm text-brand-gray-500 leading-relaxed whitespace-pre-line font-normal font-semibold">
+            <p className="text-sm text-brand-gray-500 leading-relaxed whitespace-pre-line font-medium">
               {t(`properties.${property.id}.description`).startsWith('properties.') ? property.description : t(`properties.${property.id}.description`)}
             </p>
           </div>
 
-          {/* Ficha Técnica y Superficies */}
+          {/* 2. Expediente Jurídico */}
+          {(() => {
+            const legalStatus = PropertyEligibilityEngine.getLegalStatus(property);
+            const statusColors = {
+              GREEN: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+              YELLOW: 'bg-amber-50 border-amber-200 text-amber-800',
+              RED: 'bg-rose-50 border-rose-200 text-rose-800'
+            };
+            const statusIcons = {
+              GREEN: '🟢',
+              YELLOW: '🟡',
+              RED: '🔴'
+            };
+
+            return (
+              <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
+                <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-brand-accent" />
+                  <span>{language === 'es' ? 'Expediente Jurídico' : 'Legal Dossier'}</span>
+                </h3>
+
+                {/* Semáforo Jurídico Banner */}
+                <div className={`p-4 rounded-2xl border ${statusColors[legalStatus.status]} flex gap-3 shadow-xs`}>
+                  <span className="text-xl leading-none">{statusIcons[legalStatus.status]}</span>
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider">{language === 'es' ? `Semáforo: ${legalStatus.label}` : `Traffic Light: ${legalStatus.label}`}</h4>
+                    <p className="text-xs mt-1 leading-normal font-semibold opacity-90">{legalStatus.explanation}</p>
+                    {legalStatus.warnings.length > 0 && (
+                      <ul className="list-disc list-inside text-[11px] mt-2 flex flex-col gap-1.5 font-bold">
+                        {legalStatus.warnings.map((w, idx) => (
+                          <li key={idx} className="leading-snug">{w}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+
+                {/* Dossier Table */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm text-brand-gray-500 font-semibold">
+                  <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                    <span className="text-brand-gray-400">{language === 'es' ? 'Escrituras' : 'Public Deeds'}</span>
+                    <span className="text-brand-black">{property.legalPublicDeed ? (language === 'es' ? 'Escritura Pública Inscrita' : 'Public Deed Registered') : (language === 'es' ? 'Sin Escrituras' : 'No Public Deed')}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                    <span className="text-brand-gray-400">{language === 'es' ? 'Predial' : 'Property Tax'}</span>
+                    <span className="text-brand-black">{property.legalTaxCurrent ? (language === 'es' ? 'Al corriente' : 'Up to date') : (language === 'es' ? 'Con adeudo' : 'With debts')}</span>
+                  </div>
+                  {property.legalRegime && (
+                    <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                      <span className="text-brand-gray-400">{language === 'es' ? 'Régimen' : 'Regime'}</span>
+                      <span className="text-brand-black">{property.legalRegime}</span>
+                    </div>
+                  )}
+                  {property.legalLandUse && (
+                    <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                      <span className="text-brand-gray-400">{language === 'es' ? 'Uso de suelo' : 'Land Use'}</span>
+                      <span className="text-brand-black">{property.legalLandUse}</span>
+                    </div>
+                  )}
+                  {property.legalJuridicalResponsible && (
+                    <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                      <span className="text-brand-gray-400">{language === 'es' ? 'Responsable jurídico' : 'Juridical Responsible'}</span>
+                      <span className="text-brand-black">{property.legalJuridicalResponsible}</span>
+                    </div>
+                  )}
+                  {property.legalLastUpdate && (
+                    <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                      <span className="text-brand-gray-400">{language === 'es' ? 'Última actualización' : 'Last update'}</span>
+                      <span className="text-brand-black">{property.legalLastUpdate}</span>
+                    </div>
+                  )}
+                  {property.legalRestrictions && (
+                    <div className="col-span-2 flex flex-col gap-1 border-b border-brand-gray-100 pb-1.5">
+                      <span className="text-brand-gray-400">{language === 'es' ? 'Restricciones / Afectaciones' : 'Restrictions'}</span>
+                      <span className="text-brand-black leading-snug">{property.legalRestrictions}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 3. Avalúo e Indicadores de Plusvalía */}
+          {(property.appraisalAmount || property.appreciationLevel) && (
+            <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
+              <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-brand-accent" />
+                <span>{language === 'es' ? 'Valuación y Plusvalía' : 'Valuation & Appreciation'}</span>
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {property.appraisalAmount && (
+                  <div className="p-4 rounded-2xl border border-brand-gray-200 bg-white flex flex-col gap-1 shadow-xs">
+                    <span className="text-[10px] font-black uppercase text-brand-gray-400 tracking-wider">
+                      {language === 'es' ? 'Certificación de Avalúo' : 'Appraisal Certificate'}
+                    </span>
+                    <span className="text-xl font-black text-brand-black">
+                      ${property.appraisalAmount.toLocaleString()} MXN
+                    </span>
+                    <span className="text-[10px] text-brand-gray-500 font-semibold mt-1">
+                      📋 Valuador: {property.appraisalExpert || 'N/A'}
+                    </span>
+                    <span className="text-[10px] text-brand-gray-400 font-semibold">
+                      | Fecha: {property.appraisalDate || 'N/A'} • Vigencia: {property.appraisalValidity || 'N/A'}
+                    </span>
+                  </div>
+                )}
+
+                {property.appreciationLevel && (() => {
+                  const details = PropertyEligibilityEngine.getInvestmentDetails(property);
+                  return (
+                    <div className={`p-4 rounded-2xl border ${details.color} flex flex-col gap-1 shadow-xs`}>
+                      <span className="text-[10px] font-black uppercase tracking-wider opacity-75">
+                        {language === 'es' ? 'Plusvalía Estimada (Zona)' : 'Estimated Appreciation'}
+                      </span>
+                      <span className="text-base font-extrabold flex items-center gap-1.5 mt-0.5">
+                        📈 {details.label}
+                      </span>
+                      <span className="text-[10px] font-semibold mt-1 opacity-90">
+                        {language === 'es' ? `Crecimiento promedio: ${details.rate}` : `Average growth: ${details.rate}`}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* 4. Créditos Compatibles (Motor de Créditos) */}
+          {property.primaryOperation === 'SALE' && (
+            <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
+              <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
+                <Award className="w-5 h-5 text-brand-accent" />
+                <span>{language === 'es' ? 'Compatibilidad de Financiamiento' : 'Financing Compatibility'}</span>
+              </h3>
+
+              {(() => {
+                const credits = PropertyEligibilityEngine.calculateEligibleCredits(property);
+
+                return (
+                  <div className="flex flex-col gap-4">
+                    {/* compatibles */}
+                    {credits.compatibles.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <span className="text-[10px] font-black uppercase text-emerald-700 tracking-wider flex items-center gap-1">
+                          🟢 {language === 'es' ? 'Créditos Compatibles' : 'Compatible Credits'}
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {credits.compatibles.map((c) => (
+                            <div key={c} className="p-3 bg-emerald-50/40 border border-emerald-100 rounded-xl text-xs font-bold text-brand-black flex items-center gap-2">
+                              <span>✓</span>
+                              <span>{c}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* evaluables */}
+                    {credits.evaluables.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <span className="text-[10px] font-black uppercase text-amber-700 tracking-wider flex items-center gap-1">
+                          🟡 {language === 'es' ? 'Sujetos a Evaluación de Capacidad' : 'Subject to Pre-qualification'}
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {credits.evaluables.map((c) => (
+                            <div key={c} className="p-3 bg-amber-50/40 border border-amber-100 rounded-xl text-xs font-bold text-brand-black flex items-center gap-2">
+                              <span>⚠</span>
+                              <span>{c}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* noCompatibles */}
+                    {credits.noCompatibles.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        <span className="text-[10px] font-black uppercase text-rose-700 tracking-wider flex items-center gap-1">
+                          🔴 {language === 'es' ? 'No Compatibles' : 'Not Compatible'}
+                        </span>
+                        <div className="flex flex-col gap-1.5">
+                          {credits.noCompatibles.map((item) => (
+                            <div key={item.credit} className="p-3 bg-rose-50/30 border border-rose-100 rounded-xl text-xs flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1.5">
+                              <span className="font-bold text-brand-black">{item.credit}</span>
+                              <span className="text-[10px] text-rose-700 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
+                                {item.reason}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <span className="text-[10px] text-brand-gray-400 font-semibold leading-normal block border-t border-brand-gray-100 pt-3">
+                      ℹ️ {language === 'es'
+                        ? '* Nota: El resultado es una simulación de precalificación basada en las condiciones jurídicas del inmueble. El otorgamiento definitivo está sujeto a la aprobación de la institución financiera y el perfil de ingresos del cliente.'
+                        : '* Note: This is an automated eligibility simulation based on the legal status of the property. Final approval is subject to the financial institution\'s criteria and the client\'s credit profile.'}
+                    </span>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* 5. Amenidades */}
+          {property.amenities && property.amenities.length > 0 && (
+            <div className="border-b border-brand-gray-200/80 pb-6">
+              <h3 className="text-base font-bold text-brand-black mb-4">{t('details.whatOffers')}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {property.amenities.map((amenity) => {
+                  const Icon = AMENITY_ICONS[amenity] || Compass;
+                  const translatedAmenity = t(`amenities.${amenity}`);
+                  const displayAmenity = translatedAmenity.startsWith('amenities.') ? amenity : translatedAmenity;
+                  return (
+                    <div key={amenity} className="flex items-center gap-3 text-sm text-brand-gray-500 font-semibold">
+                      <Icon className="w-4 h-4 text-brand-black shrink-0" />
+                      <span>{displayAmenity}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 6. Ficha Técnica */}
           <div className="border-b border-brand-gray-200/80 pb-6">
             <h3 className="text-base font-bold text-brand-black mb-3">
-              {language === 'es' ? 'Ficha Técnica' : 'Technical Specifications'}
+              {language === 'es' ? 'Ficha Técnica de Construcción' : 'Construction Specifications'}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5 text-sm text-brand-gray-500 font-semibold">
               {property.developmentName && (
@@ -866,55 +1253,136 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             </div>
           </div>
 
-          {/* Amenities grid */}
-          <div className="border-b border-brand-gray-200/80 pb-6">
-            <h3 className="text-base font-bold text-brand-black mb-4">{t('details.whatOffers')}</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {property.amenities.map((amenity) => {
-                const Icon = AMENITY_ICONS[amenity] || Compass;
-                const translatedAmenity = t(`amenities.${amenity}`);
-                const displayAmenity = translatedAmenity.startsWith('amenities.') ? amenity : translatedAmenity;
-                return (
-                  <div key={amenity} className="flex items-center gap-3 text-sm text-brand-gray-500 font-semibold">
-                    <Icon className="w-4 h-4 text-brand-black shrink-0" />
-                    <span>{displayAmenity}</span>
+          {/* 7. Multimedia Avanzada (Pestañas) */}
+          <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
+            <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
+              <Compass className="w-5 h-5 text-brand-accent" />
+              <span>{language === 'es' ? 'Multimedia y Recorridos' : 'Multimedia & Tours'}</span>
+            </h3>
+
+            {/* Tab Header */}
+            <div className="flex border-b border-brand-gray-100 bg-brand-gray-100 p-1 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => setActiveMediaTab('photos')}
+                className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'photos' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+              >
+                🖼️ {language === 'es' ? 'Fotos' : 'Photos'} ({property.images.length})
+              </button>
+              {(property.metadata?.videoPlaceholder || property.metadata?.videoUrl) && (
+                <button
+                  type="button"
+                  onClick={() => setActiveMediaTab('video')}
+                  className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'video' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                >
+                  📹 {language === 'es' ? 'Video / Drone' : 'Video / Drone'}
+                </button>
+              )}
+              {property.metadata?.virtualTourPlaceholder && (
+                <button
+                  type="button"
+                  onClick={() => setActiveMediaTab('virtual')}
+                  className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'virtual' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                >
+                  🕶️ {language === 'es' ? 'Tour 3D' : '3D Tour'}
+                </button>
+              )}
+              {property.metadata?.blueprintsUrl && (
+                <button
+                  type="button"
+                  onClick={() => setActiveMediaTab('blueprints')}
+                  className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'blueprints' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                >
+                  📐 {language === 'es' ? 'Planos' : 'Blueprints'}
+                </button>
+              )}
+            </div>
+
+            {/* Tab Content */}
+            <div className="relative rounded-2xl overflow-hidden bg-brand-gray-100 aspect-video flex items-center justify-center border border-brand-gray-200/50 shadow-inner">
+              {activeMediaTab === 'photos' && (
+                <div 
+                  onClick={() => setIsGalleryOpen(true)}
+                  className="w-full h-full relative cursor-pointer group"
+                >
+                  <img
+                    src={property.images[0]}
+                    alt={property.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  />
+                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="bg-white text-brand-black px-5 py-2.5 rounded-full text-xs font-black shadow-lg">
+                      Ver todas las fotos
+                    </span>
                   </div>
-                );
-              })}
+                </div>
+              )}
+
+              {activeMediaTab === 'video' && (
+                <div className="w-full h-full bg-brand-black flex items-center justify-center relative">
+                  <div className="flex flex-col items-center gap-3 text-white text-center p-6">
+                    <div className="w-16 h-16 rounded-full bg-brand-accent/90 flex items-center justify-center text-white text-xl animate-pulse cursor-pointer shadow-md hover:scale-105 transition-transform">
+                      ▶
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black">{language === 'es' ? 'Video Descriptivo y Tomas con Drone' : 'Walkthrough Video & Drone Footage'}</h4>
+                      <p className="text-[10px] text-brand-gray-400 font-semibold mt-1">
+                        {property.metadata?.videoPlaceholder || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeMediaTab === 'virtual' && (
+                <div className="w-full h-full bg-brand-black flex items-center justify-center relative">
+                  <div className="flex flex-col items-center gap-3 text-white text-center p-6">
+                    <div className="w-16 h-16 rounded-full bg-amber-500/90 flex items-center justify-center text-white text-xl cursor-pointer hover:scale-105 transition-transform shadow-md">
+                      🕶️
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black">{language === 'es' ? 'Recorrido Virtual Interactivo 3D (Matterport)' : '3D Matterport Interactive Tour'}</h4>
+                      <p className="text-[10px] text-brand-gray-400 font-semibold mt-1">
+                        {property.metadata?.virtualTourPlaceholder}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeMediaTab === 'blueprints' && (
+                <div className="w-full h-full bg-white flex items-center justify-center p-6 relative">
+                  <div className="flex flex-col items-center gap-3 text-brand-black text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-brand-gray-100 flex items-center justify-center text-xl shadow-xs">
+                      📐
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black">{language === 'es' ? 'Plano Arquitectónico Oficial' : 'Official Architectural Blueprint'}</h4>
+                      <p className="text-[10px] text-brand-gray-500 font-semibold mt-1">
+                        Escala 1:100 • Plantas de distribución y fachadas
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* House Rules */}
-          {property.rules && property.rules.length > 0 && (
-            <div className="border-b border-brand-gray-200/80 pb-6">
-              <h3 className="text-base font-bold text-brand-black mb-3">{t('details.houseRules')}</h3>
-              <ul className="list-disc list-inside text-sm text-brand-gray-500 flex flex-col gap-2 font-semibold leading-relaxed">
-                {property.rules.map((rule, idx) => {
-                  const translatedRule = t(`properties.${property.id}.rules.${idx}`);
-                  const displayRule = translatedRule.startsWith('properties.') ? rule : translatedRule;
-                  return <li key={idx}>{displayRule}</li>;
-                })}
-              </ul>
-            </div>
-          )}
-
-          {/* Ubicación y Mapa */}
+          {/* 8. Ubicación y Mapa */}
           {property.latitude !== null && property.longitude !== null && (
             <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
-              <h3 className="text-base font-bold text-brand-black">{language === 'es' ? 'Ubicación' : 'Location'}</h3>
+              <h3 className="text-base font-bold text-brand-black">{language === 'es' ? 'Ubicación y Entorno' : 'Location & Neighborhood'}</h3>
               {property.formattedAddress && (
                 <p className="text-xs text-brand-gray-500 font-semibold flex items-center gap-1.5">
                   📍 {property.formattedAddress}
                 </p>
               )}
               
-              {/* Dynamic Leaflet Map Container */}
               <div 
                 id="property-details-map" 
                 className="w-full h-64 rounded-3xl border border-brand-gray-200/60 overflow-hidden shadow-sm relative z-0 bg-[#e4e4e7]"
               />
 
-              {/* Navigation Action Buttons */}
               <div className="flex flex-wrap gap-2 mt-1">
                 <a 
                   href={`https://www.google.com/maps/dir/?api=1&destination=${property.latitude},${property.longitude}`}
@@ -943,6 +1411,137 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               </div>
             </div>
           )}
+
+          {/* 9. Expediente de Documentos */}
+          <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
+            <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
+              <FileText className="w-5 h-5 text-brand-accent" />
+              <span>{language === 'es' ? 'Documentos del Listado' : 'Listing Documents'}</span>
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <a 
+                href="/docs/Brochure_Propiedad.pdf" 
+                download
+                className="flex items-center justify-between p-3.5 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200/60 rounded-2xl text-xs font-bold text-brand-black shadow-xs transition-colors"
+                onClick={(e) => { e.preventDefault(); alert(language === 'es' ? 'Descargando Ficha Comercial / Brochure PDF de la propiedad...' : 'Downloading Property Brochure PDF...'); }}
+              >
+                <div className="flex items-center gap-2">
+                  <span>📄</span>
+                  <div className="flex flex-col">
+                    <span>{language === 'es' ? 'Brochure del Inmueble' : 'Property Brochure'}</span>
+                    <span className="text-[9px] text-brand-gray-400 font-semibold mt-0.5">PDF • 4.2 MB</span>
+                  </div>
+                </div>
+                <Download className="w-4 h-4 text-brand-gray-400" />
+              </a>
+
+              <a 
+                href="/docs/Reglamento_Condominio.pdf" 
+                download
+                className="flex items-center justify-between p-3.5 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200/60 rounded-2xl text-xs font-bold text-brand-black shadow-xs transition-colors"
+                onClick={(e) => { e.preventDefault(); alert(language === 'es' ? 'Descargando Reglamento del Condominio...' : 'Downloading Condo Regulations...'); }}
+              >
+                <div className="flex items-center gap-2">
+                  <span>📜</span>
+                  <div className="flex flex-col">
+                    <span>{language === 'es' ? 'Reglamento de Condominio' : 'Condo Regulations'}</span>
+                    <span className="text-[9px] text-brand-gray-400 font-semibold mt-0.5">PDF • 1.8 MB</span>
+                  </div>
+                </div>
+                <Download className="w-4 h-4 text-brand-gray-400" />
+              </a>
+
+              <a 
+                href="/docs/Plano_Arquitectonico.pdf" 
+                download
+                className="flex items-center justify-between p-3.5 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200/60 rounded-2xl text-xs font-bold text-brand-black shadow-xs transition-colors"
+                onClick={(e) => { e.preventDefault(); alert(language === 'es' ? 'Descargando Planos Arquitectónicos...' : 'Downloading Blueprints...'); }}
+              >
+                <div className="flex items-center gap-2">
+                  <span>📐</span>
+                  <div className="flex flex-col">
+                    <span>{language === 'es' ? 'Planos Oficiales' : 'Official Blueprints'}</span>
+                    <span className="text-[9px] text-brand-gray-400 font-semibold mt-0.5">PDF • 6.5 MB</span>
+                  </div>
+                </div>
+                <Download className="w-4 h-4 text-brand-gray-400" />
+              </a>
+
+              {property.legalPublicDeed && (
+                <a 
+                  href="/docs/Escritura_Publica.pdf" 
+                  download
+                  className="flex items-center justify-between p-3.5 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200/60 rounded-2xl text-xs font-bold text-brand-black shadow-xs transition-colors"
+                  onClick={(e) => { e.preventDefault(); alert(language === 'es' ? 'Descargando copia simple pública de Escrituras...' : 'Downloading simple public copy of Deeds...'); }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span>🏛️</span>
+                    <div className="flex flex-col">
+                      <span>{language === 'es' ? 'Escrituras Públicas (Copia Simple)' : 'Public Deeds (Simple Copy)'}</span>
+                      <span className="text-[9px] text-brand-gray-400 font-semibold mt-0.5">PDF • 8.9 MB</span>
+                    </div>
+                  </div>
+                  <Download className="w-4 h-4 text-brand-gray-400" />
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* 10. Análisis Inmobiliario con IA (Eterna) */}
+          <div className="bg-gradient-to-br from-brand-accent/5 to-white border border-brand-accent/20 rounded-3xl p-6 flex flex-col gap-4 shadow-sm mb-6">
+            <h3 className="text-base font-black text-brand-black flex items-center gap-2 text-brand-accent uppercase tracking-wider">
+              <Sparkles className="w-5 h-5 text-brand-accent animate-pulse" />
+              <span>{language === 'es' ? 'Análisis de Inteligencia Inmobiliaria' : 'Real Estate AI Analysis'}</span>
+            </h3>
+
+            <p className="text-xs text-brand-gray-600 leading-normal font-semibold">
+              {language === 'es'
+                ? 'Eterna ha auditado este listado residencial y proyecta el siguiente análisis de viabilidad comercial e inversión:'
+                : 'Eterna has audited this residential listing and projects the following commercial and investment viability analysis:'}
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1 p-3 bg-emerald-50/40 border border-emerald-100 rounded-2xl">
+                <span className="text-[9px] font-black uppercase text-emerald-800 tracking-wider">🟢 {language === 'es' ? 'Fortaleza Principal' : 'Key Strength'}</span>
+                <p className="text-xs font-bold text-brand-black mt-1 leading-normal">
+                  {property.id === 'prop-1' 
+                    ? (language === 'es' ? 'Acceso directo a playa privada y alta plusvalía proyectada.' : 'Direct access to private beach and high projected appreciation.')
+                    : (language === 'es' ? 'Ubicación premium con alta demanda de rentas y plusvalía sólida.' : 'Premium location with high rental demand and solid appreciation.')}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1 p-3 bg-amber-50/40 border border-amber-100 rounded-2xl">
+                <span className="text-[9px] font-black uppercase text-amber-800 tracking-wider">🟡 {language === 'es' ? 'Área de Oportunidad' : 'Opportunity Area'}</span>
+                <p className="text-xs font-bold text-brand-black mt-1 leading-normal">
+                  {property.legalDebtFree === false
+                    ? (language === 'es' ? 'Requiere liquidación del gravamen actual durante la firma notarial.' : 'Requires liquidation of the current lien during the notary signing.')
+                    : (language === 'es' ? 'Optimizar costos de mantenimiento mensual para maximizar el cap rate.' : 'Optimize monthly maintenance fees to maximize the cap rate.')}
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-brand-gray-100 my-1" />
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="flex flex-col bg-brand-gray-50 p-2.5 rounded-xl border">
+                <span className="text-[8px] font-black uppercase text-brand-gray-400 tracking-wider">{language === 'es' ? 'Precio m² Recom.' : 'Recom. Price/m²'}</span>
+                <span className="text-xs font-extrabold text-brand-black mt-1">
+                  ${property.surfaceBuilt ? Math.round((property.appraisalAmount || 4500000) / property.surfaceBuilt).toLocaleString() : 'N/A'} MXN
+                </span>
+              </div>
+              <div className="flex flex-col bg-brand-gray-50 p-2.5 rounded-xl border">
+                <span className="text-[8px] font-black uppercase text-brand-gray-400 tracking-wider">{language === 'es' ? 'Velocidad de Venta' : 'Liquidity Speed'}</span>
+                <span className="text-xs font-extrabold text-brand-black mt-1">
+                  {property.id === 'prop-1' ? (language === 'es' ? 'Rápida' : 'Fast') : (language === 'es' ? 'Media-Alta' : 'Moderate-High')}
+                </span>
+              </div>
+              <div className="flex flex-col bg-brand-gray-50 p-2.5 rounded-xl border">
+                <span className="text-[8px] font-black uppercase text-brand-gray-400 tracking-wider">{language === 'es' ? 'Tiempo Estimado' : 'Est. Days on Market'}</span>
+                <span className="text-xs font-extrabold text-brand-black mt-1">
+                  {property.id === 'prop-1' ? '45-60 días' : '60-90 días'}
+                </span>
+              </div>
+            </div>
+          </div>
 
           {/* Guest Reviews Section */}
           <div>
@@ -1197,19 +1796,37 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     </p>
                   </div>
 
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between text-brand-gray-500">
-                      <span>{t('details.rentCharge')}</span>
-                      <span className="line-through font-semibold text-brand-black">0,00 €</span>
+                  {/* Detailed trueque preferences card */}
+                  <div className="bg-brand-gray-50 rounded-2xl p-4 border border-brand-gray-200/40 text-[11px] leading-relaxed text-brand-gray-600 font-semibold flex flex-col gap-2 shadow-xs mb-1">
+                    <div className="flex items-center justify-between text-brand-black font-extrabold text-[9px] uppercase tracking-wider text-brand-accent">
+                      <span>🔄</span>
+                      <span>{language === 'es' ? 'Preferencias de Intercambio' : 'Swap Preferences'}</span>
                     </div>
-                    <div className="flex items-center justify-between text-brand-gray-500">
-                      <span>{language === 'es' ? 'Tarifa de verificación (Estimada)' : 'Verification fee (Estimated)'}</span>
-                      <span className="font-bold text-brand-accent">{t('details.serviceFeeDesc')}</span>
+                    <div className="border-t border-brand-gray-200/60 my-1" />
+                    <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                      <span>{language === 'es' ? 'Acepta:' : 'Accepts:'}</span>
+                      <span className="text-brand-black font-extrabold">
+                        {[
+                          property.metadata?.swapAcceptsHouse !== false ? (language === 'es' ? 'Casa' : 'House') : null,
+                          property.metadata?.swapAcceptsDept !== false ? (language === 'es' ? 'Depto' : 'Condo') : null,
+                          property.metadata?.swapAcceptsLand ? (language === 'es' ? 'Terreno' : 'Land') : null,
+                          property.metadata?.swapAcceptsVehicle ? (language === 'es' ? 'Vehículo' : 'Vehicle') : null
+                        ].filter(Boolean).join(', ') || (language === 'es' ? 'Cualquiera' : 'Any')}
+                      </span>
                     </div>
-                    <div className="border-t border-brand-gray-100 my-1" />
-                    <div className="flex items-center justify-between font-bold text-brand-black text-sm">
-                      <span>{language === 'es' ? 'Comisión Total Estimada' : 'Total Estimated Fee'}</span>
-                      <span>29 €</span>
+                    <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                      <span>{language === 'es' ? 'Efectivo como diferencia:' : 'Cash difference:'}</span>
+                      <span className="text-brand-black font-extrabold">{property.metadata?.swapAcceptsCash !== false ? (language === 'es' ? 'Sí, aceptado' : 'Yes') : (language === 'es' ? 'No aceptado' : 'No')}</span>
+                    </div>
+                    {property.metadata?.swapMaxCashDiff && (
+                      <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                        <span>{language === 'es' ? 'Diferencia máxima:' : 'Max difference:'}</span>
+                        <span className="text-brand-black font-extrabold">${Number(property.metadata?.swapMaxCashDiff).toLocaleString()} USD</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span>{language === 'es' ? 'Ciudades aceptadas:' : 'Preferred cities:'}</span>
+                      <span className="text-brand-black font-extrabold">{property.desiredExchange || (language === 'es' ? 'Culiacán, Mazatlán, CDMX' : 'Any city')}</span>
                     </div>
                   </div>
                 </div>
@@ -1443,22 +2060,42 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   </div>
                 </div>
 
-                <div className="bg-brand-gray-50 rounded-2xl p-4 border border-brand-gray-200/40 text-xs leading-relaxed text-brand-gray-600 font-semibold flex flex-col gap-3">
+                <div className="bg-brand-gray-50 rounded-2xl p-4 border border-brand-gray-200/40 text-[11px] leading-relaxed text-brand-gray-600 font-semibold flex flex-col gap-2.5">
                   <div className="flex justify-between border-b border-brand-gray-200 pb-2">
-                    <span>{language === 'es' ? 'Depósito reembolsable:' : 'Security deposit:'}</span>
-                    <span className="text-brand-black font-extrabold">${activeRentOffering.securityDepositAmount || 2000} USD</span>
+                    <span>{language === 'es' ? 'Depósito en garantía:' : 'Security deposit:'}</span>
+                    <span className="text-brand-black font-extrabold">${(activeRentOffering.securityDepositAmount || 2000).toLocaleString()} USD</span>
                   </div>
                   <div className="flex justify-between border-b border-brand-gray-200 pb-2">
-                    <span>{language === 'es' ? 'Periodo mínimo:' : 'Minimum contract:'}</span>
-                    <span className="text-brand-black font-extrabold">30 {language === 'es' ? 'días' : 'days'}</span>
+                    <span>{language === 'es' ? 'Mes adelantado:' : 'Months in advance:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.advanceMonths || 1} {language === 'es' ? 'mes' : 'month'}</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span>{language === 'es' ? 'Firma de Contrato:' : 'Formal Contract:'}</span>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${activeRentOffering.metadata?.requiresContract !== false ? 'bg-amber-50 border border-amber-200 text-amber-700' : 'bg-emerald-50 border border-emerald-200 text-emerald-700'}`}>
-                      {activeRentOffering.metadata?.requiresContract !== false 
-                        ? (language === 'es' ? 'Requerido' : 'Required') 
-                        : (language === 'es' ? 'No requerido' : 'Not required')}
-                    </span>
+                  <div className="flex justify-between border-b border-brand-gray-200 pb-2">
+                    <span>{language === 'es' ? 'Aval / Obligado Solidario:' : 'Guarantor Required:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.requiresGuarantor ? (language === 'es' ? 'Sí, requerido' : 'Yes') : (language === 'es' ? 'No requerido' : 'No')}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-brand-gray-200 pb-2">
+                    <span>{language === 'es' ? 'Póliza Jurídica:' : 'Legal Policy:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.requiresLegalPolicy ? (language === 'es' ? 'Sí, requerida' : 'Yes') : (language === 'es' ? 'No requerida' : 'No')}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-brand-gray-200 pb-2">
+                    <span>{language === 'es' ? 'Contrato Mínimo:' : 'Min Contract Term:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.monthlyContract || 12} {language === 'es' ? 'meses' : 'months'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-brand-gray-200 pb-2">
+                    <span>{language === 'es' ? 'Mascotas:' : 'Pets Allowed:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.acceptsPets !== false ? (language === 'es' ? 'Aceptadas' : 'Allowed') : (language === 'es' ? 'No aceptadas' : 'No')}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-brand-gray-200 pb-2">
+                    <span>{language === 'es' ? 'Amueblado:' : 'Furnished:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.isFurnished ? (language === 'es' ? 'Sí' : 'Yes') : (language === 'es' ? 'No' : 'No')}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-brand-gray-200 pb-2">
+                    <span>{language === 'es' ? 'Mantenimiento:' : 'Maintenance:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.includesMaintenance !== false ? (language === 'es' ? 'Incluido' : 'Included') : (language === 'es' ? 'No incluido' : 'Not Included')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>{language === 'es' ? 'Servicios (Agua/Luz):' : 'Utilities:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.includesServices ? (language === 'es' ? 'Incluidos' : 'Included') : (language === 'es' ? 'No incluidos' : 'Not Included')}</span>
                   </div>
                 </div>
 
@@ -1513,6 +2150,35 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                       {activeSaleOffering.currency || 'USD'} ${(activeSaleOffering.priceAmount || 450000).toLocaleString()}
                     </span>
                   </div>
+
+                  {/* Historial de Precios (Zillow-like) */}
+                  {property.priceHistory && (
+                    <div className="mt-2 p-3 bg-brand-gray-50 rounded-2xl border border-brand-gray-200/50 flex flex-col gap-1.5 text-xs font-semibold">
+                      <div className="flex justify-between items-center text-[10px] text-brand-gray-400 font-black uppercase tracking-wider">
+                        <span>📈 {language === 'es' ? 'Historial de Precios' : 'Price History'}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                          property.priceHistory.trend === 'DOWN' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                          property.priceHistory.trend === 'UP' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                          'bg-brand-gray-100 text-brand-gray-500'
+                        }`}>
+                          {property.priceHistory.trend === 'DOWN' ? (language === 'es' ? 'Bajó ↓' : 'Dropped ↓') :
+                           property.priceHistory.trend === 'UP' ? (language === 'es' ? 'Subió ↑' : 'Increased ↑') :
+                           (language === 'es' ? 'Estable' : 'Stable')}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-brand-gray-500 text-[11px] mt-0.5">
+                        <span>{language === 'es' ? 'Precio Inicial:' : 'Original Price:'}</span>
+                        <span className="text-brand-black line-through">${property.priceHistory.initialPrice.toLocaleString()} MXN</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-brand-gray-500">{language === 'es' ? 'Último Cambio:' : 'Last Modified:'}</span>
+                        <span className="text-brand-black font-bold">
+                          {property.priceHistory.lastModificationDate} ({language === 'es' ? 'hace 3 semanas' : '3 weeks ago'})
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   <p className="text-[10px] text-brand-gray-500 font-semibold mt-1">
                     {language === 'es' ? 'Listado inmobiliario premium de propiedad verificada.' : 'Premium verified real estate listing.'}
                   </p>
@@ -1535,6 +2201,135 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                       {activeSaleOffering.acceptsOffers !== false ? (language === 'es' ? 'SÍ' : 'YES') : (language === 'es' ? 'SÓLO LISTADO' : 'ONLY LISTING')}
                     </span>
                   </div>
+                </div>
+
+                {/* 1. Simulador Hipotecario Financiero */}
+                <div className="bg-brand-gray-50 border border-brand-gray-200/60 rounded-3xl p-4 flex flex-col gap-3.5 shadow-xs">
+                  <div className="flex items-center justify-between text-brand-black font-extrabold text-[9px] uppercase tracking-wider text-brand-accent">
+                    <span>🧮</span>
+                    <span>{language === 'es' ? 'Simulador Hipotecario (Informativo)' : 'Mortgage Simulator'}</span>
+                  </div>
+                  <div className="border-t border-brand-gray-200/60" />
+
+                  {/* Down payment percentage selector */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between text-[11px] font-bold text-brand-gray-500">
+                      <span>{language === 'es' ? 'Enganche:' : 'Down payment:'}</span>
+                      <span className="text-brand-black">{downPaymentPct}% (${Math.round(activeSaleOffering.priceAmount * (downPaymentPct / 100)).toLocaleString()} {activeSaleOffering.currency || 'USD'})</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={20}
+                      max={80}
+                      step={10}
+                      value={downPaymentPct}
+                      onChange={(e) => setDownPaymentPct(Number(e.target.value))}
+                      className="w-full accent-brand-accent h-1 bg-brand-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[9px] text-brand-gray-400 font-semibold px-0.5">
+                      <span>20%</span>
+                      <span>40%</span>
+                      <span>60%</span>
+                      <span>80%</span>
+                    </div>
+                  </div>
+
+                  {/* Plazo selection */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-bold text-brand-gray-500">{language === 'es' ? 'Plazo del Crédito:' : 'Loan Term:'}</span>
+                    <div className="flex gap-1.5 bg-brand-gray-200/40 p-0.5 rounded-xl border border-brand-gray-200/60">
+                      {[10, 15, 20].map((years) => (
+                        <button
+                          key={years}
+                          type="button"
+                          onClick={() => setFinancingTermYears(years)}
+                          className={`flex-1 py-1.5 rounded-lg text-[10px] font-black transition-all cursor-pointer ${financingTermYears === years ? 'bg-white text-brand-black shadow-xs' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                        >
+                          {years} {language === 'es' ? 'años' : 'years'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Calculator Payment display */}
+                  {(() => {
+                    const price = activeSaleOffering.priceAmount || 450000;
+                    const downPayment = price * (downPaymentPct / 100);
+                    const loan = price - downPayment;
+                    const annualRate = 0.105; // 10.5% annual rate
+                    const monthlyRate = annualRate / 12;
+                    const totalPayments = financingTermYears * 12;
+                    const monthlyPayment = loan * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+
+                    return (
+                      <div className="bg-brand-accent/5 p-3 rounded-2xl border border-brand-accent/20 flex flex-col gap-1 text-center">
+                        <span className="text-[9px] font-black uppercase text-brand-accent tracking-wider">
+                          {language === 'es' ? 'Mensualidad Estimada' : 'Estimated Monthly Payment'}
+                        </span>
+                        <span className="text-xl font-black text-brand-black">
+                          ${Math.round(monthlyPayment).toLocaleString()} {activeSaleOffering.currency || 'USD'}
+                        </span>
+                        <span className="text-[9px] text-brand-gray-500 font-semibold">
+                          {language === 'es'
+                            ? `Financiando el ${100 - downPaymentPct}% a tasa fija de 10.5%`
+                            : `Financing ${100 - downPaymentPct}% at 10.5% fixed rate`}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* 2. Desglose de Gastos de Adquisición */}
+                <div className="bg-brand-gray-50 border border-brand-gray-200/60 rounded-3xl p-4 flex flex-col gap-3 shadow-xs">
+                  <div className="flex items-center justify-between text-brand-black font-extrabold text-[9px] uppercase tracking-wider text-brand-accent">
+                    <span>💵</span>
+                    <span>{language === 'es' ? 'Costos de Adquisición (Escrituración)' : 'Acquisition & Notary Costs'}</span>
+                  </div>
+                  <div className="border-t border-brand-gray-200/60" />
+
+                  {(() => {
+                    const price = activeSaleOffering.priceAmount || 450000;
+                    const isai = price * 0.03; // ISAI 3%
+                    const notary = price * 0.025; // Notary 2.5%
+                    const appraisal = Math.max(5000, price * 0.001); // Appraisal 0.1% or min 5000
+                    const registration = price * 0.005; // Registration fee 0.5%
+                    const totalAcquisition = isai + notary + appraisal + registration;
+
+                    return (
+                      <div className="flex flex-col gap-2.5 text-[11px] leading-relaxed text-brand-gray-600 font-semibold">
+                        <div className="flex justify-between border-b border-brand-gray-100 pb-1">
+                          <span>{language === 'es' ? 'ISAI (Impuesto de Traslado - 3%):' : 'ISAI (Transfer Tax - 3%):'}</span>
+                          <span className="text-brand-black font-bold">${Math.round(isai).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-brand-gray-100 pb-1">
+                          <span>{language === 'es' ? 'Honorarios Notaría (2.5%):' : 'Notary Fees (2.5%):'}</span>
+                          <span className="text-brand-black font-bold">${Math.round(notary).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-brand-gray-100 pb-1">
+                          <span>{language === 'es' ? 'Avalúo Comercial Oficial:' : 'Official Appraisal:'}</span>
+                          <span className="text-brand-black font-bold">${Math.round(appraisal).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-brand-gray-100 pb-1">
+                          <span>{language === 'es' ? 'Registro Público (0.5%):' : 'Public Registry Fee (0.5%):'}</span>
+                          <span className="text-brand-black font-bold">${Math.round(registration).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-brand-gray-100 pb-1">
+                          <span>{language === 'es' ? 'Honorarios de Intermediación:' : 'Agency Commission:'}</span>
+                          <span className="text-emerald-600 font-bold">{language === 'es' ? 'Paga Propietario ($0)' : 'Paid by Seller ($0)'}</span>
+                        </div>
+                        <div className="border-t border-brand-gray-200/60 my-1" />
+                        <div className="flex justify-between items-center text-brand-black font-extrabold text-xs">
+                          <span>{language === 'es' ? 'Total Gastos Escrituración:' : 'Total Acquisition Costs:'}</span>
+                          <span>${Math.round(totalAcquisition).toLocaleString()} {activeSaleOffering.currency || 'USD'}</span>
+                        </div>
+                        <span className="text-[9px] text-brand-gray-400 font-semibold leading-snug">
+                          {language === 'es'
+                            ? '* Gastos calculados en promedio para la República Mexicana (aprox. 5% al 6% del valor total de venta).'
+                            : '* Estimated values based on average rates in Mexico (approx. 5% to 6% of total purchase value).'}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {isSelfProperty ? (
@@ -1865,6 +2660,171 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 {language === 'es' ? 'Entendido' : 'Got it'}
               </button>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Premium Lightbox Gallery Modal */}
+      <AnimatePresence>
+        {isGalleryOpen && property?.images && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-[#09090b]/98 backdrop-blur-xl flex flex-col justify-between"
+          >
+            {/* Top Toolbar */}
+            <div className="flex items-center justify-between p-4 md:p-6 bg-gradient-to-b from-black/60 to-transparent z-10 text-white">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsGalleryOpen(false)}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+                  title={language === 'es' ? 'Cerrar' : 'Close'}
+                >
+                  <ChevronLeft className="w-6 h-6 rotate-180" />
+                </button>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase text-brand-accent tracking-widest">
+                    {language === 'es' ? 'Galería Premium' : 'Premium Gallery'}
+                  </span>
+                  <span className="text-xs font-bold text-brand-gray-300">
+                    {galleryIndex + 1} / {property.images.length}
+                  </span>
+                </div>
+              </div>
+
+              {/* Controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newScale = Math.min(4, zoomScale + 0.5);
+                    setZoomScale(newScale);
+                    setIsZoomed(newScale > 1);
+                  }}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer text-brand-gray-300 hover:text-white"
+                  title="Acercar"
+                >
+                  <ZoomIn className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newScale = Math.max(1, zoomScale - 0.5);
+                    setZoomScale(newScale);
+                    setIsZoomed(newScale > 1);
+                    if (newScale === 1) setPanOffset({ x: 0, y: 0 });
+                  }}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer text-brand-gray-300 hover:text-white"
+                  title="Alejar"
+                >
+                  <ZoomOut className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsZoomed(!isZoomed);
+                    setZoomScale(isZoomed ? 1 : 2.5);
+                    if (isZoomed) setPanOffset({ x: 0, y: 0 });
+                  }}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer text-brand-gray-300 hover:text-white"
+                  title="Restablecer"
+                >
+                  <Maximize className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = property.images[galleryIndex];
+                    link.download = `propiedad-${property.id}-foto-${galleryIndex + 1}.jpg`;
+                    link.target = '_blank';
+                    link.click();
+                  }}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer text-brand-gray-300 hover:text-white"
+                  title="Descargar Foto"
+                >
+                  <Download className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(property.images[galleryIndex]);
+                    alert(language === 'es' ? 'Enlace de la imagen copiado al portapapeles.' : 'Image URL copied to clipboard.');
+                  }}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer text-brand-gray-300 hover:text-white"
+                  title="Compartir enlace"
+                >
+                  <Share className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Main Interactive Stage */}
+            <div 
+              className="flex-1 w-full flex items-center justify-center relative overflow-hidden px-4 md:px-16"
+            >
+              {/* Navigation Arrows */}
+              <button
+                type="button"
+                onClick={handlePrevImage}
+                className="absolute left-4 md:left-8 p-3 bg-white/5 hover:bg-white/15 border border-white/10 rounded-full text-white transition-colors cursor-pointer z-10 hidden sm:block"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+
+              {/* Main Image with Pan & Zoom */}
+              <div className="w-full h-full flex items-center justify-center relative">
+                <motion.img
+                  key={galleryIndex}
+                  src={property.images[galleryIndex]}
+                  alt={`${property.title} - ${galleryIndex + 1}`}
+                  animate={{ scale: zoomScale, x: panOffset.x, y: panOffset.y }}
+                  drag={isZoomed}
+                  dragConstraints={{ left: -300 * zoomScale, right: 300 * zoomScale, top: -200 * zoomScale, bottom: 200 * zoomScale }}
+                  dragElastic={0.1}
+                  onDragEnd={(e, info) => {
+                    setPanOffset({ x: info.offset.x, y: info.offset.y });
+                  }}
+                  onDoubleClick={handleDoubleClick}
+                  className={`max-w-full max-h-[75vh] object-contain rounded-xl select-none shadow-2xl transition-shadow ${isZoomed ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleNextImage}
+                className="absolute right-4 md:right-8 p-3 bg-white/5 hover:bg-white/15 border border-white/10 rounded-full text-white transition-colors cursor-pointer z-10 hidden sm:block"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Bottom Thumbnail Strip */}
+            <div className="bg-gradient-to-t from-black/80 to-transparent p-6 z-10">
+              <div className="flex justify-center gap-2 max-w-full overflow-x-auto py-2 no-scrollbar">
+                {property.images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setIsZoomed(false);
+                      setZoomScale(1);
+                      setPanOffset({ x: 0, y: 0 });
+                      setGalleryIndex(idx);
+                    }}
+                    className={`relative w-16 h-12 rounded-lg overflow-hidden shrink-0 transition-all border-2 cursor-pointer ${galleryIndex === idx ? 'border-brand-accent scale-105' : 'border-transparent opacity-50 hover:opacity-100'}`}
+                  >
+                    <img
+                      src={img}
+                      alt={`Thumbnail ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

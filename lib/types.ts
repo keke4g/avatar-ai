@@ -268,6 +268,43 @@ export interface Property {
   shortCode?: string | null;
   shortLink?: string | null;
   updatedAt?: string;
+  desiredExchange?: string | null;
+
+  // Expediente Jurídico & Avalúo & Comercial
+  legalLienType?: 'Banco' | 'Infonavit' | 'FOVISSSTE' | 'Particular' | 'Hipoteca privada' | 'Embargo' | 'Otro';
+  legalLienObservations?: string;
+  legalRegime?: 'Condominal' | 'Propiedad Privada' | 'Ejidal' | 'Fideicomiso' | 'Otro';
+  legalLandUse?: 'Residencial' | 'Comercial' | 'Mixto' | 'Industrial' | 'Otro';
+  legalRestrictions?: string;
+  legalDocumentationComplete?: boolean;
+  legalJuridicalResponsible?: string;
+  legalLastUpdate?: string;
+  
+  appraisalAmount?: number;
+  appraisalDate?: string;
+  appraisalExpert?: string;
+  appraisalValidity?: string;
+  
+  appreciationLevel?: 'Alta' | 'Media' | 'Baja' | 'En desarrollo';
+  commercialStatus?: 'Disponible' | 'Apartada' | 'Promesa de Compra' | 'En Escrituración' | 'Vendida' | 'Rentada' | 'Suspendida' | 'Bajo Oferta' | 'En negociación';
+  
+  priceHistory?: {
+    initialPrice: number;
+    currentPrice: number;
+    lastModificationDate: string;
+    trend: 'UP' | 'DOWN' | 'STABLE';
+  };
+  
+  brokerProfile?: {
+    photo: string;
+    name: string;
+    company: string;
+    position: string;
+    responseTime: string;
+    phone: string;
+    whatsapp: string;
+    email: string;
+  };
 
   // Relations
   documents?: PropertyDocument[];

@@ -534,6 +534,24 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
   const [legalOwnerType, setLegalOwnerType] = useState('Privada');
   const [legalIsMortgaged, setLegalIsMortgaged] = useState(false);
 
+  // Expanded Legal & Appraisal & Commercial fields
+  const [legalLienType, setLegalLienType] = useState<string>('Banco');
+  const [legalLienObservations, setLegalLienObservations] = useState<string>('');
+  const [legalRegime, setLegalRegime] = useState<string>('Propiedad Privada');
+  const [legalLandUse, setLegalLandUse] = useState<string>('Residencial');
+  const [legalRestrictions, setLegalRestrictions] = useState<string>('');
+  const [legalDocumentationComplete, setLegalDocumentationComplete] = useState<boolean>(true);
+  const [legalJuridicalResponsible, setLegalJuridicalResponsible] = useState<string>('Lic. Alejandro Ruiz');
+  const [legalLastUpdate, setLegalLastUpdate] = useState<string>('');
+
+  const [appraisalAmount, setAppraisalAmount] = useState<number | ''>('');
+  const [appraisalDate, setAppraisalDate] = useState<string>('');
+  const [appraisalExpert, setAppraisalExpert] = useState<string>('');
+  const [appraisalValidity, setAppraisalValidity] = useState<string>('');
+
+  const [appreciationLevel, setAppreciationLevel] = useState<'Alta' | 'Media' | 'Baja' | 'En desarrollo'>('Media');
+  const [commercialStatus, setCommercialStatus] = useState<string>('Disponible');
+
   // Operation specific new fields - VENTA
   const [valuationAmount, setValuationAmount] = useState<number | ''>('');
   const [catastralValue, setCatastralValue] = useState<number | ''>('');
@@ -812,6 +830,23 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setCatastralValue(initialData.metadata?.catastralValue || '');
       setCondoRegime(!!initialData.metadata?.condoRegime);
       setMaintenanceFee(initialData.metadata?.maintenanceFee || '');
+
+      // Expanded Legal & Appraisal & Commercial fields load
+      setLegalLienType(initialData.legalLienType || 'Banco');
+      setLegalLienObservations(initialData.legalLienObservations || '');
+      setLegalRegime(initialData.legalRegime || initialData.legalOwnerType || 'Propiedad Privada');
+      setLegalLandUse(initialData.legalLandUse || 'Residencial');
+      setLegalRestrictions(initialData.legalRestrictions || '');
+      setLegalDocumentationComplete(initialData.legalDocumentationComplete ?? true);
+      setLegalJuridicalResponsible(initialData.legalJuridicalResponsible || 'Lic. Alejandro Ruiz');
+      setLegalLastUpdate(initialData.legalLastUpdate || '');
+      setAppraisalAmount(initialData.appraisalAmount || '');
+      setAppraisalDate(initialData.appraisalDate || '');
+      setAppraisalExpert(initialData.appraisalExpert || '');
+      setAppraisalValidity(initialData.appraisalValidity || '');
+      setAppreciationLevel(initialData.appreciationLevel || 'Media');
+      setCommercialStatus(initialData.commercialStatus || 'Disponible');
+
       // Renta Extra
       setAdvanceMonths(initialData.metadata?.advanceMonths || 1);
       setRequiresGuarantor(!!initialData.metadata?.requiresGuarantor);
@@ -840,11 +875,28 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setActiveConfigTab('SWAP');
       setTitle('');
       setDescription('');
+      
       // Venta reset
       setValuationAmount('');
       setCatastralValue('');
       setCondoRegime(false);
       setMaintenanceFee('');
+
+      // Expanded Legal & Appraisal & Commercial fields reset
+      setLegalLienType('Banco');
+      setLegalLienObservations('');
+      setLegalRegime('Propiedad Privada');
+      setLegalLandUse('Residencial');
+      setLegalRestrictions('');
+      setLegalDocumentationComplete(true);
+      setLegalJuridicalResponsible('Lic. Alejandro Ruiz');
+      setLegalLastUpdate('');
+      setAppraisalAmount('');
+      setAppraisalDate('');
+      setAppraisalExpert('');
+      setAppraisalValidity('');
+      setAppreciationLevel('Media');
+      setCommercialStatus('Disponible');
       // Renta reset
       setAdvanceMonths(1);
       setRequiresGuarantor(false);
@@ -1190,7 +1242,21 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       legalTaxCurrent,
       legalServicesPaid,
       legalOwnerType,
-      legalIsMortgaged
+      legalIsMortgaged,
+      legalLienType,
+      legalLienObservations,
+      legalRegime,
+      legalLandUse,
+      legalRestrictions,
+      legalDocumentationComplete,
+      legalJuridicalResponsible,
+      legalLastUpdate,
+      appraisalAmount,
+      appraisalDate,
+      appraisalExpert,
+      appraisalValidity,
+      appreciationLevel,
+      commercialStatus
     };
 
     localStorage.setItem('auraswap_draft_property', JSON.stringify(draftData));
@@ -1262,7 +1328,21 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     legalTaxCurrent,
     legalServicesPaid,
     legalOwnerType,
-    legalIsMortgaged
+    legalIsMortgaged,
+    legalLienType,
+    legalLienObservations,
+    legalRegime,
+    legalLandUse,
+    legalRestrictions,
+    legalDocumentationComplete,
+    legalJuridicalResponsible,
+    legalLastUpdate,
+    appraisalAmount,
+    appraisalDate,
+    appraisalExpert,
+    appraisalValidity,
+    appreciationLevel,
+    commercialStatus
   ]);
 
   // Load draft check on modal mount or open
@@ -1341,6 +1421,20 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
             if (parsed.legalServicesPaid !== undefined) setLegalServicesPaid(parsed.legalServicesPaid);
             if (parsed.legalOwnerType) setLegalOwnerType(parsed.legalOwnerType);
             if (parsed.legalIsMortgaged !== undefined) setLegalIsMortgaged(parsed.legalIsMortgaged);
+            if (parsed.legalLienType) setLegalLienType(parsed.legalLienType);
+            if (parsed.legalLienObservations) setLegalLienObservations(parsed.legalLienObservations);
+            if (parsed.legalRegime) setLegalRegime(parsed.legalRegime);
+            if (parsed.legalLandUse) setLegalLandUse(parsed.legalLandUse);
+            if (parsed.legalRestrictions) setLegalRestrictions(parsed.legalRestrictions);
+            if (parsed.legalDocumentationComplete !== undefined) setLegalDocumentationComplete(parsed.legalDocumentationComplete);
+            if (parsed.legalJuridicalResponsible) setLegalJuridicalResponsible(parsed.legalJuridicalResponsible);
+            if (parsed.legalLastUpdate) setLegalLastUpdate(parsed.legalLastUpdate);
+            if (parsed.appraisalAmount !== undefined) setAppraisalAmount(parsed.appraisalAmount);
+            if (parsed.appraisalDate) setAppraisalDate(parsed.appraisalDate);
+            if (parsed.appraisalExpert) setAppraisalExpert(parsed.appraisalExpert);
+            if (parsed.appraisalValidity) setAppraisalValidity(parsed.appraisalValidity);
+            if (parsed.appreciationLevel) setAppreciationLevel(parsed.appreciationLevel);
+            if (parsed.commercialStatus) setCommercialStatus(parsed.commercialStatus);
             
             showToast(
               language === 'es' 
@@ -1662,6 +1756,20 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       legalServicesPaid,
       legalOwnerType,
       legalIsMortgaged,
+      legalLienType,
+      legalLienObservations,
+      legalRegime,
+      legalLandUse,
+      legalRestrictions,
+      legalDocumentationComplete,
+      legalJuridicalResponsible,
+      legalLastUpdate,
+      appraisalAmount: appraisalAmount === '' ? null : Number(appraisalAmount),
+      appraisalDate,
+      appraisalExpert,
+      appraisalValidity,
+      appreciationLevel,
+      commercialStatus,
       servicesWater: true,
       servicesElectricity: true,
       servicesSewerage: true,
@@ -1699,6 +1807,21 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
         catastralValue,
         condoRegime,
         maintenanceFee,
+        // Expanded Legal & Appraisal & Commercial fields
+        legalLienType,
+        legalLienObservations,
+        legalRegime,
+        legalLandUse,
+        legalRestrictions,
+        legalDocumentationComplete,
+        legalJuridicalResponsible,
+        legalLastUpdate,
+        appraisalAmount,
+        appraisalDate,
+        appraisalExpert,
+        appraisalValidity,
+        appreciationLevel,
+        commercialStatus,
         // Renta extra
         advanceMonths,
         requiresGuarantor,
@@ -2923,7 +3046,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                         <FileText className="w-4 h-4" />
                         <span>Paso 8: Términos y Legal de Venta</span>
                       </h4>
-                      <p className="text-xs text-brand-gray-500 mt-0.5">Configura el precio de venta y las condiciones legales del expediente.</p>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Configura el precio de venta, avalúo y las condiciones legales del expediente.</p>
                     </div>
 
                     <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
@@ -2967,12 +3090,17 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-bold text-brand-gray-500">Régimen de Propiedad</label>
                           <CustomSelect
-                            value={legalOwnerType}
-                            onChange={(val) => setLegalOwnerType(val)}
+                            value={legalRegime}
+                            onChange={(val) => {
+                              setLegalRegime(val);
+                              setLegalOwnerType(val); // Sync for backwards compatibility
+                            }}
                             options={[
-                              { value: 'Privada', label: 'Propiedad Privada (Escriturada)' },
+                              { value: 'Propiedad Privada', label: 'Propiedad Privada (Escriturada)' },
+                              { value: 'Condominal', label: 'Régimen de Condominio' },
                               { value: 'Ejidal', label: 'Ejidal / Posesión' },
-                              { value: 'Fideicomiso', label: 'Fideicomiso Bancario' }
+                              { value: 'Fideicomiso', label: 'Fideicomiso Bancario' },
+                              { value: 'Otro', label: 'Otro Régimen' }
                             ]}
                             scrollContainerRef={scrollAreaRef}
                           />
@@ -2981,40 +3109,91 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
 
                       <div className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500">Valor de Avalúo Comercial</label>
-                          <input
-                            type="number"
-                            value={valuationAmount}
-                            onChange={(e) => setValuationAmount(Number(e.target.value) || '')}
-                            placeholder="Opcional"
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          <label className="text-xs font-bold text-brand-gray-500">Uso de Suelo</label>
+                          <CustomSelect
+                            value={legalLandUse}
+                            onChange={(val) => setLegalLandUse(val)}
+                            options={[
+                              { value: 'Residencial', label: 'Residencial' },
+                              { value: 'Comercial', label: 'Comercial' },
+                              { value: 'Mixto', label: 'Mixto (Residencial/Comercial)' },
+                              { value: 'Industrial', label: 'Industrial' },
+                              { value: 'Otro', label: 'Otro' }
+                            ]}
+                            scrollContainerRef={scrollAreaRef}
                           />
                         </div>
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500">Valor Catastral (Opcional)</label>
-                          <input
-                            type="number"
-                            value={catastralValue}
-                            onChange={(e) => setCatastralValue(Number(e.target.value) || '')}
-                            placeholder="Opcional"
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          <label className="text-xs font-bold text-brand-gray-500">Estado Comercial</label>
+                          <CustomSelect
+                            value={commercialStatus}
+                            onChange={(val) => setCommercialStatus(val)}
+                            options={[
+                              { value: 'Disponible', label: 'Disponible' },
+                              { value: 'Apartada', label: 'Apartada' },
+                              { value: 'Promesa de Compra', label: 'Promesa de Compra' },
+                              { value: 'En Escrituración', label: 'En Escrituración' },
+                              { value: 'Vendida', label: 'Vendida' },
+                              { value: 'Rentada', label: 'Rentada' },
+                              { value: 'Suspendida', label: 'Suspendida' },
+                              { value: 'Bajo Oferta', label: 'Bajo Oferta' },
+                              { value: 'En negociación', label: 'En negociación' }
+                            ]}
+                            scrollContainerRef={scrollAreaRef}
                           />
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-1.5 mt-1">
-                        <span className="text-[10px] font-black text-brand-gray-500 uppercase tracking-wider">Condiciones Legales</span>
-                        <div className="grid grid-cols-2 gap-2.5">
-                          <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
-                            <input
-                              type="checkbox"
-                              id="legalDebtFree"
-                              checked={legalDebtFree}
-                              onChange={(e) => setLegalDebtFree(e.target.checked)}
-                              className="w-4 h-4 accent-brand-accent cursor-pointer"
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Estado Jurídico del Gravamen</label>
+                          <CustomSelect
+                            value={legalDebtFree ? 'Libre' : 'ConGravamen'}
+                            onChange={(val) => setLegalDebtFree(val === 'Libre')}
+                            options={[
+                              { value: 'Libre', label: 'Libre de Gravamen' },
+                              { value: 'ConGravamen', label: 'Con Gravamen Activo' }
+                            ]}
+                            scrollContainerRef={scrollAreaRef}
+                          />
+                        </div>
+                        {!legalDebtFree && (
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-brand-gray-500">Tipo de Gravamen</label>
+                            <CustomSelect
+                              value={legalLienType}
+                              onChange={(val) => setLegalLienType(val)}
+                              options={[
+                                { value: 'Banco', label: 'Banco / Hipotecario' },
+                                { value: 'Infonavit', label: 'Infonavit' },
+                                { value: 'FOVISSSTE', label: 'FOVISSSTE' },
+                                { value: 'Particular', label: 'Particular' },
+                                { value: 'Hipoteca privada', label: 'Hipoteca Privada' },
+                                { value: 'Embargo', label: 'Embargo Activo' },
+                                { value: 'Otro', label: 'Otro' }
+                              ]}
+                              scrollContainerRef={scrollAreaRef}
                             />
-                            <label htmlFor="legalDebtFree" className="text-xs font-bold text-brand-black cursor-pointer">Libre de Gravamen</label>
                           </div>
+                        )}
+                      </div>
+
+                      {!legalDebtFree && (
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Observaciones del Gravamen</label>
+                          <textarea
+                            rows={2}
+                            value={legalLienObservations}
+                            onChange={(e) => setLegalLienObservations(e.target.value)}
+                            placeholder="Mencione el saldo aproximado, banco acreedor o detalles del gravamen..."
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent resize-none text-brand-black"
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex flex-col gap-1.5 mt-1">
+                        <span className="text-[10px] font-black text-brand-gray-500 uppercase tracking-wider">Declaraciones y Expediente</span>
+                        <div className="grid grid-cols-2 gap-2.5">
                           <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
                             <input
                               type="checkbox"
@@ -3045,7 +3224,84 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                             />
                             <label htmlFor="legalIsMortgaged" className="text-xs font-bold text-brand-black cursor-pointer">Tiene Hipoteca Activa</label>
                           </div>
-                          <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white col-span-2">
+                          <div className="flex items-center gap-2.5 p-3 rounded-xl border bg-white">
+                            <input
+                              type="checkbox"
+                              id="legalDocumentationComplete"
+                              checked={legalDocumentationComplete}
+                              onChange={(e) => setLegalDocumentationComplete(e.target.checked)}
+                              className="w-4 h-4 accent-brand-accent cursor-pointer"
+                            />
+                            <label htmlFor="legalDocumentationComplete" className="text-xs font-bold text-brand-black cursor-pointer">Expediente Completo</label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-brand-gray-100 my-1" />
+                      <span className="text-[10px] font-black text-brand-gray-500 uppercase tracking-wider">Expediente de Avalúo</span>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Monto Último Avalúo ($)</label>
+                          <input
+                            type="number"
+                            value={appraisalAmount}
+                            onChange={(e) => setAppraisalAmount(Number(e.target.value) || '')}
+                            placeholder="Monto valuado"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Fecha del Avalúo</label>
+                          <input
+                            type="date"
+                            value={appraisalDate}
+                            onChange={(e) => setAppraisalDate(e.target.value)}
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Perito Valuador</label>
+                          <input
+                            type="text"
+                            value={appraisalExpert}
+                            onChange={(e) => setAppraisalExpert(e.target.value)}
+                            placeholder="Nombre del perito / Registro"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Vigencia del Avalúo</label>
+                          <input
+                            type="text"
+                            value={appraisalValidity}
+                            onChange={(e) => setAppraisalValidity(e.target.value)}
+                            placeholder="Ej. 6 meses / Fecha de vencimiento"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Plusvalía Estimada</label>
+                          <CustomSelect
+                            value={appreciationLevel}
+                            onChange={(val) => setAppreciationLevel(val as any)}
+                            options={[
+                              { value: 'Alta', label: 'Alta' },
+                              { value: 'Media', label: 'Media' },
+                              { value: 'Baja', label: 'Baja' },
+                              { value: 'En desarrollo', label: 'En desarrollo' }
+                            ]}
+                            scrollContainerRef={scrollAreaRef}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Sujeto a Régimen de Condominio</label>
+                          <div className="flex items-center gap-2.5 p-3.5 rounded-xl border bg-white h-[42px]">
                             <input
                               type="checkbox"
                               id="condoRegime"
@@ -3053,10 +3309,44 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                               onChange={(e) => setCondoRegime(e.target.checked)}
                               className="w-4 h-4 accent-brand-accent cursor-pointer"
                             />
-                            <label htmlFor="condoRegime" className="text-xs font-bold text-brand-black cursor-pointer">Sujeto a Régimen de Condominio</label>
+                            <label htmlFor="condoRegime" className="text-xs font-bold text-brand-black cursor-pointer">Sí, sujeto</label>
                           </div>
                         </div>
                       </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-brand-gray-500">Restricciones Legales / Afectaciones</label>
+                        <textarea
+                          rows={2}
+                          value={legalRestrictions}
+                          onChange={(e) => setLegalRestrictions(e.target.value)}
+                          placeholder="Mencione afectaciones viales, servidumbres de paso u otras limitaciones..."
+                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent resize-none text-brand-black"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Responsable Jurídico</label>
+                          <input
+                            type="text"
+                            value={legalJuridicalResponsible}
+                            onChange={(e) => setLegalJuridicalResponsible(e.target.value)}
+                            placeholder="Nombre del abogado"
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-bold text-brand-gray-500">Fecha Última Actualización</label>
+                          <input
+                            type="date"
+                            value={legalLastUpdate}
+                            onChange={(e) => setLegalLastUpdate(e.target.value)}
+                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                          />
+                        </div>
+                      </div>
+
                     </div>
                   </motion.div>
                 )}
