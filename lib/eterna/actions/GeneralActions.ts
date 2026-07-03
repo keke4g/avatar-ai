@@ -102,7 +102,7 @@ export function useGeneralActions({
             reply = `¡Hola ${intentContext.userName.split(' ')[0]}! Soy Eterna, tu Concierge de Inteligencia Artificial. ¿En qué puedo asistirte hoy?`;
           } else if (clean.includes('como funciona') || clean.includes('intercambio') || clean.includes('tarifa') || clean.includes('comision')) {
             console.log("[Eterna Audit] runIntelligentFallback: Matched 'aura swap details' keywords.");
-            reply = 'AuraSwap permite intercambiar propiedades vacacionales sin pagar renta. Solo cobramos un 1% por intercambio exitoso, lo cual incluye un seguro premium de hasta 1 millón de euros.';
+            reply = 'AuraSwap permite intercambiar y rentar propiedades de forma directa. Solo cobramos un 1% por intercambio exitoso, lo cual incluye un seguro premium de hasta 1 millón de euros.';
           } else {
             console.log("[Eterna Audit] runIntelligentFallback: Matched NO keywords. Falling back to default offline message.");
             reply = `Disculpa ${intentContext.userName.split(' ')[0]}, en este momento opero en modo offline. Activa la conexión con el servidor para obtener respuestas más detalladas. ¿Puedo ayudarte con algo más?`;
@@ -159,7 +159,7 @@ export function useGeneralActions({
             reply = `Hello ${intentContext.userName.split(' ')[0]}! I am Eterna, your AI Concierge. How can I assist you today?`;
           } else if (clean.includes('how it works') || clean.includes('exchange') || clean.includes('fee') || clean.includes('commission')) {
             console.log("[Eterna Audit] runIntelligentFallback (EN): Matched 'aura swap details' keywords.");
-            reply = 'AuraSwap lets you exchange vacation properties rent-free. We charge a 1% service fee per successful swap, which includes premium damage protection up to 1 million euros.';
+            reply = 'AuraSwap lets you exchange premium properties or lease them directly. We charge a 1% service fee per successful swap, which includes premium damage protection up to 1 million euros.';
           } else {
             console.log("[Eterna Audit] runIntelligentFallback (EN): Matched NO keywords. Falling back to default offline message.");
             reply = `Sorry ${intentContext.userName.split(' ')[0]}, I'm currently operating in offline mode. Activate the server connection for more detailed responses. Can I help with something else?`;

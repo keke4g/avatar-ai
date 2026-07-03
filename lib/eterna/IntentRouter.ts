@@ -158,12 +158,12 @@ export const INTENT_PATTERNS: IntentPattern[] = [
   },
   {
     patterns: [
-      /\b(ver mis viajes|ir a mis viajes|abrir mis viajes|ver viajes|view my trips|see my trips|open trips)\b/i
+      /\b(ver mis solicitudes|ir a mis solicitudes|abrir mis solicitudes|ver solicitudes|view my requests|see my requests|open requests)\b/i
     ],
     route: '/dashboard?tab=trips',
     action: 'navigate',
     getResponse: () => ({
-      es: 'Te llevo a la pestaña de viajes de tu panel de control.',
+      es: 'Te llevo a la pestaña de solicitudes de tu panel de control.',
       en: 'Taking you to the trips tab of your dashboard.'
     })
   },
@@ -215,8 +215,8 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const futureTrips = trips.filter((t: any) => new Date(t.startDate) >= new Date());
       if (futureTrips.length === 0) {
         return {
-          es: 'No tienes ningún viaje próximo programado para consultar la red wifi.',
-          en: 'You have no upcoming trips scheduled to check the wifi network.'
+          es: 'No tienes ninguna visita o contrato próximo para consultar la red wifi.',
+          en: 'You have no upcoming lease or visits scheduled to check the wifi network.'
         };
       }
       const sorted = [...futureTrips].sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
@@ -225,13 +225,13 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       
       if (!details || (!details.wifiName && !details.wifiPassword)) {
         return {
-          es: 'El anfitrión aún no ha compartido los detalles de la red wifi para tu próximo viaje.',
-          en: 'The host has not shared the wifi network details for your upcoming trip yet.'
+          es: 'El propietario aún no ha compartido los detalles de la red wifi para tu próxima visita.',
+          en: 'The owner has not shared the wifi network details for your upcoming stay yet.'
         };
       }
       return {
-        es: `La red wifi para tu próximo viaje es "${details.wifiName || 'No compartida'}" y la contraseña es "${details.wifiPassword || 'No compartida'}".`,
-        en: `The wifi network for your upcoming trip is "${details.wifiName || 'Not shared'}" and the password is "${details.wifiPassword || 'Not shared'}".`
+        es: `La red wifi para tu próxima visita es "${details.wifiName || 'No compartida'}" y la contraseña es "${details.wifiPassword || 'No compartida'}".`,
+        en: `The wifi network for your upcoming stay is "${details.wifiName || 'Not shared'}" and the password is "${details.wifiPassword || 'Not shared'}".`
       };
     }
   },
@@ -248,8 +248,8 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const futureTrips = trips.filter((t: any) => new Date(t.startDate) >= new Date());
       if (futureTrips.length === 0) {
         return {
-          es: 'No tienes ningún viaje próximo programado para ver las instrucciones.',
-          en: 'You have no upcoming trips scheduled to see instructions.'
+          es: 'No tienes ninguna visita o contrato próximo para ver las instrucciones.',
+          en: 'You have no upcoming visits scheduled to see instructions.'
         };
       }
       const sorted = [...futureTrips].sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
@@ -258,13 +258,13 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       
       if (!details || !details.checkinInstructions) {
         return {
-          es: 'El anfitrión aún no ha compartido las instrucciones de llegada para tu próximo viaje.',
-          en: 'The host has not shared the check-in instructions for your upcoming trip yet.'
+          es: 'El propietario aún no ha compartido las instrucciones de entrada para tu próxima visita.',
+          en: 'The owner has not shared the move-in instructions for your upcoming stay yet.'
         };
       }
       return {
-        es: `Instrucciones de llegada:\n${details.checkinInstructions}`,
-        en: `Check-in instructions:\n${details.checkinInstructions}`
+        es: `Instrucciones de entrada:\n${details.checkinInstructions}`,
+        en: `Move-in instructions:\n${details.checkinInstructions}`
       };
     }
   },
@@ -281,8 +281,8 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const futureTrips = trips.filter((t: any) => new Date(t.startDate) >= new Date());
       if (futureTrips.length === 0) {
         return {
-          es: 'No tienes ningún viaje próximo programado.',
-          en: 'You have no upcoming trips scheduled.'
+          es: 'No tienes ningún contrato o visita próxima programada.',
+          en: 'You have no upcoming visits or contracts scheduled.'
         };
       }
       const sorted = [...futureTrips].sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
@@ -291,8 +291,8 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       
       if (!details || !details.accessCode) {
         return {
-          es: 'El anfitrión aún no ha compartido ningún código de acceso para tu próximo viaje.',
-          en: 'The host has not shared any access code for your upcoming trip yet.'
+          es: 'El propietario aún no ha compartido ningún código de acceso para tu próxima visita.',
+          en: 'The owner has not shared any access code for your upcoming stay yet.'
         };
       }
       return {
@@ -314,8 +314,8 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const futureTrips = trips.filter((t: any) => new Date(t.startDate) >= new Date());
       if (futureTrips.length === 0) {
         return {
-          es: 'No tienes ningún viaje próximo confirmado para ver detalles de llegada.',
-          en: 'You have no upcoming confirmed trips to view arrival details.'
+          es: 'No tienes ninguna visita o contrato próximo confirmado para ver detalles de entrada.',
+          en: 'You have no upcoming confirmed stays to view access details.'
         };
       }
       const sorted = [...futureTrips].sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
@@ -324,32 +324,32 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const isSender = next.senderId === ctx.currentUser?.id;
       const partnerPropId = isSender ? next.receiverPropertyId : next.senderPropertyId;
       const partnerProp = ctx.properties.find((p: any) => p.id === partnerPropId);
-      const dest = partnerProp ? `"${partnerProp.title}" en ${partnerProp.location}` : 'tu próximo destino';
+      const dest = partnerProp ? `"${partnerProp.title}" en ${partnerProp.location}` : 'tu próxima propiedad';
       
       if (!details) {
         return {
-          es: `Tu próximo viaje es a ${dest}, pero el anfitrión aún no ha compartido los detalles de llegada.`,
-          en: `Your next trip is to ${dest}, but the host has not shared arrival details yet.`
+          es: `Tu próxima visita es a ${dest}, pero el propietario aún no ha compartido los detalles de entrada.`,
+          en: `Your next stay is at ${dest}, but the owner has not shared move-in details yet.`
         };
       }
       
       return {
-        es: `Detalles de llegada para tu viaje a ${dest}:\n` +
+        es: `Detalles de acceso para tu visita a ${dest}:\n` +
             `• Red Wifi: ${details.wifiName || 'No compartida'}\n` +
             `• Contraseña Wifi: ${details.wifiPassword || 'No compartida'}\n` +
             `• Código de acceso: ${details.accessCode || 'No compartido'}\n` +
-            `• Hora de Check-in: ${details.checkinTime || '15:00'}\n` +
-            `• Hora de Check-out: ${details.checkoutTime || '11:00'}\n` +
+            `• Hora de Entrada: ${details.checkinTime || '15:00'}\n` +
+            `• Hora de Salida: ${details.checkoutTime || '11:00'}\n` +
             `• Contacto de Emergencia: ${details.emergencyContactName || 'No compartido'} (${details.emergencyContactPhone || 'No compartido'})\n` +
-            `• Instrucciones: ${details.checkinInstructions || 'El anfitrión no ha dejado instrucciones específicas.'}`,
-        en: `Arrival details for your trip to ${dest}:\n` +
+            `• Instrucciones: ${details.checkinInstructions || 'El propietario no ha dejado instrucciones específicas.'}`,
+        en: `Access details for your stay at ${dest}:\n` +
             `• Wifi Network: ${details.wifiName || 'Not shared'}\n` +
             `• Wifi Password: ${details.wifiPassword || 'Not shared'}\n` +
             `• Access Code: ${details.accessCode || 'Not shared'}\n` +
-            `• Check-in Time: ${details.checkinTime || '15:00'}\n` +
-            `• Check-out Time: ${details.checkoutTime || '11:00'}\n` +
+            `• Move-in Time: ${details.checkinTime || '15:00'}\n` +
+            `• Move-out Time: ${details.checkoutTime || '11:00'}\n` +
             `• Emergency Contact: ${details.emergencyContactName || 'Not shared'} (${details.emergencyContactPhone || 'Not shared'})\n` +
-            `• Instructions: ${details.checkinInstructions || 'No specific instructions shared by the host.'}`
+            `• Instructions: ${details.checkinInstructions || 'No specific instructions shared by the owner.'}`
       };
     }
   },
@@ -543,7 +543,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
     },
   },
 
-  // ── CATEGORÍA: VIAJES ──
+  // ── CATEGORÍA: SOLICITUDES Y CONTRATOS ──
   {
     patterns: [
       /\b(cuando llego|cuándo llego|fecha de llegada|dia de llegada|día de llegada|when do i arrive|arrival date)\b/i
@@ -557,15 +557,15 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const futureTrips = trips.filter((t: any) => new Date(t.startDate) >= new Date());
       if (futureTrips.length === 0) {
         return {
-          es: 'No tienes viajes próximos programados.',
-          en: 'You have no upcoming trips scheduled.'
+          es: 'No tienes visitas o contratos próximos programados.',
+          en: 'You have no upcoming stays or visits scheduled.'
         };
       }
       const sorted = [...futureTrips].sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
       const next = sorted[0];
       return {
-        es: `Llegas a tu próximo destino el ${next.startDate}.`,
-        en: `You arrive at your next destination on ${next.startDate}.`
+        es: `Entras a tu próxima propiedad el ${next.startDate}.`,
+        en: `You move in to your next property on ${next.startDate}.`
       };
     }
   },
@@ -589,8 +589,8 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const sorted = [...futureTrips].sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
       const next = sorted[0];
       return {
-        es: `Sales de tu próximo destino el ${next.endDate}.`,
-        en: `You depart from your next destination on ${next.endDate}.`
+        es: `Sales de tu próxima propiedad el ${next.endDate}.`,
+        en: `You move out from your next property on ${next.endDate}.`
       };
     }
   },
@@ -616,10 +616,10 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const isSender = next.senderId === ctx.currentUser?.id;
       const partnerPropId = isSender ? next.receiverPropertyId : next.senderPropertyId;
       const partnerProp = ctx.properties.find((p: any) => p.id === partnerPropId);
-      const hostName = partnerProp ? partnerProp.hostName : 'otro anfitrión';
+      const hostName = partnerProp ? partnerProp.hostName : 'otro propietario';
       return {
-        es: `Tu anfitrión en tu próximo viaje es ${hostName}.`,
-        en: `Your host for your next trip is ${hostName}.`
+        es: `El propietario de tu próxima propiedad es ${hostName}.`,
+        en: `The owner of your upcoming property is ${hostName}.`
       };
     }
   },
@@ -645,16 +645,16 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const isSender = next.senderId === ctx.currentUser?.id;
       const partnerPropId = isSender ? next.receiverPropertyId : next.senderPropertyId;
       const partnerProp = ctx.properties.find((p: any) => p.id === partnerPropId);
-      const dest = partnerProp ? `"${partnerProp.title}" en ${partnerProp.location}` : 'un destino por confirmar';
+      const dest = partnerProp ? `"${partnerProp.title}" en ${partnerProp.location}` : 'una propiedad por confirmar';
       return {
-        es: `Te hospedarás en: ${dest}.`,
-        en: `You will stay at: ${dest}.`
+        es: `Tu propiedad confirmada es: ${dest}.`,
+        en: `You will reside at: ${dest}.`
       };
     }
   },
   {
     patterns: [
-      /\b(mi proximo viaje|mi próximo viaje|cual es mi proximo viaje|cuál es mi próximo viaje|donde viajo despues|dónde viajo después|siguiente viaje|proximo destino|próximo destino|next trip|where do i travel next)\b/i,
+      /\b(mi proxima solicitud|mi próxima solicitud|cual es mi proxima visita|cuál es mi próxima visita|siguiente visita|proxima propiedad|próxima propiedad|next stay|where do i stay next)\b/i,
     ],
     action: 'local_response',
     getResponse: (ctx) => {
@@ -665,8 +665,8 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const futureTrips = trips.filter((t: any) => new Date(t.startDate) >= new Date());
       if (futureTrips.length === 0) {
         return {
-          es: 'No tienes viajes programados a futuro en este momento.',
-          en: 'You have no future trips scheduled at this time.',
+          es: 'No tienes visitas o contratos programados a futuro.',
+          en: 'You have no future stays scheduled at this time.',
         };
       }
       const sorted = [...futureTrips].sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
@@ -676,14 +676,14 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const partnerProp = ctx.properties.find((p: any) => p.id === partnerPropId);
       const dest = partnerProp ? `"${partnerProp.title}" en ${partnerProp.location} (${partnerProp.country})` : 'Intercambio Recíproco';
       return {
-        es: `Tu próximo viaje es a "${dest}", del ${next.startDate} al ${next.endDate}.`,
-        en: `Your next trip is to "${dest}", from ${next.startDate} to ${next.endDate}.`
+        es: `Tu próximo contrato/visita es en "${dest}", del ${next.startDate} al ${next.endDate}.`,
+        en: `Your next stay is at "${dest}", from ${next.startDate} to ${next.endDate}.`
       };
     }
   },
   {
     patterns: [
-      /\b(mi ultimo viaje|mi último viaje|cual fue mi ultimo viaje|cuál fue mi último viaje|ultimo viaje|último viaje|last trip|previous trip)\b/i,
+      /\b(mi ultima solicitud|mi última solicitud|cual fue mi ultima visita|cuál fue mi última visita|ultima visita|última visita|last stay|previous stay)\b/i,
     ],
     action: 'local_response',
     getResponse: (ctx) => {
@@ -694,8 +694,8 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const pastTrips = trips.filter((t: any) => new Date(t.endDate) < new Date());
       if (pastTrips.length === 0) {
         return {
-          es: 'No tienes registros de viajes pasados completados en tu cuenta.',
-          en: 'You have no records of past completed trips in your account.',
+          es: 'No tienes registros de contratos o visitas completadas.',
+          en: 'You have no records of past completed stays in your account.',
         };
       }
       const sorted = [...pastTrips].sort((a: any, b: any) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
@@ -705,14 +705,14 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const partnerProp = ctx.properties.find((p: any) => p.id === partnerPropId);
       const dest = partnerProp ? `"${partnerProp.title}" en ${partnerProp.location}` : 'Intercambio Costero';
       return {
-        es: `Tu último viaje completado fue a "${dest}", el cual concluyó el ${last.endDate}.`,
-        en: `Your last completed trip was to "${dest}", which concluded on ${last.endDate}.`
+        es: `Tu último contrato/visita completada fue en "${dest}", el cual concluyó el ${last.endDate}.`,
+        en: `Your last completed stay was at "${dest}", which concluded on ${last.endDate}.`
       };
     }
   },
   {
     patterns: [
-      /\b(viajes este año|viajes de este año|viajes del 2026|trips this year)\b/i,
+      /\b(solicitudes este año|solicitudes de este año|solicitudes del 2026|requests this year)\b/i,
     ],
     action: 'local_response',
     getResponse: (ctx) => {
@@ -723,7 +723,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       );
       if (trips.length === 0) {
         return {
-          es: 'No tienes viajes registrados para el año en curso (2026).',
+          es: 'No tienes contratos o visitas registradas para el año en curso (2026).',
           en: 'You have no registered trips for the current year (2026).'
         };
       }
@@ -731,17 +731,17 @@ export const INTENT_PATTERNS: IntentPattern[] = [
         const isSender = t.senderId === ctx.currentUser?.id;
         const partnerPropId = isSender ? t.receiverPropertyId : t.senderPropertyId;
         const partnerProp = ctx.properties.find((p: any) => p.id === partnerPropId);
-        return `${i + 1}. del ${t.startDate} al ${t.endDate} a "${partnerProp?.title || 'Destino'}" en ${partnerProp?.location || 'Intercambio'}`;
+        return `${i + 1}. del ${t.startDate} al ${t.endDate} en "${partnerProp?.title || 'Propiedad'}" en ${partnerProp?.location || 'Intercambio'}`;
       }).join('\n');
       return {
-        es: `Tus viajes de este año 2026 son:\n${list}`,
+        es: `Tus solicitudes de este año 2026 son:\n${list}`,
         en: `Your trips for this year 2026 are:\n${list}`
       };
     }
   },
   {
     patterns: [
-      /\b(viajes activos|viajes en curso|viaje en curso|viaje activo|active trips|current trips)\b/i,
+      /\b(solicitudes activas|solicitudes en curso|solicitud en curso|solicitud activa|active requests|current requests)\b/i,
     ],
     action: 'local_response',
     getResponse: (ctx) => {
@@ -751,7 +751,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       );
       if (trips.length === 0) {
         return {
-          es: 'No tienes ningún viaje en curso o activo hoy.',
+          es: 'No tienes ningún contrato o visita activa hoy.',
           en: 'You have no trips currently active or in progress today.'
         };
       }
@@ -759,17 +759,17 @@ export const INTENT_PATTERNS: IntentPattern[] = [
         const isSender = t.senderId === ctx.currentUser?.id;
         const partnerPropId = isSender ? t.receiverPropertyId : t.senderPropertyId;
         const partnerProp = ctx.properties.find((p: any) => p.id === partnerPropId);
-        return `${i + 1}. Viaje a "${partnerProp?.title || 'Alojamiento'}" del ${t.startDate} al ${t.endDate}`;
+        return `${i + 1}. Visita en "${partnerProp?.title || 'Propiedad'}" del ${t.startDate} al ${t.endDate}`;
       }).join('\n');
       return {
-        es: `Tienes los siguientes viajes activos hoy:\n${list}`,
+        es: `Tienes las siguientes solicitudes activas hoy:\n${list}`,
         en: `You have the following active trips today:\n${list}`
       };
     }
   },
   {
     patterns: [
-      /\b(viajes aprobados|viajes confirmados|trips approved|approved trips)\b/i,
+      /\b(solicitudes aprobadas|solicitudes confirmadas|requests approved|approved requests)\b/i,
     ],
     action: 'local_response',
     getResponse: (ctx) => {
@@ -779,7 +779,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       );
       if (approved.length === 0) {
         return {
-          es: 'No tienes viajes con estado Aprobado en este momento.',
+          es: 'No tienes solicitudes confirmadas en este momento.',
           en: 'You have no trips with Approved status at this time.'
         };
       }
@@ -787,17 +787,17 @@ export const INTENT_PATTERNS: IntentPattern[] = [
         const isSender = t.senderId === ctx.currentUser?.id;
         const partnerPropId = isSender ? t.receiverPropertyId : t.senderPropertyId;
         const partnerProp = ctx.properties.find((p: any) => p.id === partnerPropId);
-        return `${i + 1}. a "${partnerProp?.title || 'Alojamiento'}" del ${t.startDate} al ${t.endDate} (${t.status})`;
+        return `${i + 1}. en "${partnerProp?.title || 'Propiedad'}" del ${t.startDate} al ${t.endDate} (${t.status})`;
       }).join('\n');
       return {
-        es: `Tus viajes aprobados y programados son:\n${list}`,
+        es: `Tus solicitudes aprobadas y programadas son:\n${list}`,
         en: `Your approved and scheduled trips are:\n${list}`
       };
     }
   },
   {
     patterns: [
-      /\b(viajes pendientes|viajes sin confirmar|viajes en espera|trips pending|pending trips)\b/i,
+      /\b(solicitudes pendientes|solicitudes sin confirmar|solicitudes en espera|requests pending|pending requests)\b/i,
     ],
     action: 'local_response',
     getResponse: (ctx) => {
@@ -807,25 +807,25 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       );
       if (pendingTrips.length === 0) {
         return {
-          es: 'No tienes ninguna reserva de viaje en estado pendiente de aprobación.',
-          en: 'You have no trip reservations pending approval.'
+          es: 'No tienes ninguna solicitud en estado pendiente de aprobación.',
+          en: 'You have no requests pending approval.'
         };
       }
       const list = pendingTrips.map((t: any, i: number) => {
         const isSender = t.senderId === ctx.currentUser?.id;
         const partnerPropId = isSender ? t.receiverPropertyId : t.senderPropertyId;
         const partnerProp = ctx.properties.find((p: any) => p.id === partnerPropId);
-        return `${i + 1}. a "${partnerProp?.title || 'Alojamiento'}" del ${t.startDate} al ${t.endDate}`;
+        return `${i + 1}. en "${partnerProp?.title || 'Propiedad'}" del ${t.startDate} al ${t.endDate}`;
       }).join('\n');
       return {
-        es: `Tienes las siguientes reservas de viaje pendientes de confirmación:\n${list}`,
-        en: `You have the following trip reservations pending confirmation:\n${list}`
+        es: `Tienes las siguientes solicitudes pendientes de confirmación:\n${list}`,
+        en: `You have the following requests pending confirmation:\n${list}`
       };
     }
   },
   {
     patterns: [
-      /\b(cuales son mis viajes|cuáles son mis viajes|muestrame mis viajes|muéstrame mis viajes|mis viajes|mis reservas|mis escapadas)\b/i,
+      /\b(cuales son mis solicitudes|cuáles son mis solicitudes|muestrame mis solicitudes|muéstrame mis solicitudes|mis solicitudes|mis visitas|mis contratos)\b/i,
     ],
     action: 'local_response',
     getResponse: (ctx) => {
@@ -835,7 +835,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       );
       if (trips.length === 0) {
         return {
-          es: 'No tienes viajes programados o completados en tu cuenta.',
+          es: 'No tienes contratos o visitas registradas en tu cuenta.',
           en: 'You have no scheduled or completed trips in your account.',
         };
       }
@@ -854,14 +854,14 @@ export const INTENT_PATTERNS: IntentPattern[] = [
         return `${idx + 1}. ${dest} — from ${t.startDate} to ${t.endDate} (${t.status})`;
       }).join('\n');
       return {
-        es: `Tus viajes son:\n${esList}`,
-        en: `Your trips are:\n${enList}`,
+        es: `Tus solicitudes son:\n${esList}`,
+        en: `Your requests/stays are:\n${enList}`,
       };
     },
   },
   {
     patterns: [
-      /\b(cuantos viajes tengo|cuántos viajes tengo|numero de viajes|número de viajes)\b/i,
+      /\b(cuantas solicitudes tengo|cuántas solicitudes tengo|numero de solicitudes|número de solicitudes)\b/i,
     ],
     action: 'local_response',
     getResponse: (ctx) => {
@@ -873,14 +873,14 @@ export const INTENT_PATTERNS: IntentPattern[] = [
         const isSender = t.senderId === ctx.currentUser?.id;
         const partnerPropId = isSender ? t.receiverPropertyId : t.senderPropertyId;
         const partnerProp = ctx.properties.find((p: any) => p.id === partnerPropId);
-        return `${idx + 1}. a "${partnerProp?.title || 'Destino'}" del ${t.startDate} al ${t.endDate}`;
+        return `${idx + 1}. en "${partnerProp?.title || 'Propiedad'}" del ${t.startDate} al ${t.endDate}`;
       }).join('\n');
       return {
         es: ctx.activeTrips > 0
-          ? `Tienes ${ctx.activeTrips} viaje(s) registrado(s) en tu cuenta:\n${list}`
+          ? `Tienes ${ctx.activeTrips} solicitud(es) registrada(s) en tu cuenta:\n${list}`
           : 'No tienes viajes registrados programados en este momento.',
         en: ctx.activeTrips > 0
-          ? `You have ${ctx.activeTrips} registered trip(s) in your account:\n${list}`
+          ? `You have ${ctx.activeTrips} registered request(s) in your account:\n${list}`
           : 'You have no active trips currently scheduled.',
       };
     },
@@ -987,7 +987,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
         const isSender = s.senderId === ctx.currentUser?.id;
         const partnerPropId = isSender ? s.receiverPropertyId : s.senderPropertyId;
         const partnerProp = ctx.properties.find((p: any) => p.id === partnerPropId);
-        return `${i + 1}. Intercambio a "${partnerProp?.title || 'Destino'}" del ${s.startDate} al ${s.endDate} (${s.status})`;
+        return `${i + 1}. Intercambio en "${partnerProp?.title || 'Propiedad'}" del ${s.startDate} al ${s.endDate} (${s.status})`;
       }).join('\n');
       return {
         es: `Tus intercambios aprobados son:\n${list}`,
@@ -1235,7 +1235,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       }
       const list = pendingReviews.map((t: any, i: number) => {
         const partnerProp = ctx.properties.find((p: any) => p.id === (t.senderId === ctx.currentUser?.id ? t.receiverPropertyId : t.senderPropertyId));
-        return `${i + 1}. Tras viaje a "${partnerProp?.title || 'Destino'}" del ${t.startDate} al ${t.endDate}`;
+        return `${i + 1}. Tras visita en "${partnerProp?.title || 'Propiedad'}" del ${t.startDate} al ${t.endDate}`;
       }).join('\n');
       return {
         es: `Tienes ${pendingReviews.length} reseña(s) pendiente(s) por escribir tras intercambios completados:\n${list}`,
@@ -1329,20 +1329,20 @@ export const INTENT_PATTERNS: IntentPattern[] = [
   },
   {
     patterns: [
-      /\b(ver|abrir|ir|ir a|llevame|llévame|llevame a|llévame a|show|open|go|go to)\b.*\b(viajes|trips|travel|mis viajes|my trips|reservas|bookings|reserva|reserva activa)\b/i,
-      /\b(mis viajes|my trips|viajes activos|active trips)\b/i
+      /\b(ver|abrir|ir|ir a|llevame|llévame|llevame a|llévame a|show|open|go|go to)\b.*\b(solicitudes|requests|mis solicitudes|my requests|visitas|contratos|visita|reserva activa)\b/i,
+      /\b(mis solicitudes|my requests|solicitudes activas|active requests)\b/i
     ],
     route: '/dashboard?tab=trips',
     action: 'navigate',
     getResponse: (ctx) => ({
       es: ctx.activeTrips > 0
         ? (ctx.activeTrips === 1
-            ? 'Tienes un viaje activo. Te llevo al panel de viajes.'
+            ? 'Tienes una solicitud activa. Te llevo al panel de solicitudes.'
             : `Tienes ${ctx.activeTrips} viajes activos. Te llevo al panel de viajes.`)
         : 'No tienes viajes activos en este momento. Te llevo al panel de viajes.',
       en: ctx.activeTrips > 0
         ? (ctx.activeTrips === 1
-            ? 'You have one active trip. Taking you to your trips panel.'
+            ? 'You have one active request. Taking you to your requests panel.'
             : `You have ${ctx.activeTrips} active trips. Taking you to your trips panel.`)
         : 'No active trips at the moment. Taking you to your trips panel.',
     }),
@@ -1397,8 +1397,8 @@ export const INTENT_PATTERNS: IntentPattern[] = [
     ],
     action: 'local_response',
     getResponse: () => ({
-      es: 'Soy Eterna, tu anfitriona virtual de AuraSwap. En este modo local, puedo detallarte tus propiedades, viajes, solicitudes de intercambio (swaps), mensajes sin leer, detalles de llegada de tu próximo viaje y calificaciones. También puedo llevarte a cualquier sección si me dices "llévame a...". ¿Qué te gustaría consultar?',
-      en: 'I am Eterna, your virtual host at AuraSwap. In this local mode, I can detail your properties, trips, swap requests, unread messages, arrival details for your next trip, and reviews. I can also take you to any section if you say "take me to...". What would you like to consult?'
+      es: 'Soy Eterna, tu concierge inmobiliaria de AuraSwap. En este modo local, puedo detallarte tus propiedades, solicitudes, propuestas de intercambio (swaps), mensajes sin leer, detalles de entrada de tu próxima visita y calificaciones. También puedo llevarte a cualquier sección si me dices "llévame a...". ¿Qué te gustaría consultar?',
+      en: 'I am Eterna, your real estate concierge at AuraSwap. In this local mode, I can detail your properties, requests, swap proposals, unread messages, move-in details for your next stay, and reviews. I can also take you to any section if you say "take me to...". What would you like to consult?'
     })
   },
   {
@@ -1408,7 +1408,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const myProps = ctx.properties.filter((p: any) => p.hostId === ctx.currentUser?.id);
       
       const propsStrES = myProps.length === 1 ? 'una propiedad registrada' : `${myProps.length} propiedades registradas`;
-      const tripsStrES = ctx.activeTrips === 1 ? 'un viaje activo' : `${ctx.activeTrips} viajes activos`;
+      const tripsStrES = ctx.activeTrips === 1 ? 'una solicitud activa' : `${ctx.activeTrips} solicitudes activas`;
       const swapsStrES = ctx.pendingSwaps === 1 ? 'una solicitud de intercambio pendiente de revisión' : `${ctx.pendingSwaps} solicitudes de intercambio pendientes de revisión`;
 
       const propsStrEN = myProps.length === 1 ? 'one property registered' : `${myProps.length} properties registered`;
@@ -1492,7 +1492,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
     ],
     action: 'local_response',
     getResponse: () => ({
-      es: '¡Es un placer ayudarte! ¿Hay algún otro destino o detalle de tu cuenta que quieras consultar?',
+      es: '¡Es un placer ayudarte! ¿Hay alguna otra propiedad, ubicación o detalle de tu cuenta que quieras consultar?',
       en: 'It is my pleasure to help! Is there any other destination or account detail you would like to check?'
     })
   },
@@ -1557,7 +1557,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
         
       if (!destination) {
         return {
-          es: '¿Qué destino te gustaría buscar en el catálogo?',
+          es: '¿Qué propiedad o ubicación te gustaría buscar en el catálogo?',
           en: 'Which destination would you like to search for in the catalog?'
         };
       }
@@ -1566,7 +1566,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       const excludedWords = ['si', 'no', 'yes', 'ok', 'okay', 'bien', 'bueno', 'hello', 'hola', 'hi', 'eterna'];
       if (excludedWords.includes(normDest)) {
         return {
-          es: '¿En qué puedo ayudarte hoy? Dime qué destino deseas buscar o qué consulta tienes sobre tu cuenta.',
+          es: '¿En qué puedo ayudarte hoy? Dime qué propiedad o ubicación deseas buscar o qué consulta tienes sobre tu cuenta.',
           en: 'How can I help you today? Tell me which destination you want to search for or what query you have about your account.'
         };
       }

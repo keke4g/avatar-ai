@@ -112,8 +112,8 @@ export function useSearchActions({
 
     if (!intent.guests) {
       const question = language === 'es'
-        ? (intent.isPropertyMode ? '¿Para cuántas personas la necesitas?' : '¿Para cuántas personas necesitas el alojamiento?')
-        : (intent.isPropertyMode ? 'How many people is it for?' : 'For how many guests do you need the accommodation?');
+        ? (intent.isPropertyMode ? '¿Para cuántas personas la necesitas?' : '¿Para cuántas personas necesitas la propiedad?')
+        : (intent.isPropertyMode ? 'How many people is it for?' : 'For how many people do you need the property?');
       setSearchIntent(intent);
       respondLocally(question);
       return;

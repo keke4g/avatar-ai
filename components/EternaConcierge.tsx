@@ -413,7 +413,7 @@ export default function EternaConcierge() {
       unreadMessages: unreadMessages.length,
       myPropertiesCount: myProps.length,
       pendingReviews: pendingReviews.length,
-      userName: currentUser?.name || 'Viajero',
+      userName: currentUser?.name || 'Usuario',
       swaps,
       properties,
       currentUser,
@@ -432,7 +432,7 @@ export default function EternaConcierge() {
     const myReviews = reviews.filter(r => r.reviewedUserId === currentUser?.id);
 
     return JSON.stringify({
-      user: currentUser?.name || 'Viajero',
+      user: currentUser?.name || 'Usuario',
       userId: currentUser?.id || '',
       properties: myProps.map(p => `${p.title} (${p.location}, ${p.country})`),
       propertiesCount: myProps.length,
@@ -469,8 +469,8 @@ export default function EternaConcierge() {
     return {
       role: 'system',
       content: language === 'es'
-        ? `Eres Eterna, la Concierge IA de Lujo y anfitriona virtual oficial de AuraSwap (versión 2026).
-Tu propósito es asistir con extrema elegancia, calidez y profesionalidad a ${currentUser?.name || 'el usuario'} en su viaje.
+        ? `Eres Eterna, la Concierge Inmobiliaria de Lujo oficial de AuraSwap (versión 2026).
+Tu propósito es asistir con extrema elegancia, calidez y profesionalidad a ${currentUser?.name || 'el usuario'} en la búsqueda, inversión, compra, venta, renta o intercambio de propiedades.
 REGLAS DE RESPUESTA:
 1. Responde estrictamente en ESPAÑOL neutro y elegante. Evita modismos de otros idiomas.
 2. Da respuestas de máximo 2 o 3 oraciones extremadamente fluidas y directas, óptimas para sintetizar a voz nativa.
@@ -505,7 +505,7 @@ El Wizard consta de 6 fases secuenciales en el modal:
 
 3. EXPLORACIÓN DE PROPIEDADES (Explore Page):
 * Categorías (Tipos de Propiedad): Apartment, Beach House, Cabin, Penthouse, Villa, Loft.
-* Filtros disponibles: Destino (buscador), Rango de Fechas (calendario), Huéspedes, Swap Type (Premium, Luxury, Exclusive, Curated), y ordenación por Aura Score (match), capacidad o calificación.
+* Filtros disponibles: Ubicación o ciudad (buscador), Rango de Fechas (calendario), Capacidad de personas, Swap Type (Premium, Luxury, Exclusive, Curated), y ordenación por Aura Score (match), capacidad o calificación.
 * Pestañas comerciales en Explore: Todo (ALL), Intercambio (SWAP), Renta (RENT - engloba SHORT_RENT y MONTHLY_RENT) y Venta (SALE).
 
 4. NAVEGACIÓN DISPONIBLE (Rutas de AuraSwap a las que puedes dirigir al usuario):
@@ -513,11 +513,11 @@ El Wizard consta de 6 fases secuenciales en el modal:
 * Bandeja de entrada de chat/mensajes: "/messages"
 * Edición de perfil: "/profile"
 * Dashboard - Pestaña Mis Propiedades (y Wizard): "/dashboard?tab=properties"
-* Dashboard - Pestaña Mis Viajes: "/dashboard?tab=trips"
+* Dashboard - Pestaña Mis Solicitudes / Visitas: "/dashboard?tab=trips"
 * Dashboard - Pestaña Solicitudes de Intercambio (Swaps): "/dashboard?tab=swaps"
 No inventes otras rutas de navegación. Si el usuario te pide ir a alguna sección, guíalo hacia estas rutas SPA con amabilidad.`
-        : `You are Eterna, the official Luxury AI Concierge and virtual host of AuraSwap (2026 version).
-Your purpose is to assist ${currentUser?.name || 'the user'} with extreme elegance, warmth, and professionalism on their journey.
+        : `You are Eterna, the official Luxury Real Estate AI Concierge and advisor of AuraSwap (2026 version).
+Your purpose is to assist ${currentUser?.name || 'the user'} with extreme elegance, warmth, and professionalism in finding, buying, renting, selling, or exchanging premium properties.
 RESPONSE RULES:
 1. Respond strictly in clean and elegant ENGLISH.
 2. Give short responses of at most 2 or 3 extremely fluid and direct sentences, optimal for speech synthesis.
@@ -552,7 +552,7 @@ The Wizard consists of 6 sequential steps in the modal:
 
 3. PROPERTY EXPLORATION (Explore Page):
 * Categories (Property Types): Apartment, Beach House, Cabin, Penthouse, Villa, Loft.
-* Available Filters: Destination (search bar), Dates (calendar), Guests, Swap Type (Premium, Luxury, Exclusive, Curated), and sorting by Aura Score (match), capacity, or rating.
+* Available Filters: Location (search bar), Dates (calendar), Capacity (people), Swap Type (Premium, Luxury, Exclusive, Curated), and sorting by Aura Score (match), capacity, or rating.
 * Commercial tabs in Explore: All (ALL), Swap (SWAP), Rent (RENT - groups SHORT_RENT and MONTHLY_RENT), and Sale (SALE).
 
 4. AVAILABLE NAVIGATION (AuraSwap SPA routes you can guide the user to):
@@ -560,7 +560,7 @@ The Wizard consists of 6 sequential steps in the modal:
 * Inbox messages / chats: "/messages"
 * Edit profile details: "/profile"
 * Dashboard - My Properties tab (and Wizard): "/dashboard?tab=properties"
-* Dashboard - My Trips tab: "/dashboard?tab=trips"
+* Dashboard - My Requests tab: "/dashboard?tab=trips"
 * Dashboard - Swap Requests tab: "/dashboard?tab=swaps"
 Do not invent any other routes. If the user asks you to go to a section, politely guide them to these SPA routes.`
     };
@@ -2184,8 +2184,8 @@ Explore actualizado: Redirecting to /explore`);
                 >
                   <span className="text-[11px] font-bold text-white leading-none">
                     {language === 'es' 
-                      ? `¡Hola, ${currentUser?.name ? currentUser.name.split(' ')[0] : 'Viajero'}! 👋` 
-                      : `Hi, ${currentUser?.name ? currentUser.name.split(' ')[0] : 'Traveler'}! 👋`}
+                      ? `¡Hola, ${currentUser?.name ? currentUser.name.split(' ')[0] : 'Usuario'}! 👋` 
+                      : `Hi, ${currentUser?.name ? currentUser.name.split(' ')[0] : 'User'}! 👋`}
                   </span>
                   <span className="text-[10px] text-white/60 font-semibold leading-none">
                     {language === 'es' ? '¿En qué puedo ayudarte?' : 'How can I help you?'}
@@ -2472,7 +2472,7 @@ Explore actualizado: Redirecting to /explore`);
                             isCompact ? 'p-1 h-[40px]' : 'p-6 h-full'
                           }`}>
                             <HelpCircle className={`${isHome ? 'text-white/40' : 'text-brand-gray-300'} ${isCompact ? 'hidden' : 'w-8 h-8 mb-3'}`} />
-                            <p className={`text-xs font-extrabold ${isHome ? 'text-white' : 'text-brand-black'}`}>{t('messages.eternaGreeting', { name: currentUser?.name ? currentUser.name.split(' ')[0] : 'Viajero' })}</p>
+                            <p className={`text-xs font-extrabold ${isHome ? 'text-white' : 'text-brand-black'}`}>{t('messages.eternaGreeting', { name: currentUser?.name ? currentUser.name.split(' ')[0] : 'Usuario' })}</p>
                             {!isCompact && (
                               <p className={`text-[10px] leading-relaxed mt-1 max-w-[220px] ${isHome ? 'text-white/60' : 'text-brand-gray-400'}`}>
                                 {t('messages.eternaGreetingDesc')}

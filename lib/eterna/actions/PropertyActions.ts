@@ -138,8 +138,8 @@ const getReasonWhy = (property: EternaProperty, lang: 'es' | 'en'): string => {
 
   if (hasSeaView) {
     return lang === 'es'
-      ? "Te la recomiendo especialmente por sus hermosas vistas al mar y cercanía a la playa, ideales para unas vacaciones perfectas."
-      : "I highly recommend it for its beautiful ocean views and proximity to the beach, ideal for a perfect vacation.";
+      ? "Te la recomiendo especialmente por sus hermosas vistas al mar y cercanía a la playa, ideales para una estancia inigualable."
+      : "I highly recommend it for its beautiful ocean views and proximity to the beach, ideal for an unparalleled stay.";
   }
 
   if (hasSale) {

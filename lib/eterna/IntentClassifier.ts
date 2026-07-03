@@ -164,8 +164,8 @@ export class IntentClassifier {
           'efectivo', 'cash', 'abonos', 'cuotas', 'pesos', 'millones', 'dolares', 'breve', 'abril', 'mayo', 'junio', 'julio', 'agosto',
           'septiembre', 'octubre', 'noviembre', 'diciembre', 'enero', 'febrero', 'marzo', 'casa', 'casas', 'departamento', 'departamentos',
           'apartamento', 'apartamentos', 'depa', 'depas', 'villa', 'villas', 'loft', 'lofts', 'cabana', 'cabaña', 'cabañas', 'penthouse',
-          'penthouses', 'propiedad', 'propiedades', 'inversion', 'invertir', 'inversión', 'tres', 'rios', 'ríos', 'zona', 'lugar', 'destino',
-          'vivir', 'hospedaje', 'hospedar', 'hospedarse', 'quedar', 'quedarse', 'viajar', 'viaje'
+          'penthouses', 'propiedad', 'propiedades', 'inversion', 'invertir', 'inversión', 'tres', 'rios', 'ríos', 'zona', 'lugar',
+          'vivir', 'inversion', 'invertir', 'inversión', 'plusvalia', 'rentar', 'comprar', 'intercambiar'
         ];
         const extracted = match[1].trim();
         if (!cityExclusions.includes(extracted.toLowerCase()) && extracted.length > 2) {
@@ -348,7 +348,7 @@ export class IntentClassifier {
     });
 
     // SEARCH_PROPERTY fallback check: if property terms are present
-    const propertyTerms = ['casa', 'casas', 'propiedad', 'propiedades', 'departamento', 'departamentos', 'depa', 'depas', 'apartamento', 'apartamentos', 'loft', 'lofts', 'penthouse', 'villa', 'villas', 'cabana', 'cabanas', 'alojamiento', 'alojamientos', 'inmueble', 'vivienda', 'donde vivir', 'donde hospedar', 'donde quedar', 'presupuesto'];
+    const propertyTerms = ['casa', 'casas', 'propiedad', 'propiedades', 'departamento', 'departamentos', 'depa', 'depas', 'apartamento', 'apartamentos', 'loft', 'lofts', 'penthouse', 'villa', 'villas', 'cabana', 'cabanas', 'inmueble', 'vivienda', 'donde vivir', 'presupuesto'];
     propertyTerms.forEach(term => {
       if (cleanRawNormalized.includes(term)) {
         scores['SEARCH_PROPERTY'] += 1;
