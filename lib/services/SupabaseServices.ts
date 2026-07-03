@@ -268,10 +268,6 @@ export class SupabasePropertyService implements IPropertyService {
     const { result: searchResult, executionTime } = await measureExecution(async () => {
       let query = supabase.from('properties').select(HYBRID_PROPERTY_SELECT);
       
-      if (filters.city) {
-        query = query.or(`city.ilike.%${filters.city}%,location.ilike.%${filters.city}%`);
-      }
-      
       if (filters.type) {
         const allowedTypes = PROPERTY_TYPE_MAPPING[filters.type] || [filters.type];
         const capitalizedTypes = allowedTypes.map(t => {
@@ -287,9 +283,6 @@ export class SupabasePropertyService implements IPropertyService {
 
       if (error && isMissingOfferingsRelationError(error)) {
         let legacyQuery = supabase.from('properties').select(LEGACY_PROPERTY_SELECT);
-        if (filters.city) {
-          legacyQuery = legacyQuery.or(`city.ilike.%${filters.city}%,location.ilike.%${filters.city}%`);
-        }
         if (filters.type) {
           const allowedTypes = PROPERTY_TYPE_MAPPING[filters.type] || [filters.type];
           const capitalizedTypes = allowedTypes.map(t => {
