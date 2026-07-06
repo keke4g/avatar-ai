@@ -9,12 +9,22 @@ export const generatePropertySummary = (property: EternaProperty, lang: 'es' | '
   const t = property.title || 'Propiedad';
   const loc = property.location || 'Destino';
   const c = property.country || '';
-  const rating = property.rating || 5;
+  const bedrooms = property.bedrooms || 0;
+  const bathrooms = property.bathrooms || 0;
+  const isDebtFree = property.legalDebtFree !== false;
 
   if (lang === 'es') {
-    return `Estamos en "${t}", ubicada en ${loc} (${c}). Esta exclusiva propiedad cuenta con una calificación de ${rating} estrellas y está disponible en catálogo. ¿Deseas que te explique los detalles de sus características o modalidades de renta?`;
+    const gravamenText = isDebtFree ? 'libre de gravamen' : 'con gravamen activo';
+    const bedText = bedrooms === 1 ? '1 habitación' : `${bedrooms} habitaciones`;
+    const bathText = bathrooms === 1 ? '1 baño' : `${bathrooms} baños`;
+    
+    return `Estamos en "${t}", ubicada en ${loc} (${c}). Esta exclusiva propiedad cuenta con ${bedText}, ${bathText} y se encuentra ${gravamenText}. ¿Deseas que te explique los detalles de sus características, expediente jurídico o modalidades de adquisición?`;
   } else {
-    return `We are viewing "${t}", located in ${loc} (${c}). This exclusive property has a rating of ${rating} stars and is available in the catalog. Would you like me to explain the details of its features or rental terms?`;
+    const gravamenText = isDebtFree ? 'free of liens' : 'subject to active liens';
+    const bedText = bedrooms === 1 ? '1 bedroom' : `${bedrooms} bedrooms`;
+    const bathText = bathrooms === 1 ? '1 bathroom' : `${bathrooms} bathrooms`;
+
+    return `We are viewing "${t}", located in ${loc} (${c}). This exclusive property features ${bedText}, ${bathText} and is ${gravamenText}. Would you like me to explain the details of its features, legal dossier, or acquisition terms?`;
   }
 };
 
