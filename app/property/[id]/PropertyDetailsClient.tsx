@@ -379,6 +379,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   const [modalOpen, setModalOpen] = useState(false);
   const [leadModalOpen, setLeadModalOpen] = useState(false);
   const [selectedMode, setSelectedMode] = useState<PropertyOfferingMode | null>(null);
+  const [isEvaluablesExpanded, setIsEvaluablesExpanded] = useState(false);
+  const [isNoCompatiblesExpanded, setIsNoCompatiblesExpanded] = useState(false);
 
   // Set default selected mode when activeOfferings load
   useEffect(() => {
@@ -1016,7 +1018,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               <>
                 <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
                   <Award className="w-5 h-5 text-brand-accent" />
-                  <span>{language === 'es' ? 'Métodos de Pago Aceptados' : 'Accepted Payment Methods'}</span>
+                  <span>{language === 'es' ? '✅ Puedes comprar esta propiedad con' : '✅ You can buy this property with'}</span>
                 </h3>
 
                 {(() => {
@@ -1058,14 +1060,12 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
                   return (
                     <div className="flex flex-col gap-4">
-                      {/* Responsive Grid: 1 col on mobile, 2 or 3 cols on desktop */}
+                      {/* Compatibles (Green 🟢) - Shown by default. Maximum 3 columns on desktop, 1 on mobile */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        
-                        {/* Compatibles (Green 🟢) */}
                         {credits.compatibles.map((c) => (
                           <div 
                             key={c} 
-                            className="group relative p-3.5 bg-emerald-50/40 hover:bg-emerald-50/80 border border-emerald-300 rounded-2xl text-xs font-black text-brand-black flex items-center justify-between transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                            className="group relative p-3.5 bg-emerald-50/40 hover:bg-emerald-50/80 border border-emerald-300 rounded-2xl text-xs font-black text-brand-black flex items-center justify-between transition-all duration-250 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                           >
                             <span className="flex items-center gap-2">
                               <span className="w-2 h-2 rounded-full bg-emerald-500" />
@@ -1082,51 +1082,117 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                             </div>
                           </div>
                         ))}
-
-                        {/* Sujetos a evaluación (Yellow 🟡) */}
-                        {credits.evaluables.map((c) => (
-                          <div 
-                            key={c} 
-                            className="group relative p-3.5 bg-amber-50/40 hover:bg-amber-50/80 border border-amber-300 rounded-2xl text-xs font-black text-brand-black flex items-center justify-between transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-                          >
-                            <span className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                              <span>{c}</span>
-                            </span>
-                            <span className="text-[10px] text-amber-700 bg-amber-100/50 px-2 py-0.5 rounded-lg border border-amber-205 font-black">
-                              {language === 'es' ? 'Evaluar' : 'Evaluate'}
-                            </span>
-
-                            {/* Premium CSS Tooltip */}
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 p-2.5 bg-brand-black text-white text-[10px] leading-normal font-semibold rounded-xl opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition-all duration-250 pointer-events-none shadow-lg z-55 text-center">
-                              {getTooltip(c)}
-                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-brand-black" />
-                            </div>
-                          </div>
-                        ))}
-
-                        {/* No compatibles (Red 🔴) - Only show if there are actual non-compatibles (e.g. Ejidal, no deeds) */}
-                        {credits.noCompatibles.map((item) => (
-                          <div 
-                            key={item.credit} 
-                            className="group relative p-3.5 bg-rose-50/40 hover:bg-rose-50/80 border border-rose-300 rounded-2xl text-xs font-black text-brand-black flex items-center justify-between transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-                          >
-                            <span className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-rose-500" />
-                              <span>{item.credit}</span>
-                            </span>
-                            <span className="text-[10px] text-rose-700 bg-rose-100/50 px-2 py-0.5 rounded-lg border border-rose-205 font-black">
-                              {language === 'es' ? 'No compatible' : 'Not eligible'}
-                            </span>
-
-                            {/* Premium CSS Tooltip explaining the restriction */}
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 p-2.5 bg-brand-black text-white text-[10px] leading-normal font-semibold rounded-xl opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition-all duration-250 pointer-events-none shadow-lg z-55 text-center">
-                              {language === 'es' ? `No compatible. Motivo: ${item.reason}` : `Not compatible. Reason: ${item.reason}`}
-                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-brand-black" />
-                            </div>
-                          </div>
-                        ))}
                       </div>
+
+                      {/* Evaluables (Yellow 🟡) - Collapsible section */}
+                      {credits.evaluables.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                          <button 
+                            type="button"
+                            onClick={() => setIsEvaluablesExpanded(!isEvaluablesExpanded)}
+                            className="flex items-center gap-2 text-xs font-black text-brand-gray-500 hover:text-brand-black transition-colors self-start py-1.5 focus:outline-hidden cursor-pointer"
+                          >
+                            <span className={`inline-block transform transition-transform duration-200 ${isEvaluablesExpanded ? 'rotate-180' : ''}`}>
+                              ▼
+                            </span>
+                            <span>
+                              {language === 'es' 
+                                ? `${isEvaluablesExpanded ? 'Ocultar' : 'Ver'} opciones sujetas a evaluación (${credits.evaluables.length})`
+                                : `${isEvaluablesExpanded ? 'Hide' : 'Show'} options subject to evaluation (${credits.evaluables.length})`}
+                            </span>
+                          </button>
+
+                          <AnimatePresence initial={false}>
+                            {isEvaluablesExpanded && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1 pb-2">
+                                  {credits.evaluables.map((c) => (
+                                    <div 
+                                      key={c} 
+                                      className="group relative p-3.5 bg-amber-50/40 hover:bg-amber-50/80 border border-amber-300 rounded-2xl text-xs font-black text-brand-black flex items-center justify-between transition-all duration-250 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                        <span>{c}</span>
+                                      </span>
+                                      <span className="text-[10px] text-amber-700 bg-amber-100/50 px-2 py-0.5 rounded-lg border border-amber-205 font-black">
+                                        {language === 'es' ? 'Evaluar' : 'Evaluate'}
+                                      </span>
+
+                                      {/* Premium CSS Tooltip */}
+                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 p-2.5 bg-brand-black text-white text-[10px] leading-normal font-semibold rounded-xl opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition-all duration-250 pointer-events-none shadow-lg z-55 text-center">
+                                        {getTooltip(c)}
+                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-brand-black" />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
+
+                      {/* No compatibles (Red 🔴) - Collapsible section */}
+                      {credits.noCompatibles.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                          <button 
+                            type="button"
+                            onClick={() => setIsNoCompatiblesExpanded(!isNoCompatiblesExpanded)}
+                            className="flex items-center gap-2 text-xs font-black text-brand-gray-500 hover:text-brand-black transition-colors self-start py-1.5 focus:outline-hidden cursor-pointer"
+                          >
+                            <span className={`inline-block transform transition-transform duration-200 ${isNoCompatiblesExpanded ? 'rotate-180' : ''}`}>
+                              ▼
+                            </span>
+                            <span>
+                              {language === 'es' 
+                                ? `${isNoCompatiblesExpanded ? 'Ocultar' : 'Ver'} métodos no compatibles (${credits.noCompatibles.length})`
+                                : `${isNoCompatiblesExpanded ? 'Hide' : 'Show'} non-compatible methods (${credits.noCompatibles.length})`}
+                            </span>
+                          </button>
+
+                          <AnimatePresence initial={false}>
+                            {isNoCompatiblesExpanded && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1 pb-2">
+                                  {credits.noCompatibles.map((item) => (
+                                    <div 
+                                      key={item.credit} 
+                                      className="group relative p-3.5 bg-rose-50/40 hover:bg-rose-50/80 border border-rose-300 rounded-2xl text-xs font-black text-brand-black flex items-center justify-between transition-all duration-250 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-rose-500" />
+                                        <span>{item.credit}</span>
+                                      </span>
+                                      <span className="text-[10px] text-rose-700 bg-rose-100/50 px-2 py-0.5 rounded-lg border border-rose-205 font-black">
+                                        {language === 'es' ? 'No compatible' : 'Not eligible'}
+                                      </span>
+
+                                      {/* Premium CSS Tooltip explaining the restriction */}
+                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 p-2.5 bg-brand-black text-white text-[10px] leading-normal font-semibold rounded-xl opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition-all duration-250 pointer-events-none shadow-lg z-55 text-center">
+                                        {language === 'es' ? `No compatible. Motivo: ${item.reason}` : `Not compatible. Reason: ${item.reason}`}
+                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-brand-black" />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
 
                       <span className="text-[10px] text-brand-gray-400 font-semibold leading-normal block border-t border-brand-gray-100 pt-3">
                         ⚠️ {language === 'es'
