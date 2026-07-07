@@ -848,7 +848,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             if (selectedMode === 'SALE' && activeSaleOffering) {
               priceText = `${activeSaleOffering.currency || 'USD'} $${(activeSaleOffering.priceAmount || 0).toLocaleString()}`;
               labelText = language === 'es' ? 'Precio de Venta' : 'Sale Price';
-            } else if (selectedMode === 'RENT' && activeRentOffering) {
+            } else if ((selectedMode === 'MONTHLY_RENT' || selectedMode === 'SHORT_RENT') && activeRentOffering) {
               priceText = `${activeRentOffering.currency || 'USD'} $${(activeRentOffering.priceAmount || 0).toLocaleString()} / ${language === 'es' ? 'mes' : 'month'}`;
               labelText = language === 'es' ? 'Precio de Renta' : 'Rental Price';
             } else if (selectedMode === 'SWAP') {
@@ -902,6 +902,113 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               {t(`properties.${property.id}.description`).startsWith('properties.') ? property.description : t(`properties.${property.id}.description`)}
             </p>
           </div>
+
+          {/* 2. Expediente Jurídico */}
+          {(() => {
+            const legalStatus = PropertyEligibilityEngine.getLegalStatus(property);
+            const statusConfig = {
+              GREEN: {
+                bg: 'bg-emerald-50/60 border-emerald-200/60',
+                dot: 'bg-emerald-500 ring-emerald-100',
+                text: 'text-emerald-950',
+                badgeBg: 'bg-emerald-100/80 text-emerald-800 border-emerald-200/50'
+              },
+              YELLOW: {
+                bg: 'bg-amber-50/60 border-amber-200/60',
+                dot: 'bg-amber-500 ring-amber-100',
+                text: 'text-amber-950',
+                badgeBg: 'bg-amber-100/80 text-amber-800 border-amber-200/50'
+              },
+              RED: {
+                bg: 'bg-rose-50/60 border-rose-200/60',
+                dot: 'bg-rose-500 ring-rose-100',
+                text: 'text-rose-950',
+                badgeBg: 'bg-rose-100/80 text-rose-800 border-rose-200/50'
+              }
+            };
+            const config = statusConfig[legalStatus.status];
+
+            return (
+              <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
+                <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-brand-accent" />
+                  <span>{language === 'es' ? 'Expediente Jurídico' : 'Legal Dossier'}</span>
+                </h3>
+
+                {/* Semáforo Jurídico Banner Premium */}
+                <div className={`p-4 rounded-2xl border ${config.bg} flex gap-3 shadow-xs transition-all duration-300 hover:shadow-sm`}>
+                  <div className="pt-1">
+                    <span className={`flex w-3.5 h-3.5 rounded-full ${config.dot} ring-4 animate-pulse`} />
+                  </div>
+                  <div>
+                    <h4 className={`text-xs font-black uppercase tracking-wider ${config.text}`}>{language === 'es' ? `Semáforo: ${legalStatus.label}` : `Traffic Light: ${legalStatus.label}`}</h4>
+                    <p className={`text-xs mt-1 leading-normal font-semibold ${config.text} opacity-90`}>{legalStatus.explanation}</p>
+                    {legalStatus.warnings.length > 0 && (
+                      <ul className={`list-disc list-inside text-[11px] mt-2 flex flex-col gap-1.5 font-bold ${config.text}`}>
+                        {legalStatus.warnings.map((w, idx) => (
+                          <li key={idx} className="leading-snug">{w}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+
+                {/* Dossier Table Premium List */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-brand-gray-500 font-semibold mt-1">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
+                    <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Escrituras:' : 'Public Deeds:'}</span>
+                    <span className={`px-2.5 py-0.5 rounded-lg border text-[10px] font-black ${
+                      property.legalPublicDeed 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
+                        : 'bg-rose-50 text-rose-700 border-rose-300'
+                    }`}>
+                      {property.legalPublicDeed ? (language === 'es' ? 'Escritura Pública Inscrita' : 'Public Deed Registered') : (language === 'es' ? 'Sin Escrituras' : 'No Public Deed')}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
+                    <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Predial:' : 'Property Tax:'}</span>
+                    <span className={`px-2.5 py-0.5 rounded-lg border text-[10px] font-black ${
+                      property.legalTaxCurrent 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
+                        : 'bg-rose-50 text-rose-700 border-rose-300'
+                    }`}>
+                      {property.legalTaxCurrent ? (language === 'es' ? 'Al corriente' : 'Up to date') : (language === 'es' ? 'Con adeudo' : 'With debts')}
+                    </span>
+                  </div>
+                  {property.legalRegime && (
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
+                      <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Régimen:' : 'Regime:'}</span>
+                      <span className="text-brand-black font-extrabold">{property.legalRegime}</span>
+                    </div>
+                  )}
+                  {property.legalLandUse && (
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
+                      <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Uso de suelo:' : 'Land Use:'}</span>
+                      <span className="text-brand-black font-extrabold">{property.legalLandUse}</span>
+                    </div>
+                  )}
+                  {property.legalJuridicalResponsible && (
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-555 border border-brand-gray-300">
+                      <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Responsable jurídico:' : 'Juridical Responsible:'}</span>
+                      <span className="text-brand-black font-extrabold">{property.legalJuridicalResponsible}</span>
+                    </div>
+                  )}
+                  {property.legalLastUpdate && (
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
+                      <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Última actualización:' : 'Last update:'}</span>
+                      <span className="text-brand-black font-extrabold">{property.legalLastUpdate}</span>
+                    </div>
+                  )}
+                  {property.legalRestrictions && (
+                    <div className="col-span-2 flex flex-col gap-1 p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
+                      <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Restricciones / Afectaciones:' : 'Restrictions:'}</span>
+                      <span className="text-brand-black leading-relaxed font-bold">{property.legalRestrictions}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Métodos de Pago / Financiamiento Card (Dynamic based on selectedMode) */}
           <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4 animate-in fade-in duration-300">
@@ -1033,7 +1140,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             )}
 
             {/* RENT mode: Conditions of lease */}
-            {selectedMode === 'RENT' && activeRentOffering && (
+            {(selectedMode === 'MONTHLY_RENT' || selectedMode === 'SHORT_RENT') && activeRentOffering && (
               <>
                 <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
                   <FileCheck className="w-5 h-5 text-brand-accent" />
@@ -1042,7 +1149,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
-                    <span className="text-brand-gray-500 font-bold">{language === 'es' ? 'Depósito requerido:' : 'Security deposit:'}</span>
+                    <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Depósito requerido:' : 'Security deposit:'}</span>
                     <span className="text-brand-accent font-extrabold">{property.metadata?.depositMonths ? `${property.metadata.depositMonths} ${language === 'es' ? 'mes(es)' : 'month(s)'}` : (language === 'es' ? '1 mes' : '1 month')}</span>
                   </div>
                   <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
@@ -1054,7 +1161,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
                       property.metadata?.guarantorRequired !== false 
                         ? 'bg-amber-50 text-amber-700 border border-amber-250' 
-                        : 'bg-emerald-50 text-emerald-700 border border-emerald-250'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-250'
                     }`}>
                       {property.metadata?.guarantorRequired !== false ? (language === 'es' ? 'Requerido' : 'Required') : (language === 'es' ? 'No indispensable' : 'Not required')}
                     </span>
@@ -1153,113 +1260,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               </>
             )}
           </div>
-
-          {/* 2. Expediente Jurídico */}
-          {(() => {
-            const legalStatus = PropertyEligibilityEngine.getLegalStatus(property);
-            const statusConfig = {
-              GREEN: {
-                bg: 'bg-emerald-50/60 border-emerald-200/60',
-                dot: 'bg-emerald-500 ring-emerald-100',
-                text: 'text-emerald-950',
-                badgeBg: 'bg-emerald-100/80 text-emerald-800 border-emerald-200/50'
-              },
-              YELLOW: {
-                bg: 'bg-amber-50/60 border-amber-200/60',
-                dot: 'bg-amber-500 ring-amber-100',
-                text: 'text-amber-950',
-                badgeBg: 'bg-amber-100/80 text-amber-800 border-amber-200/50'
-              },
-              RED: {
-                bg: 'bg-rose-50/60 border-rose-200/60',
-                dot: 'bg-rose-500 ring-rose-100',
-                text: 'text-rose-950',
-                badgeBg: 'bg-rose-100/80 text-rose-800 border-rose-200/50'
-              }
-            };
-            const config = statusConfig[legalStatus.status];
-
-            return (
-              <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
-                <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-brand-accent" />
-                  <span>{language === 'es' ? 'Expediente Jurídico' : 'Legal Dossier'}</span>
-                </h3>
-
-                {/* Semáforo Jurídico Banner Premium */}
-                <div className={`p-4 rounded-2xl border ${config.bg} flex gap-3 shadow-xs transition-all duration-300 hover:shadow-sm`}>
-                  <div className="pt-1">
-                    <span className={`flex w-3.5 h-3.5 rounded-full ${config.dot} ring-4 animate-pulse`} />
-                  </div>
-                  <div>
-                    <h4 className={`text-xs font-black uppercase tracking-wider ${config.text}`}>{language === 'es' ? `Semáforo: ${legalStatus.label}` : `Traffic Light: ${legalStatus.label}`}</h4>
-                    <p className={`text-xs mt-1 leading-normal font-semibold ${config.text} opacity-90`}>{legalStatus.explanation}</p>
-                    {legalStatus.warnings.length > 0 && (
-                      <ul className={`list-disc list-inside text-[11px] mt-2 flex flex-col gap-1.5 font-bold ${config.text}`}>
-                        {legalStatus.warnings.map((w, idx) => (
-                          <li key={idx} className="leading-snug">{w}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-
-                {/* Dossier Table Premium List */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-brand-gray-500 font-semibold mt-1">
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
-                    <span className="text-brand-gray-500 font-bold">{language === 'es' ? 'Escrituras:' : 'Public Deeds:'}</span>
-                    <span className={`px-2.5 py-0.5 rounded-lg border text-[10px] font-black ${
-                      property.legalPublicDeed 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
-                        : 'bg-rose-50 text-rose-700 border-rose-300'
-                    }`}>
-                      {property.legalPublicDeed ? (language === 'es' ? 'Escritura Pública Inscrita' : 'Public Deed Registered') : (language === 'es' ? 'Sin Escrituras' : 'No Public Deed')}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
-                    <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Predial:' : 'Property Tax:'}</span>
-                    <span className={`px-2.5 py-0.5 rounded-lg border text-[10px] font-black ${
-                      property.legalTaxCurrent 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
-                        : 'bg-rose-50 text-rose-700 border-rose-300'
-                    }`}>
-                      {property.legalTaxCurrent ? (language === 'es' ? 'Al corriente' : 'Up to date') : (language === 'es' ? 'Con adeudo' : 'With debts')}
-                    </span>
-                  </div>
-                  {property.legalRegime && (
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
-                      <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Régimen:' : 'Regime:'}</span>
-                      <span className="text-brand-black font-extrabold">{property.legalRegime}</span>
-                    </div>
-                  )}
-                  {property.legalLandUse && (
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
-                      <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Uso de suelo:' : 'Land Use:'}</span>
-                      <span className="text-brand-black font-extrabold">{property.legalLandUse}</span>
-                    </div>
-                  )}
-                  {property.legalJuridicalResponsible && (
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
-                      <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Responsable jurídico:' : 'Juridical Responsible:'}</span>
-                      <span className="text-brand-black font-extrabold">{property.legalJuridicalResponsible}</span>
-                    </div>
-                  )}
-                  {property.legalLastUpdate && (
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
-                      <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Última actualización:' : 'Last update:'}</span>
-                      <span className="text-brand-black font-extrabold">{property.legalLastUpdate}</span>
-                    </div>
-                  )}
-                  {property.legalRestrictions && (
-                    <div className="col-span-2 flex flex-col gap-1 p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-300">
-                      <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Restricciones / Afectaciones:' : 'Restrictions:'}</span>
-                      <span className="text-brand-black leading-relaxed font-bold">{property.legalRestrictions}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
 
           {/* 3. Avalúo e Indicadores de Plusvalía */}
           {(property.appraisalAmount || property.appreciationLevel) && (
