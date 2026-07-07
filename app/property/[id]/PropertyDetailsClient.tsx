@@ -8,7 +8,7 @@ import {
   Star, ShieldCheck, Heart, Share, Calendar, MapPin, Sparkles, AlertCircle,
   BedDouble, Bath, Users, ArrowRight, ChevronLeft, ChevronRight,
   Wifi, Waves, Coffee, Monitor, Wind, Key, Flame, Compass, MessageSquareCode,
-  ZoomIn, ZoomOut, Maximize, Download, ExternalLink, Play, FileText, Info, ShieldAlert, Award, TrendingUp, BarChart2
+  ZoomIn, ZoomOut, Maximize, Download, ExternalLink, Play, FileText, Info, ShieldAlert, Award, TrendingUp, BarChart2, FileCheck, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -841,101 +841,28 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
         {/* Left Column: Specifications & Descriptions */}
         <div className="flex-1 flex flex-col gap-8 w-full">
           
-          {/* Responsable Comercial Card (Premium design) */}
+          {/* Price display at the top of Left Column */}
           {(() => {
-            const broker = property.brokerProfile || {
-              photo: property.hostAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-              name: property.hostName || 'Agente Responsable',
-              company: 'AuraSwap Elite Estates',
-              position: 'Asesor Inmobiliario Senior',
-              responseTime: 'Menos de 15 minutos',
-              phone: '+52 667 392 4829',
-              whatsapp: '526673924829',
-              email: 'contacto@auraswap.com'
-            };
+            let priceText = '';
+            let labelText = '';
+            if (selectedMode === 'SALE' && activeSaleOffering) {
+              priceText = `${activeSaleOffering.currency || 'USD'} $${(activeSaleOffering.priceAmount || 0).toLocaleString()}`;
+              labelText = language === 'es' ? 'Precio de Venta' : 'Sale Price';
+            } else if (selectedMode === 'RENT' && activeRentOffering) {
+              priceText = `${activeRentOffering.currency || 'USD'} $${(activeRentOffering.priceAmount || 0).toLocaleString()} / ${language === 'es' ? 'mes' : 'month'}`;
+              labelText = language === 'es' ? 'Precio de Renta' : 'Rental Price';
+            } else if (selectedMode === 'SWAP') {
+              priceText = language === 'es' ? 'Disponible para Intercambio' : 'Available for Swap';
+              labelText = language === 'es' ? 'Modalidad de Trueque' : 'Swap Mode';
+            }
 
-            const getResponsibleLabel = (prop: Property, lang: string) => {
-              const pubType = prop.metadata?.publisherType;
-              if (pubType === 'developer' || prop.companyId) {
-                return lang === 'es' ? 'Inmobiliaria Responsable' : 'Responsible Developer';
-              }
-              if (pubType === 'agent') {
-                return lang === 'es' ? 'Asesor Comercial' : 'Commercial Advisor';
-              }
-              if (prop.primaryOperation === 'SALE') {
-                return lang === 'es' ? 'Propietario / Asesor' : 'Owner / Advisor';
-              } else if (prop.primaryOperation === 'RENT') {
-                return lang === 'es' ? 'Responsable de Propiedad' : 'Property Manager';
-              } else {
-                return lang === 'es' ? 'Propietario' : 'Property Owner';
-              }
-            };
-
-            const label = getResponsibleLabel(property, language);
+            if (!priceText) return null;
 
             return (
-              <div className="bg-white border border-brand-gray-200 rounded-3xl p-6 flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between shadow-xs transition-all duration-300 hover:shadow-sm">
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left w-full lg:w-auto">
-                  <div className="relative shrink-0">
-                    <img
-                      src={broker.photo}
-                      alt={broker.name}
-                      className="w-16 h-16 rounded-full object-cover border-2 border-brand-accent/20 p-0.5 shadow-xs"
-                    />
-                    {property.hostVerified && (
-                      <span className="absolute bottom-0 right-0 bg-brand-accent text-white p-0.5 rounded-full border-2 border-white shadow-xs">
-                        <ShieldCheck className="w-3.5 h-3.5 fill-white" />
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1 w-full text-left">
-                    <div>
-                      <span className="inline-block bg-brand-accent/10 text-brand-accent px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">{label}</span>
-                    </div>
-                    <h3 className="text-xl font-black text-brand-black mt-1 leading-tight">{broker.name}</h3>
-                    <p className="text-xs font-bold text-brand-gray-650">
-                      {broker.position} <span className="text-brand-gray-300 mx-1">•</span> <span className="text-brand-gray-400">{broker.company}</span>
-                    </p>
-                    <p className="text-xs text-brand-gray-500 font-semibold mt-1 flex items-center gap-1.5 justify-start">
-                      <span>⚡</span>
-                      <span>{language === 'es' ? 'Tiempo de respuesta:' : 'Response time:'} <span className="text-brand-accent font-black">{broker.responseTime}</span></span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5 w-full lg:w-80 shrink-0">
-                  {broker.whatsapp && (
-                    <a
-                      href={`https://wa.me/${broker.whatsapp}?text=Hola%20${encodeURIComponent(broker.name)},%20estoy%20interesado%20en%20la%20propiedad%20"${encodeURIComponent(property.title)}"%20con%20ID%20${property.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="h-11 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
-                    >
-                      WhatsApp
-                    </a>
-                  )}
-                  {broker.phone && (
-                    <a
-                      href={`tel:${broker.phone}`}
-                      className="h-11 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-300 text-brand-black rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
-                    >
-                      Llamar
-                    </a>
-                  )}
-                  {broker.email && (
-                    <a
-                      href={`mailto:${broker.email}?subject=Interés en propiedad AuraSwap: ${encodeURIComponent(property.title)}`}
-                      className="h-11 bg-brand-gray-50 hover:bg-brand-gray-155 border border-brand-gray-300 text-brand-black rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
-                    >
-                      Correo
-                    </a>
-                  )}
-                  <button
-                    onClick={() => router.push(`/profile/${property.hostId || 'current-user'}`)}
-                    className="h-11 bg-brand-black hover:bg-brand-black/90 text-white rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
-                  >
-                    Ver Perfil
-                  </button>
+              <div className="border-b border-brand-gray-200/80 pb-5 animate-in fade-in duration-300">
+                <span className="inline-block bg-brand-accent/10 text-brand-accent px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">{labelText}</span>
+                <div className="text-3xl font-black text-brand-black tracking-tight mt-2 flex items-baseline gap-1">
+                  {priceText}
                 </div>
               </div>
             );
@@ -974,6 +901,257 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             <p className="text-sm text-brand-gray-500 leading-relaxed whitespace-pre-line font-medium">
               {t(`properties.${property.id}.description`).startsWith('properties.') ? property.description : t(`properties.${property.id}.description`)}
             </p>
+          </div>
+
+          {/* Métodos de Pago / Financiamiento Card (Dynamic based on selectedMode) */}
+          <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4 animate-in fade-in duration-300">
+            {selectedMode === 'SALE' && (
+              <>
+                <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
+                  <Award className="w-5 h-5 text-brand-accent" />
+                  <span>{language === 'es' ? 'Métodos de Pago Aceptados' : 'Accepted Payment Methods'}</span>
+                </h3>
+
+                {(() => {
+                  const credits = PropertyEligibilityEngine.calculateEligibleCredits(property);
+                  
+                  // Tooltips texts
+                  const tooltipsEs: Record<string, string> = {
+                    'Contado': 'Compra directa mediante recursos propios, transferencia o cheque de caja.',
+                    'Crédito Bancario': 'Compatible con crédito hipotecario de cualquier institución bancaria comercial.',
+                    'Cofinavit': 'Combina tu crédito Infonavit con un crédito hipotecario bancario para mayor capacidad.',
+                    'Unamos Créditos': 'Permite unir tu capacidad de crédito Infonavit con la de tu pareja, familiar o amigo.',
+                    'Infonavit': 'Sujeto al monto de crédito aprobado por Infonavit y la precalificación del derechohabiente.',
+                    'FOVISSSTE': 'Sujeto a la precalificación de FOVISSSTE y las convocatorias anuales del fondo.',
+                    'FOVISSSTE para Todos': 'Crédito cofinanciado entre FOVISSSTE y una institución bancaria.',
+                    'Crédito mixto Banco + Infonavit': 'Combina financiamiento del banco con tu saldo de la subcuenta de vivienda.',
+                    'Crédito mixto Banco + FOVISSSTE': 'Combina financiamiento bancario con el esquema de FOVISSSTE.',
+                    'Infonavit Conyugal': 'Une tu crédito Infonavit con el de tu cónyuge legalmente casado.'
+                  };
+
+                  const tooltipsEn: Record<string, string> = {
+                    'Contado': 'Direct purchase through own funds, transfer, or cashier\'s check.',
+                    'Crédito Bancario': 'Compatible with mortgage credit from any commercial banking institution.',
+                    'Cofinavit': 'Combines Infonavit credit with a bank mortgage credit for higher purchasing power.',
+                    'Unamos Créditos': 'Allows combining your Infonavit credit capacity with a partner, relative, or friend.',
+                    'Infonavit': 'Subject to the credit amount approved by Infonavit and user pre-qualification.',
+                    'FOVISSSTE': 'Subject to FOVISSSTE pre-qualification and annual fund calls.',
+                    'FOVISSSTE para Todos': 'Co-financed credit between FOVISSSTE and a banking institution.',
+                    'Crédito mixto Banco + Infonavit': 'Combines bank financing with your housing subaccount balance.',
+                    'Crédito mixto Banco + FOVISSSTE': 'Combines bank financing with the FOVISSSTE scheme.',
+                    'Infonavit Conyugal': 'Combines your Infonavit credit with your legally married spouse.'
+                  };
+
+                  const getTooltip = (cName: string) => {
+                    const dict = language === 'es' ? tooltipsEs : tooltipsEn;
+                    return dict[cName] || (language === 'es' 
+                      ? 'Financiamiento sujeto a precalificación y políticas de la institución.'
+                      : 'Financing subject to pre-qualification and institution policies.');
+                  };
+
+                  return (
+                    <div className="flex flex-col gap-4">
+                      {/* Responsive Grid: 1 col on mobile, 2 or 3 cols on desktop */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        
+                        {/* Compatibles (Green 🟢) */}
+                        {credits.compatibles.map((c) => (
+                          <div 
+                            key={c} 
+                            className="group relative p-3.5 bg-emerald-50/40 hover:bg-emerald-50/80 border border-emerald-300 rounded-2xl text-xs font-black text-brand-black flex items-center justify-between transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                              <span>{c}</span>
+                            </span>
+                            <span className="text-[10px] text-emerald-700 bg-emerald-100/50 px-2 py-0.5 rounded-lg border border-emerald-205 font-black">
+                              {language === 'es' ? 'Listo' : 'Ready'}
+                            </span>
+                            
+                            {/* Premium CSS Tooltip */}
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 p-2.5 bg-brand-black text-white text-[10px] leading-normal font-semibold rounded-xl opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition-all duration-250 pointer-events-none shadow-lg z-55 text-center">
+                              {getTooltip(c)}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-brand-black" />
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Sujetos a evaluación (Yellow 🟡) */}
+                        {credits.evaluables.map((c) => (
+                          <div 
+                            key={c} 
+                            className="group relative p-3.5 bg-amber-50/40 hover:bg-amber-50/80 border border-amber-300 rounded-2xl text-xs font-black text-brand-black flex items-center justify-between transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                              <span>{c}</span>
+                            </span>
+                            <span className="text-[10px] text-amber-700 bg-amber-100/50 px-2 py-0.5 rounded-lg border border-amber-205 font-black">
+                              {language === 'es' ? 'Evaluar' : 'Evaluate'}
+                            </span>
+
+                            {/* Premium CSS Tooltip */}
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 p-2.5 bg-brand-black text-white text-[10px] leading-normal font-semibold rounded-xl opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition-all duration-250 pointer-events-none shadow-lg z-55 text-center">
+                              {getTooltip(c)}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-brand-black" />
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* No compatibles (Red 🔴) - Only show if there are actual non-compatibles (e.g. Ejidal, no deeds) */}
+                        {credits.noCompatibles.map((item) => (
+                          <div 
+                            key={item.credit} 
+                            className="group relative p-3.5 bg-rose-50/40 hover:bg-rose-50/80 border border-rose-300 rounded-2xl text-xs font-black text-brand-black flex items-center justify-between transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-rose-500" />
+                              <span>{item.credit}</span>
+                            </span>
+                            <span className="text-[10px] text-rose-700 bg-rose-100/50 px-2 py-0.5 rounded-lg border border-rose-205 font-black">
+                              {language === 'es' ? 'No compatible' : 'Not eligible'}
+                            </span>
+
+                            {/* Premium CSS Tooltip explaining the restriction */}
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 p-2.5 bg-brand-black text-white text-[10px] leading-normal font-semibold rounded-xl opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition-all duration-250 pointer-events-none shadow-lg z-55 text-center">
+                              {language === 'es' ? `No compatible. Motivo: ${item.reason}` : `Not compatible. Reason: ${item.reason}`}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-brand-black" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <span className="text-[10px] text-brand-gray-400 font-semibold leading-normal block border-t border-brand-gray-100 pt-3">
+                        ⚠️ {language === 'es'
+                          ? 'La aprobación final de cualquier crédito dependerá de la institución financiera y del perfil del comprador.'
+                          : 'Final approval of any credit will depend on the financial institution and the buyer\'s credit profile.'}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+
+            {/* RENT mode: Conditions of lease */}
+            {selectedMode === 'RENT' && activeRentOffering && (
+              <>
+                <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
+                  <FileCheck className="w-5 h-5 text-brand-accent" />
+                  <span>{language === 'es' ? 'Condiciones de Contratación' : 'Lease Terms & Conditions'}</span>
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-500 font-bold">{language === 'es' ? 'Depósito requerido:' : 'Security deposit:'}</span>
+                    <span className="text-brand-accent font-extrabold">{property.metadata?.depositMonths ? `${property.metadata.depositMonths} ${language === 'es' ? 'mes(es)' : 'month(s)'}` : (language === 'es' ? '1 mes' : '1 month')}</span>
+                  </div>
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Mes adelantado:' : 'Advance month:'}</span>
+                    <span className="text-brand-black font-extrabold">{language === 'es' ? 'Requerido' : 'Required'}</span>
+                  </div>
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Aval / Fiador:' : 'Guarantor:'}</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                      property.metadata?.guarantorRequired !== false 
+                        ? 'bg-amber-50 text-amber-700 border border-amber-250' 
+                        : 'bg-emerald-50 text-emerald-700 border border-emerald-250'
+                    }`}>
+                      {property.metadata?.guarantorRequired !== false ? (language === 'es' ? 'Requerido' : 'Required') : (language === 'es' ? 'No indispensable' : 'Not required')}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Póliza jurídica:' : 'Legal lease policy:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.legalPolicyRequired !== false ? (language === 'es' ? 'Requerida (50/50)' : 'Required (50/50)') : (language === 'es' ? 'No requerida' : 'No policy')}</span>
+                  </div>
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Obligado solidario:' : 'Joint co-signer:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.jointCosignerRequired ? (language === 'es' ? 'Requerido' : 'Required') : (language === 'es' ? 'Opcional' : 'Optional')}</span>
+                  </div>
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Contrato mínimo:' : 'Minimum lease:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.minContractMonths || 12} {language === 'es' ? 'meses' : 'months'}</span>
+                  </div>
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Mascotas:' : 'Pets allowed:'}</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                      property.metadata?.petsAllowed 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-250' 
+                        : 'bg-rose-50 text-rose-700 border-rose-250'
+                    }`}>
+                      {property.metadata?.petsAllowed ? (language === 'es' ? 'Permitidas' : 'Allowed') : (language === 'es' ? 'No permitidas' : 'No pets')}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Servicios incluidos:' : 'Utilities included:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.utilitiesIncluded ? (language === 'es' ? 'Sí' : 'Yes') : (language === 'es' ? 'No' : 'No')}</span>
+                  </div>
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Mantenimiento:' : 'Maintenance fee:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.maintenanceFeeIncluded ? (language === 'es' ? 'Incluido' : 'Included') : (language === 'es' ? 'Por separado' : 'Separate')}</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* SWAP mode: Forms of exchange accepted */}
+            {selectedMode === 'SWAP' && (
+              <>
+                <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
+                  <RefreshCw className="w-5 h-5 text-brand-accent" />
+                  <span>{language === 'es' ? 'Formas de Intercambio Aceptadas' : 'Accepted Swap Framework'}</span>
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Intercambio directo:' : 'Direct swap:'}</span>
+                    <span className="text-emerald-700 font-extrabold">{language === 'es' ? 'Aceptado' : 'Accepted'}</span>
+                  </div>
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Intercambio + diferencia:' : 'Swap + cash:'}</span>
+                    <span className="text-emerald-700 font-extrabold">{language === 'es' ? 'Aceptado' : 'Accepted'}</span>
+                  </div>
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Solo propiedades:' : 'Properties only:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.swapPropertiesOnly ? (language === 'es' ? 'Sí' : 'Yes') : (language === 'es' ? 'No' : 'No')}</span>
+                  </div>
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Vehículos + diferencia:' : 'Vehicles + cash:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.swapVehiclesAllowed ? (language === 'es' ? 'Aceptados' : 'Allowed') : (language === 'es' ? 'No aceptados' : 'No vehicles')}</span>
+                  </div>
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Terrenos:' : 'Land lots:'}</span>
+                    <span className="text-brand-black font-extrabold">{property.metadata?.swapLandAllowed ? (language === 'es' ? 'Aceptados' : 'Allowed') : (language === 'es' ? 'No aceptados' : 'No land')}</span>
+                  </div>
+                  <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
+                    <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Departamentos:' : 'Apartments:'}</span>
+                    <span className="text-brand-black font-extrabold">{language === 'es' ? 'Aceptados' : 'Allowed'}</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-brand-gray-150 pt-3 mt-1" />
+                <h4 className="text-xs font-black uppercase text-brand-gray-400 tracking-wider">
+                  🎯 {language === 'es' ? 'Busca recibir a cambio:' : 'Seeks to receive in return:'}
+                </h4>
+
+                <div className="flex flex-wrap gap-2">
+                  {['Casa', 'Departamento', 'Terreno', 'Local', 'Vehículo', 'Efectivo'].map((item) => {
+                    const isLookingFor = (property.metadata?.swapPreferencesTags || ['Casa', 'Departamento', 'Efectivo']).includes(item);
+                    return (
+                      <span 
+                        key={item}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all duration-200 ${
+                          isLookingFor 
+                            ? 'bg-brand-accent/10 border-brand-accent text-brand-accent shadow-xs' 
+                            : 'bg-brand-gray-50 border-brand-gray-300 text-brand-gray-400 opacity-60'
+                        }`}
+                      >
+                        {isLookingFor ? '✅' : '⚪'} {item}
+                      </span>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
 
           {/* 2. Expediente Jurídico */}
@@ -1129,82 +1307,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             </div>
           )}
 
-          {/* 4. Créditos Compatibles (Motor de Créditos) */}
-          {property.primaryOperation === 'SALE' && (
-            <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
-              <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
-                <Award className="w-5 h-5 text-brand-accent" />
-                <span>{language === 'es' ? 'Compatibilidad de Financiamiento' : 'Financing Compatibility'}</span>
-              </h3>
 
-              {(() => {
-                const credits = PropertyEligibilityEngine.calculateEligibleCredits(property);
-
-                return (
-                  <div className="flex flex-col gap-4">
-                    {/* compatibles */}
-                    {credits.compatibles.length > 0 && (
-                      <div className="flex flex-col gap-2">
-                        <span className="text-[10px] font-black uppercase text-emerald-700 tracking-wider flex items-center gap-1">
-                          🟢 {language === 'es' ? 'Créditos Compatibles' : 'Compatible Credits'}
-                        </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {credits.compatibles.map((c) => (
-                            <div key={c} className="p-3 bg-emerald-50/40 border border-emerald-100 rounded-xl text-xs font-bold text-brand-black flex items-center gap-2">
-                              <span>✓</span>
-                              <span>{c}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* evaluables */}
-                    {credits.evaluables.length > 0 && (
-                      <div className="flex flex-col gap-2">
-                        <span className="text-[10px] font-black uppercase text-amber-700 tracking-wider flex items-center gap-1">
-                          🟡 {language === 'es' ? 'Sujetos a Evaluación de Capacidad' : 'Subject to Pre-qualification'}
-                        </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {credits.evaluables.map((c) => (
-                            <div key={c} className="p-3 bg-amber-50/40 border border-amber-100 rounded-xl text-xs font-bold text-brand-black flex items-center gap-2">
-                              <span>⚠</span>
-                              <span>{c}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* noCompatibles */}
-                    {credits.noCompatibles.length > 0 && (
-                      <div className="flex flex-col gap-2">
-                        <span className="text-[10px] font-black uppercase text-rose-700 tracking-wider flex items-center gap-1">
-                          🔴 {language === 'es' ? 'No Compatibles' : 'Not Compatible'}
-                        </span>
-                        <div className="flex flex-col gap-1.5">
-                          {credits.noCompatibles.map((item) => (
-                            <div key={item.credit} className="p-3 bg-rose-50/30 border border-rose-100 rounded-xl text-xs flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1.5">
-                              <span className="font-bold text-brand-black">{item.credit}</span>
-                              <span className="text-[10px] text-rose-700 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
-                                {item.reason}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <span className="text-[10px] text-brand-gray-400 font-semibold leading-normal block border-t border-brand-gray-100 pt-3">
-                      ℹ️ {language === 'es'
-                        ? '* Nota: El resultado es una simulación de precalificación basada en las condiciones jurídicas del inmueble. El otorgamiento definitivo está sujeto a la aprobación de la institución financiera y el perfil de ingresos del cliente.'
-                        : '* Note: This is an automated eligibility simulation based on the legal status of the property. Final approval is subject to the financial institution\'s criteria and the client\'s credit profile.'}
-                    </span>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
 
           {/* 5. Amenidades */}
           {property.amenities && property.amenities.length > 0 && (
@@ -1445,6 +1548,106 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               </div>
             </div>
           )}
+
+          {/* Responsable Comercial Card (Premium design) */}
+          {(() => {
+            const broker = property.brokerProfile || {
+              photo: property.hostAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+              name: property.hostName || 'Agente Responsable',
+              company: 'AuraSwap Elite Estates',
+              position: 'Asesor Inmobiliario Senior',
+              responseTime: 'Menos de 15 minutos',
+              phone: '+52 667 392 4829',
+              whatsapp: '526673924829',
+              email: 'contacto@auraswap.com'
+            };
+
+            const getResponsibleLabel = (prop: Property, lang: string) => {
+              const pubType = prop.metadata?.publisherType;
+              if (pubType === 'developer' || prop.companyId) {
+                return lang === 'es' ? 'Inmobiliaria Responsable' : 'Responsible Developer';
+              }
+              if (pubType === 'agent') {
+                return lang === 'es' ? 'Asesor Comercial' : 'Commercial Advisor';
+              }
+              if (prop.primaryOperation === 'SALE') {
+                return lang === 'es' ? 'Propietario / Asesor' : 'Owner / Advisor';
+              } else if (prop.primaryOperation === 'RENT') {
+                return lang === 'es' ? 'Responsable de Propiedad' : 'Property Manager';
+              } else {
+                return lang === 'es' ? 'Propietario' : 'Property Owner';
+              }
+            };
+
+            const label = getResponsibleLabel(property, language);
+
+            return (
+              <div className="bg-white border border-brand-gray-200 rounded-3xl p-6 flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between shadow-xs transition-all duration-300 hover:shadow-sm">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left w-full lg:w-auto">
+                  <div className="relative shrink-0">
+                    <img
+                      src={broker.photo}
+                      alt={broker.name}
+                      className="w-16 h-16 rounded-full object-cover border-2 border-brand-accent/20 p-0.5 shadow-xs"
+                    />
+                    {property.hostVerified && (
+                      <span className="absolute bottom-0 right-0 bg-brand-accent text-white p-0.5 rounded-full border-2 border-white shadow-xs">
+                        <ShieldCheck className="w-3.5 h-3.5 fill-white" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1 w-full text-left">
+                    <div>
+                      <span className="inline-block bg-brand-accent/10 text-brand-accent px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">{label}</span>
+                    </div>
+                    <h3 className="text-xl font-black text-brand-black mt-1 leading-tight">{broker.name}</h3>
+                    <p className="text-xs font-bold text-brand-gray-650">
+                      {broker.position} <span className="text-brand-gray-300 mx-1">•</span> <span className="text-brand-gray-400">{broker.company}</span>
+                    </p>
+                    <p className="text-xs text-brand-gray-500 font-semibold mt-1 flex items-center gap-1.5 justify-start">
+                      <span>⚡</span>
+                      <span>{language === 'es' ? 'Tiempo de respuesta:' : 'Response time:'} <span className="text-brand-accent font-black">{broker.responseTime}</span></span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 w-full lg:w-80 shrink-0">
+                  {broker.whatsapp && (
+                    <a
+                      href={`https://wa.me/${broker.whatsapp}?text=Hola%20${encodeURIComponent(broker.name)},%20estoy%20interesado%20en%20la%20propiedad%20"${encodeURIComponent(property.title)}"%20con%20ID%20${property.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="h-11 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
+                    >
+                      WhatsApp
+                    </a>
+                  )}
+                  {broker.phone && (
+                    <a
+                      href={`tel:${broker.phone}`}
+                      className="h-11 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-300 text-brand-black rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
+                    >
+                      Llamar
+                    </a>
+                  )}
+                  {broker.email && (
+                    <a
+                      href={`mailto:${broker.email}?subject=Interés en propiedad AuraSwap: ${encodeURIComponent(property.title)}`}
+                      className="h-11 bg-brand-gray-50 hover:bg-brand-gray-155 border border-brand-gray-300 text-brand-black rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
+                    >
+                      Correo
+                    </a>
+                  )}
+                  <button
+                    onClick={() => router.push(`/profile/${property.hostId || 'current-user'}`)}
+                    className="h-11 bg-brand-black hover:bg-brand-black/90 text-white rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
+                  >
+                    Ver Perfil
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* 10. Análisis Inmobiliario con IA (Eterna) */}
           <div className="bg-gradient-to-br from-brand-accent/5 to-white border border-brand-accent/20 rounded-3xl p-6 flex flex-col gap-4 shadow-sm mb-6">
