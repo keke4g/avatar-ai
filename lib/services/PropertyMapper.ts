@@ -24,6 +24,12 @@ export const toCamelCase = (str: string): string => {
   );
 };
 
+export const isUuid = (val: any): boolean => {
+  if (typeof val !== 'string') return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(val);
+};
+
 export const mapPostgresOffering = (row: any): PropertyOffering => ({
   id: row.id,
   propertyId: row.property_id,
@@ -95,9 +101,22 @@ export class PropertyMapper {
   public static mapClientToPostgres(property: Partial<Property>): Record<string, any> {
     const rawPayload: Record<string, any> = {};
 
+    const uuidColumns = [
+      'conservation_state_id',
+      'construction_type_id',
+      'view_type_id',
+      'orientation_id',
+      'company_id',
+      'owner_profile_id'
+    ];
+
     for (const [key, value] of Object.entries(property)) {
       const snakeKey = toSnakeCase(key);
-      rawPayload[snakeKey] = value;
+      if (uuidColumns.includes(snakeKey)) {
+        rawPayload[snakeKey] = isUuid(value) ? value : null;
+      } else {
+        rawPayload[snakeKey] = value;
+      }
     }
 
     // Filtrar el objeto manteniendo únicamente las columnas válidas de la whitelist
