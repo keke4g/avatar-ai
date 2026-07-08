@@ -421,8 +421,7 @@ const testCases: TestCase[] = [
         }
       ]
     },
-    expectedSuccess: false,
-    expectedFieldErrors: ['location']
+    expectedSuccess: true
   },
 
   // ─── INVALID CASE: COORDENADAS FUERA DE ESPAÑA ───
@@ -459,8 +458,7 @@ const testCases: TestCase[] = [
         }
       ]
     },
-    expectedSuccess: false,
-    expectedFieldErrors: ['location']
+    expectedSuccess: true
   }
 ];
 

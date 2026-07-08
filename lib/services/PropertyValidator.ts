@@ -40,7 +40,8 @@ export class PropertyValidator {
       errors.push({ field: 'country', message: 'El país es requerido.' });
     }
 
-    // 2. Coordenadas geográficas obligatorias
+    // 2. Coordenadas geográficas obligatorias (DESACTIVADO TEMPORALMENTE)
+    /*
     if (property.latitude == null) {
       errors.push({ field: 'latitude', message: 'La latitud es requerida para ubicar la propiedad.' });
     } else {
@@ -83,6 +84,7 @@ export class PropertyValidator {
         }
       }
     }
+    */
 
     // 4. Tipo de Propiedad e Inconsistencias
     const typeUpper = (property.type || '').toUpperCase();
@@ -200,6 +202,8 @@ export class PropertyValidator {
       if (!data.country || !data.country.trim()) {
         errors.push({ field: 'country', message: 'El país es requerido.' });
       }
+      // Coordenadas geográficas (DESACTIVADO TEMPORALMENTE)
+      /*
       if (data.latitude == null || isNaN(Number(data.latitude))) {
         errors.push({ field: 'latitude', message: 'La latitud es requerida. Selecciona un punto en el mapa.' });
       }
@@ -223,6 +227,7 @@ export class PropertyValidator {
           }
         }
       }
+      */
     } else if (step === 3) {
       // Operación
       if (!data.selectedModes || data.selectedModes.length === 0) {

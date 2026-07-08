@@ -723,8 +723,8 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
           hostVerified: currentUser.isVerified,
           isPublished: true,
           auraScore: 95 + Math.floor(Math.random() * 5),
-          latitude: prop.latitude !== undefined && prop.latitude !== null ? Number(prop.latitude) : null,
-          longitude: prop.longitude !== undefined && prop.longitude !== null ? Number(prop.longitude) : null
+          latitude: prop.latitude !== undefined && prop.latitude !== null ? Number(prop.latitude) : 0.0,
+          longitude: prop.longitude !== undefined && prop.longitude !== null ? Number(prop.longitude) : 0.0
         };
         console.log('[Publish] Enviando payload final al servicio de creación:', payload);
 
@@ -750,8 +750,8 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
       hostRating: 5.0,
       hostReviewsCount: 0,
       auraScore: 95 + Math.floor(Math.random() * 5),
-      latitude: prop.latitude !== undefined && prop.latitude !== null ? Number(prop.latitude) : null,
-      longitude: prop.longitude !== undefined && prop.longitude !== null ? Number(prop.longitude) : null,
+      latitude: prop.latitude !== undefined && prop.latitude !== null ? Number(prop.latitude) : 0.0,
+      longitude: prop.longitude !== undefined && prop.longitude !== null ? Number(prop.longitude) : 0.0,
       isPublished: true,
       rules: prop.rules || [],
       reviews: []

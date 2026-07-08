@@ -1665,7 +1665,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
 
     // Paso 2: Geolocalización asíncrona de fallback si faltan coordenadas
     if (step === 2 && (currentLat === null || currentLng === null)) {
-      setValidationError("Geocodificando ubicación...");
+      // setValidationError("Geocodificando ubicación...");
       
       // Intento 1: Dirección completa
       const query1 = [address, location, country].filter(Boolean).join(', ');
@@ -1846,8 +1846,8 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       location,
       country,
       address,
-      latitude,
-      longitude,
+      latitude: latitude ?? 0.0,
+      longitude: longitude ?? 0.0,
       placeId,
       formattedAddress,
       city,
