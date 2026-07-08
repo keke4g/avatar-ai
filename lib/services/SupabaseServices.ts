@@ -244,6 +244,38 @@ export class SupabasePropertyService implements IPropertyService {
   }
 
   async create(property: Partial<Property> & { title: string; hostId: string }): Promise<Property> {
+    // Auditar campos obligatorios antes de insertar
+    const missingFields: string[] = [];
+    const notNullFields = ['hostId', 'title', 'description', 'location', 'country', 'latitude', 'longitude', 'type', 'valueRating'];
+    notNullFields.forEach(field => {
+      const val = property[field as keyof Property];
+      if (val == null || (typeof val === 'string' && !val.trim())) {
+        missingFields.push(field);
+      }
+    });
+
+    if (missingFields.length > 0) {
+      console.log('❌ Property cannot be inserted');
+      console.log('Missing fields:\n' + missingFields.map(f => `• ${f}`).join('\n'));
+      throw new Error(`[Property Audit Error] Missing fields: ${missingFields.join(', ')}`);
+    }
+
+    // Dump completo del payload
+    console.group("[Publish] Payload Final");
+    console.table({
+      hostId: property.hostId,
+      title: property.title,
+      description: property.description,
+      type: property.type,
+      location: property.location,
+      country: property.country,
+      latitude: property.latitude,
+      longitude: property.longitude,
+      valueRating: property.valueRating,
+    });
+    console.log(property);
+    console.groupEnd();
+
     const tStartVal = performance.now();
     const validation = PropertyValidator.validatePropertyBeforeInsert(property);
     const tEndVal = performance.now();
@@ -260,8 +292,11 @@ export class SupabasePropertyService implements IPropertyService {
     const filteredPayload = PropertyMapper.mapClientToPostgres(property);
     const tEndMap = performance.now();
     console.log(`[Property Validation] [Mapper] ✔ ${Math.round(tEndMap - tStartMap)} ms`);
+    console.log('[Publish] Payload mapeado para Supabase (filteredPayload):', filteredPayload);
+    console.log('[GeoTrace] [Fase F] Después del mapper (filteredPayload):', { latitude: filteredPayload.latitude, longitude: filteredPayload.longitude });
 
     const tStartInsert = performance.now();
+    console.log('[GeoTrace] [Fase G] Antes del INSERT en properties');
     // 1. Create property record
     const { data, error } = await supabase
       .from('properties')
@@ -271,8 +306,14 @@ export class SupabasePropertyService implements IPropertyService {
     const tEndInsert = performance.now();
 
     if (error) {
-      console.log(`[Property Validation] [Supabase Insert] ❌ Failed after ${Math.round(tEndInsert - tStartInsert)} ms: ${error.message}`);
-      throw new Error(`[SupabasePropertyService] Error creating property: ${error.message}`);
+      console.log(`[Property Validation] [Supabase Insert] ❌ Failed after ${Math.round(tEndInsert - tStartInsert)} ms:`, error);
+      console.error('[Publish] ❌ Error de Supabase al insertar propiedad:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+      throw error; // Lanzar el error completo para ser atrapado y mapeado en la UI
     } else {
       console.log(`[Property Validation] [Supabase Insert] ✔ ${Math.round(tEndInsert - tStartInsert)} ms`);
     }
@@ -343,9 +384,42 @@ export class SupabasePropertyService implements IPropertyService {
   }
 
   async update(id: string, property: Partial<Property>): Promise<Property> {
-    const tStartVal = performance.now();
     const current = await this.getById(id);
     const merged = current ? { ...current, ...property } : property;
+
+    // Auditar campos obligatorios en el objeto fusionado antes de actualizar
+    const missingFields: string[] = [];
+    const notNullFields = ['hostId', 'title', 'description', 'location', 'country', 'latitude', 'longitude', 'type', 'valueRating'];
+    notNullFields.forEach(field => {
+      const val = merged[field as keyof Property];
+      if (val == null || (typeof val === 'string' && !val.trim())) {
+        missingFields.push(field);
+      }
+    });
+
+    if (missingFields.length > 0) {
+      console.log('❌ Property cannot be updated');
+      console.log('Missing fields:\n' + missingFields.map(f => `• ${f}`).join('\n'));
+      throw new Error(`[Property Audit Error] Missing fields: ${missingFields.join(', ')}`);
+    }
+
+    // Dump completo del payload fusionado
+    console.group("[Publish] Payload Update Final (Merged)");
+    console.table({
+      hostId: merged.hostId,
+      title: merged.title,
+      description: merged.description,
+      type: merged.type,
+      location: merged.location,
+      country: merged.country,
+      latitude: merged.latitude,
+      longitude: merged.longitude,
+      valueRating: merged.valueRating,
+    });
+    console.log(merged);
+    console.groupEnd();
+
+    const tStartVal = performance.now();
     const validation = PropertyValidator.validatePropertyBeforeInsert(merged);
     const tEndVal = performance.now();
 
@@ -361,8 +435,11 @@ export class SupabasePropertyService implements IPropertyService {
     const filteredPayload = PropertyMapper.mapClientToPostgres(property);
     const tEndMap = performance.now();
     console.log(`[Property Validation] [Mapper] ✔ ${Math.round(tEndMap - tStartMap)} ms`);
+    console.log('[Publish] Payload de actualización mapeado para Supabase (filteredPayload):', filteredPayload);
+    console.log('[GeoTrace] [Fase F] Después del mapper (filteredPayload):', { latitude: filteredPayload.latitude, longitude: filteredPayload.longitude });
 
     const tStartUpdate = performance.now();
+    console.log('[GeoTrace] [Fase G] Antes del UPDATE en properties');
     const { data, error } = await supabase
       .from('properties')
       .update(filteredPayload)
@@ -372,8 +449,14 @@ export class SupabasePropertyService implements IPropertyService {
     const tEndUpdate = performance.now();
 
     if (error) {
-      console.log(`[Property Validation] [Supabase Update] ❌ Failed after ${Math.round(tEndUpdate - tStartUpdate)} ms: ${error.message}`);
-      throw new Error(`[SupabasePropertyService] Error updating property: ${error.message}`);
+      console.log(`[Property Validation] [Supabase Update] ❌ Failed after ${Math.round(tEndUpdate - tStartUpdate)} ms:`, error);
+      console.error('[Publish] ❌ Error de Supabase al actualizar propiedad:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+      throw error; // Lanzar el error completo para ser atrapado y mapeado en la UI
     } else {
       console.log(`[Property Validation] [Supabase Update] ✔ ${Math.round(tEndUpdate - tStartUpdate)} ms`);
     }

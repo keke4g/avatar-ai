@@ -710,9 +710,12 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Actions delegating to concrete services
   const addProperty = async (prop: Omit<Property, 'id' | 'hostId' | 'hostName' | 'hostAvatar' | 'hostVerified' | 'hostRating' | 'hostReviewsCount' | 'latitude' | 'longitude' | 'auraScore'> & { latitude?: number | null; longitude?: number | null }) => {
+    console.log('[Publish] SwapContext.addProperty recibido:', prop);
+    console.log('[GeoTrace] [Fase E] Recibido en SwapContext.addProperty:', { latitude: prop.latitude, longitude: prop.longitude });
+
     if (useSupabase && currentUser) {
       try {
-        const liveProp = await ServiceFactory.getPropertyService().create({
+        const payload = {
           ...prop,
           hostId: currentUser.id,
           hostName: currentUser.name,
@@ -722,7 +725,12 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
           auraScore: 95 + Math.floor(Math.random() * 5),
           latitude: prop.latitude !== undefined && prop.latitude !== null ? Number(prop.latitude) : null,
           longitude: prop.longitude !== undefined && prop.longitude !== null ? Number(prop.longitude) : null
-        });
+        };
+        console.log('[Publish] Enviando payload final al servicio de creación:', payload);
+
+        const liveProp = await ServiceFactory.getPropertyService().create(payload);
+        console.log('[Publish] SupabasePropertyService.create exitoso! Propiedad creada:', liveProp);
+
         setProperties(prev => [liveProp, ...prev]);
         setMyProperties(prev => [liveProp, ...prev]);
         return;
@@ -754,9 +762,11 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateProperty = async (id: string, updatedFields: Partial<Property>) => {
+    console.log('[Publish] SwapContext.updateProperty recibido para id:', id, updatedFields);
     if (useSupabase) {
       try {
         const liveProp = await ServiceFactory.getPropertyService().update(id, updatedFields);
+        console.log('[Publish] SupabasePropertyService.update exitoso! Propiedad actualizada:', liveProp);
         setProperties(prev => prev.map(p => p.id === id ? liveProp : p));
         setMyProperties(prev => prev.map(p => p.id === id ? liveProp : p));
         return;

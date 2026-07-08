@@ -9,6 +9,8 @@ import { Property, PropertyOffering, PropertyOfferingMode, PropertyOfferingStatu
 import { useTranslation } from '../lib/context/LanguageContext';
 import ImageUploadDropzone from './ImageUploadDropzone';
 import { PropertyValidator } from '../lib/services/PropertyValidator';
+import { useSwap } from '../lib/context/SwapContext';
+
 
 interface PropertyWizardModalProps {
   isOpen: boolean;
@@ -302,10 +304,15 @@ function CustomSelect<T extends string>({
 
 export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initialData, onDelete }: PropertyWizardModalProps) {
   const { t, language } = useTranslation();
+  const { currentUser } = useSwap();
   const [step, setStep] = useState<WizardStep>(0);
+
   const [localDeleteConfirm, setLocalDeleteConfirm] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [supabaseError, setSupabaseError] = useState<{ message: string; code?: string; details?: string; hint?: string } | null>(null);
+
 
   // Swap limits
   const [swapMinValue, setSwapMinValue] = useState<number | ''>('');
@@ -373,6 +380,9 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
   // On step change: scroll to top and reset "reviewed all" flag
   useEffect(() => {
     setHasReviewedAll(false);
+    if (step === 11) {
+      console.log('[GeoTrace] [Fase D] Entrando a Step 11. Coordenadas en estado:', { latitude, longitude });
+    }
     // Small delay so Framer Motion can swap content before we measure
     const id = setTimeout(() => {
       const el = scrollAreaRef.current;
@@ -1290,6 +1300,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       commercialStatus
     };
 
+    console.log('[GeoTrace] [Fase C] Guardando borrador en localStorage con coordenadas:', { latitude: draftData.latitude, longitude: draftData.longitude });
     localStorage.setItem('auraswap_draft_property', JSON.stringify(draftData));
   }, [
     isOpen,
@@ -1383,6 +1394,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       if (savedDraft) {
         try {
           const parsed = JSON.parse(savedDraft);
+          console.log('[GeoTrace] [Fase C] Borrador cargado desde localStorage con coordenadas:', { latitude: parsed.latitude, longitude: parsed.longitude });
           if (parsed.title || parsed.location) {
             // Auto restore draft
             if (parsed.publisherType) setPublisherType(parsed.publisherType);
@@ -1659,6 +1671,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       const query1 = [address, location, country].filter(Boolean).join(', ');
       if (query1.trim()) {
         const res1 = await geocodeManualAddress(query1);
+        console.log('[GeoTrace] [Fase A] Geocoder Intento 1 devuelto:', res1);
         if (res1) {
           currentLat = res1.lat;
           currentLng = res1.lng;
@@ -1673,6 +1686,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
         const query2 = [neighborhood, location, stateName, country].filter(Boolean).join(', ');
         if (query2.trim()) {
           const res2 = await geocodeManualAddress(query2);
+          console.log('[GeoTrace] [Fase A] Geocoder Intento 2 devuelto:', res2);
           if (res2) {
             currentLat = res2.lat;
             currentLng = res2.lng;
@@ -1684,6 +1698,10 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       }
       
       setValidationError(null);
+    }
+
+    if (step === 2) {
+      console.log('[GeoTrace] [Fase B] Salida de Step 2. Coordenadas:', { latitude: currentLat, longitude: currentLng, geometrySource });
     }
 
     // Compilar datos del paso actual para validación estructurada
@@ -1733,8 +1751,18 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     }
   };
 
-  const handlePublish = (e: React.FormEvent) => {
+  const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[Publish] Step 1: Iniciando proceso de publicación');
+    setValidationError(null);
+    setSupabaseError(null);
+    setFieldErrors({});
+
+    if (!currentUser && !initialData?.hostId) {
+      console.error('[Publish] ❌ No hay un usuario autenticado.');
+      setValidationError("No hay un usuario autenticado.");
+      return;
+    }
 
     // Map form selections back into normalized offerings
     const offerings: PropertyOffering[] = selectedModes.map(mode => {
@@ -1889,6 +1917,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       folderStatus: 'DRAFT' as any,
       metaTitle: metaTitle || (title ? `${title} | AuraSwap` : ''),
       metaDescription: metaDescription || shortDescription,
+      hostId: currentUser?.id || initialData?.hostId || '',
       metadata: {
         publisherType,
         videoPlaceholder,
@@ -1940,21 +1969,58 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       }
     };
 
+    console.log('[Publish] Step 2: Payload compilado recibido del wizard:', compiledPropertyData);
+    console.log('[GeoTrace] [Fase E] Antes del mapper (compiledPropertyData):', { latitude: compiledPropertyData.latitude, longitude: compiledPropertyData.longitude });
+
     // Validar por completo antes de enviar a Supabase
+    console.log('[Publish] Step 3: Ejecutando PropertyValidator');
     const validation = PropertyValidator.validatePropertyBeforeInsert(compiledPropertyData);
+    console.log('[Publish] Resultado validator:', validation.errors);
+
     if (!validation.success) {
+      console.warn('[Publish] ❌ Validación de negocio falló. Errores:', validation.errors);
       const errMap: Record<string, string> = {};
       validation.errors.forEach(err => {
         errMap[err.field] = err.message;
       });
       setFieldErrors(errMap);
-      setValidationError("No pudimos publicar tu propiedad. Revisa los errores marcados abajo.");
+      setValidationError("La propiedad aún no puede publicarse. Revisa los errores marcados abajo.");
       setTimeout(scrollToError, 80);
       return;
     }
 
-    localStorage.removeItem('auraswap_draft_property');
-    onSubmit(compiledPropertyData);
+    try {
+      setIsSubmitting(true);
+      console.log('[Publish] Step 4: Enviando payload a onSubmit (SwapContext)...');
+      await onSubmit(compiledPropertyData);
+      console.log('[Publish] Step 5: ¡Publicación exitosa!');
+      localStorage.removeItem('auraswap_draft_property');
+    } catch (err: any) {
+      console.error('[Publish] ❌ Error de red/Supabase durante la publicación:', err);
+      const msg = err.message || '';
+      let friendlyMessage = 'No fue posible guardar la propiedad debido a un error en el servidor.';
+      if (msg.includes('latitude') || msg.includes('longitude')) {
+        friendlyMessage = 'No se pudo obtener la ubicación del inmueble. Por favor, selecciona un punto en el mapa.';
+      } else if (msg.includes('host_id')) {
+        friendlyMessage = 'No se encontró el propietario.';
+      } else if (msg.includes('title')) {
+        friendlyMessage = 'El título es obligatorio.';
+      } else if (msg.includes('description')) {
+        friendlyMessage = 'La descripción es obligatoria.';
+      } else if (msg.includes('23505') || msg.includes('unique constraint')) {
+        friendlyMessage = 'Ya existe una propiedad registrada con el mismo código interno.';
+      }
+
+      setSupabaseError({
+        message: friendlyMessage,
+        code: err.code || 'UNKNOWN_ERROR',
+        details: err.details || err.message,
+        hint: err.hint
+      });
+      setValidationError(friendlyMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -3706,7 +3772,6 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                           {type}
                         </span>
                       </div>
-
                       <div className="grid grid-cols-2 gap-3 text-xs leading-normal">
                         <div>
                           <p className="text-brand-gray-400 font-bold">Ubicación</p>
@@ -3733,54 +3798,120 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                     {/* Pre-publication Checklist */}
                     <div className="flex flex-col gap-2 mt-2">
                       <span className="text-[10px] font-black text-brand-gray-500 uppercase tracking-wider">Checklist de Calidad del Anuncio</span>
-                      <div className="flex flex-col gap-2 p-3 bg-brand-gray-50 rounded-2xl border">
-                        {/* Checklist items */}
+                      <div className="flex flex-col gap-2.5 p-3.5 bg-brand-gray-50 rounded-2xl border">
+                        
+                        {/* Usuario autenticado */}
                         <div className="flex items-center justify-between text-xs font-semibold">
-                          <span className="text-brand-gray-600">Título y descripción básica</span>
-                          <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                          <span className="text-brand-gray-600">Usuario autenticado (hostId)</span>
+                          {currentUser || initialData?.hostId ? (
+                            <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                          ) : (
+                            <span className="text-rose-600 font-bold flex items-center gap-1">❌ Sin sesión activa</span>
+                          )}
                         </div>
+
+                        {/* Título */}
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-brand-gray-600">Título del anuncio</span>
+                          {title && title.trim().length >= 10 ? (
+                            <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                          ) : (
+                            <span className="text-rose-600 font-bold flex items-center gap-1">❌ Mín. 10 caracteres</span>
+                          )}
+                        </div>
+
+                        {/* Descripción */}
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-brand-gray-600">Descripción básica</span>
+                          {shortDescription && shortDescription.trim().length >= 30 ? (
+                            <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                          ) : (
+                            <span className="text-rose-600 font-bold flex items-center gap-1">❌ Mín. 30 caracteres</span>
+                          )}
+                        </div>
+
+                        {/* Ubicación georreferenciada */}
                         <div className="flex items-center justify-between text-xs font-semibold">
                           <span className="text-brand-gray-600">Ubicación georreferenciada</span>
-                          <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                          {latitude != null && longitude != null && !isNaN(Number(latitude)) && !isNaN(Number(longitude)) ? (
+                            <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                          ) : (
+                            <span className="text-rose-600 font-bold flex items-center gap-1">❌ Coordenadas ausentes (Paso 2)</span>
+                          )}
                         </div>
+
+                        {/* Canales de operación */}
                         <div className="flex items-center justify-between text-xs font-semibold">
-                          <span className="text-brand-gray-600">Canales de operación configurados</span>
-                          <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                          <span className="text-brand-gray-600">Canales de operación</span>
+                          {selectedModes.length > 0 ? (
+                            <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo ({selectedModes.join(', ')})</span>
+                          ) : (
+                            <span className="text-rose-600 font-bold flex items-center gap-1">❌ Selecciona al menos uno (Paso 3)</span>
+                          )}
                         </div>
+
+                        {/* Precios y condiciones */}
+                        {selectedModes.map(mode => {
+                          let isVal = false;
+                          let label = '';
+                          let errLabel = '';
+                          if (mode === 'SALE') {
+                            isVal = Number(salePrice) > 0;
+                            label = 'Precio de Venta';
+                            errLabel = 'Especifica precio > 0';
+                          } else if (mode === 'MONTHLY_RENT') {
+                            isVal = Number(monthlyPrice) > 0;
+                            label = 'Precio de Renta Mensual';
+                            errLabel = 'Especifica precio > 0';
+                          } else if (mode === 'SHORT_RENT') {
+                            isVal = Number(nightlyPrice) > 0;
+                            label = 'Precio de Renta Temporal';
+                            errLabel = 'Especifica precio > 0';
+                          } else if (mode === 'SWAP') {
+                            isVal = !!(swapPreferences && swapPreferences.trim());
+                            label = 'Preferencias de Intercambio';
+                            errLabel = 'Escribe tus preferencias';
+                          }
+
+                          return (
+                            <div key={mode} className="flex items-center justify-between text-xs font-semibold pl-3 border-l-2 border-brand-gray-200">
+                              <span className="text-brand-gray-500">{label}</span>
+                              {isVal ? (
+                                <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                              ) : (
+                                <span className="text-rose-600 font-bold flex items-center gap-1">❌ {errLabel}</span>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        {/* Imágenes */}
                         <div className="flex items-center justify-between text-xs font-semibold">
                           <span className="text-brand-gray-600">Imágenes cargadas ({images.length})</span>
-                          {images.length >= 5 ? (
-                            <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
+                          {images.length > 0 ? (
+                            <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo {images.length >= 5 ? '' : '(Recomendado 5+)'}</span>
                           ) : (
-                            <span className="text-amber-500 font-bold flex items-center gap-1">⚠ Recomendado subir 5+</span>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between text-xs font-semibold">
-                          <span className="text-brand-gray-600">Video recorrido</span>
-                          {videoPlaceholder ? (
-                            <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
-                          ) : (
-                            <span className="text-brand-gray-400 font-normal">Opcional (sin video)</span>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between text-xs font-semibold">
-                          <span className="text-brand-gray-600">Recorrido virtual 3D</span>
-                          {virtualTourPlaceholder ? (
-                            <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
-                          ) : (
-                            <span className="text-brand-gray-400 font-normal">Opcional (sin Matterport)</span>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between text-xs font-semibold">
-                          <span className="text-brand-gray-600">Amenidades ({selectedAmenities.length + customAmenities.length})</span>
-                          {selectedAmenities.length + customAmenities.length >= 5 ? (
-                            <span className="text-emerald-600 font-bold flex items-center gap-1">✓ Listo</span>
-                          ) : (
-                            <span className="text-amber-500 font-bold flex items-center gap-1">⚠ Recomendado seleccionar 5+</span>
+                            <span className="text-rose-600 font-bold flex items-center gap-1">❌ Sube al menos 1 imagen</span>
                           )}
                         </div>
                       </div>
                     </div>
+
+                    {/* Supabase / Server Error display */}
+                    {supabaseError && (
+                      <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-800 font-semibold flex flex-col gap-2">
+                        <div className="flex items-center gap-1.5 font-bold text-rose-900">
+                          <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 animate-pulse" />
+                          <span>Error en el servidor de base de datos</span>
+                        </div>
+                        <p className="leading-relaxed font-bold">{supabaseError.message}</p>
+                        <div className="bg-white/60 p-2.5 rounded-lg border text-[10px] leading-normal font-mono flex flex-col gap-1 mt-1 text-rose-950">
+                          <div><span className="font-bold">Código:</span> {supabaseError.code}</div>
+                          <div><span className="font-bold">Detalle:</span> {supabaseError.details}</div>
+                          {supabaseError.hint && <div><span className="font-bold">Ayuda:</span> {supabaseError.hint}</div>}
+                        </div>
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
