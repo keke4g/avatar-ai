@@ -99,6 +99,18 @@ export class PropertyMapper {
    * Convierte un objeto frontend camelCase a un objeto snake_case filtrado por la whitelist.
    */
   public static mapClientToPostgres(property: Partial<Property>): Record<string, any> {
+    // Map metadata nested values to database columns
+    if (property.metadata) {
+      if (property.metadata.videoUrl) {
+        property.video_url = property.metadata.videoUrl;
+      }
+      if (property.metadata.videoPlaceholder) {
+        property.youtube_url = property.metadata.videoPlaceholder;
+      }
+    }
+    if (property.videoUrl) property.video_url = property.videoUrl;
+    if (property.youtubeUrl) property.youtube_url = property.youtubeUrl;
+
     const rawPayload: Record<string, any> = {};
 
     const uuidColumns = [
@@ -146,9 +158,21 @@ export class PropertyMapper {
       : [];
 
     const hostProfile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+    const videoUrl = row.video_url || null;
+    const youtubeUrl = row.youtube_url || null;
+    const metadata = {
+      ...(row.metadata || {}),
+      videoUrl: videoUrl,
+      videoPlaceholder: youtubeUrl,
+    };
 
     return {
       ...property,
+      videoUrl,
+      youtubeUrl,
+      video_url: videoUrl,
+      youtube_url: youtubeUrl,
+      metadata,
       images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80'],
       hostName: hostProfile?.name || 'Verified Host',
       hostAvatar: hostProfile?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',

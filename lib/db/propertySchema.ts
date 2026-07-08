@@ -99,5 +99,7 @@ export const PROPERTY_COLUMNS = [
   'short_link',
   'updated_at',
   'is_demo',
-  'desired_exchange'
+  'desired_exchange',
+  'video_url',
+  'youtube_url'
 ];

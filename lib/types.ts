@@ -177,6 +177,10 @@ export interface Property {
   metadata?: Record<string, any>;
   isDemo?: boolean;
   is_demo?: boolean;
+  videoUrl?: string | null;
+  youtubeUrl?: string | null;
+  video_url?: string | null;
+  youtube_url?: string | null;
 
   // Development info
   developmentName?: string | null;

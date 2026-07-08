@@ -100,7 +100,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   const property = properties.find((p) => p.id === id);
 
   const mediaItems = useMemo(() => {
-    const items: { type: 'image' | 'video' | 'youtube'; url: string }[] = [];
+    const items: { type: 'image' | 'video'; url: string }[] = [];
     if (!property) return items;
 
     // Add images
@@ -110,15 +110,10 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
       });
     }
 
-    // Add local video if exists
-    if (property.metadata?.videoUrl) {
-      items.push({ type: 'video', url: property.metadata.videoUrl });
-    }
-
-    // Add YouTube video if exists
-    const ytUrl = property.metadata?.videoPlaceholder || '';
-    if (ytUrl && (ytUrl.includes('youtube.com') || ytUrl.includes('youtu.be'))) {
-      items.push({ type: 'youtube', url: ytUrl });
+    // Add local video if exists from video_url, videoUrl or metadata.videoUrl
+    const localVideoUrl = property.video_url || property.videoUrl || property.metadata?.videoUrl;
+    if (localVideoUrl) {
+      items.push({ type: 'video', url: localVideoUrl });
     }
 
     return items;
@@ -888,11 +883,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               <Play className="w-4 h-4 fill-white text-white" />
             </div>
           )}
-          {mediaItems[0]?.type === 'youtube' && (
-            <div className="absolute top-4 right-4 bg-brand-accent/90 text-white px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider z-10">
-              3D Tour
-            </div>
-          )}
         </div>
         
         {/* Right sub-images grid */}
@@ -922,11 +912,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 {item.type === 'video' && (
                   <div className="absolute top-2 right-2 bg-brand-black/60 text-white p-1.5 rounded-full z-10 flex items-center justify-center">
                     <Play className="w-3.5 h-3.5 fill-white text-white" />
-                  </div>
-                )}
-                {item.type === 'youtube' && (
-                  <div className="absolute top-2 right-2 bg-brand-accent/90 text-white px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wide z-10">
-                    3D Tour
                   </div>
                 )}
               </div>
@@ -1132,7 +1117,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           </div>
 
           {/* 7. Multimedia Avanzada (Pestañas) - Only show if video, tour, or blueprints exist */}
-          {!!(property.metadata?.videoPlaceholder || property.metadata?.videoUrl || property.metadata?.virtualTourPlaceholder || property.metadata?.blueprintsUrl) && (
+          {!!(property.video_url || property.metadata?.videoUrl || property.metadata?.virtualTourPlaceholder || property.metadata?.blueprintsUrl) && (
             <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
               <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
                 <Compass className="w-5 h-5 text-brand-accent" />
@@ -1148,7 +1133,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 >
                   🖼️ {language === 'es' ? 'Fotos' : 'Photos'} ({property.images.length})
                 </button>
-                {(property.metadata?.videoPlaceholder || property.metadata?.videoUrl) && (
+                {(property.video_url || property.metadata?.videoUrl) && (
                   <button
                     type="button"
                     onClick={() => setActiveMediaTab('video')}
@@ -1199,26 +1184,12 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
                 {activeMediaTab === 'video' && (
                   <div className="w-full h-full bg-brand-black flex items-center justify-center relative">
-                    {property.metadata?.videoUrl ? (
-                      <video 
-                        src={property.metadata.videoUrl} 
-                        className="w-full h-full object-contain animate-in fade-in duration-300" 
-                        controls 
-                        playsInline
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center gap-3 text-white text-center p-6">
-                        <div className="w-16 h-16 rounded-full bg-brand-accent/90 flex items-center justify-center text-white text-xl animate-pulse cursor-pointer shadow-md hover:scale-105 transition-transform">
-                          ▶
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-black">{language === 'es' ? 'Video Descriptivo y Tomas con Drone' : 'Walkthrough Video & Drone Footage'}</h4>
-                          <p className="text-[10px] text-brand-gray-400 font-semibold mt-1">
-                            {property.metadata?.videoPlaceholder || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                    <video 
+                      src={property.video_url || property.metadata?.videoUrl || ''} 
+                      className="w-full h-full object-contain animate-in fade-in duration-300" 
+                      controls 
+                      playsInline
+                    />
                   </div>
                 )}
 
@@ -2375,6 +2346,47 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           </div>
         </div>
       </div>
+
+      {/* 3.5. Dedicated YouTube Virtual Tour Section */}
+      {property.youtube_url && (
+        <div className="w-full bg-white border border-brand-gray-200/60 rounded-3xl p-6 md:p-8 shadow-floating mb-10 overflow-hidden flex flex-col gap-6">
+          <div>
+            <h3 className="text-base font-extrabold text-brand-black flex items-center gap-2 uppercase tracking-wider text-brand-accent">
+              <Play className="w-5 h-5 text-brand-accent" />
+              <span>{language === 'es' ? 'Recorrido Virtual / Video de YouTube' : 'Virtual Tour / YouTube Video'}</span>
+            </h3>
+            <p className="text-xs text-brand-gray-500 mt-1">
+              {language === 'es'
+                ? 'Visualiza los interiores y exteriores a través de este recorrido en video.'
+                : 'Explore the interiors and exteriors of this property via this walkthrough video.'}
+            </p>
+          </div>
+
+          <div className="relative rounded-2xl overflow-hidden aspect-video bg-brand-black border border-brand-gray-200/40 shadow-inner">
+            {(() => {
+              let videoId = '';
+              const ytUrl = property.youtube_url;
+              if (ytUrl.includes('youtube.com')) {
+                const parts = ytUrl.split('v=');
+                if (parts.length > 1) videoId = parts[1].split('&')[0];
+              } else if (ytUrl.includes('youtu.be')) {
+                const parts = ytUrl.split('/');
+                videoId = parts[parts.length - 1].split('?')[0];
+              }
+              const embedUrl = videoId ? `https://www.youtube.com/embed/${videoId}` : ytUrl;
+
+              return (
+                <iframe
+                  src={embedUrl}
+                  className="absolute inset-0 w-full h-full border-0"
+                  allowFullScreen
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                />
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* 4. Elegant Interactive Swap Request Modal Sheet */}
       <AnimatePresence>
