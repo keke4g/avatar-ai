@@ -76,6 +76,23 @@ export default function EternaConcierge() {
   const [showTooltip, setShowTooltip] = useState(true);
   const [typedInput, setTypedInput] = useState('');
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant'; content: string; route?: string; showAuthButtons?: boolean; showPublishButton?: boolean }[]>([]);
+  const [geminiActive, setGeminiActive] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('auraswap_gemini_active') !== 'false';
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    const handleEvent = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && typeof detail.active === 'boolean') {
+        setGeminiActive(detail.active);
+      }
+    };
+    window.addEventListener('auraswap:gemini-active-changed', handleEvent);
+    return () => window.removeEventListener('auraswap:gemini-active-changed', handleEvent);
+  }, []);
   
   const chatHistoryRef = useRef(chatHistory);
   useEffect(() => {
@@ -169,7 +186,7 @@ export default function EternaConcierge() {
     interruptVoice
   } = useEternaVoice({
     language,
-    isConnected,
+    isConnected: isConnected && !geminiActive,
     interrupt,
     wsStatus,
     isMuted,
@@ -381,7 +398,7 @@ export default function EternaConcierge() {
   }, [chatHistory, textResponse, simulatedText, isHome]);
 
   // Sync simulated status when WebSocket is active
-  const activeStatus = isConnected ? wsStatus : simulatedStatus;
+  const activeStatus = (isConnected && !geminiActive) ? wsStatus : simulatedStatus;
 
   const [conciergeMode, setConciergeMode] = useState<'avatar' | 'chat'>('avatar');
 
@@ -1903,7 +1920,11 @@ Explore actualizado: Redirecting to /explore`);
     setThinkingContext(fallbackContext);
     setSimulatedStatus('thinking');
 
-    if (isConnected) {
+    if (geminiActive) {
+      // Gemini Flash is the default brain: send message directly to Gemini native endpoint
+      console.log("[Eterna-Gemini] Brain switch is active. Sending directly to Gemini API.");
+      callGeminiAvatarAPI(prompt);
+    } else if (isConnected) {
       // Send to WebSocket server with Context Bridge and Secure User ID
       console.log("[Eterna Audit] handleSend: Routing to remote WebSocket backend.");
       sendMessage(prompt, [systemPrompt, ...chatHistory.map(h => ({
@@ -1912,7 +1933,7 @@ Explore actualizado: Redirecting to /explore`);
       }))], currentUser?.id);
     } else {
       // Gemini REST integration as intelligent fallback
-      console.log("[Eterna REST Integration] Routing to Gemini API endpoint `/api/avatar`.");
+      console.log("[Eterna REST Integration] Routing to Gemini API endpoint `/api/avatar` as fallback.");
       callGeminiAvatarAPI(prompt);
     }
   };
@@ -2577,7 +2598,7 @@ Explore actualizado: Redirecting to /explore`);
                         )}
 
                         {/* Real-time WebSockets chunk transcription */}
-                        {isConnected && textResponse && wsStatus === 'talking' && (
+                        {(isConnected && !geminiActive) && textResponse && wsStatus === 'talking' && (
                           <div className="flex justify-start animate-pulse">
                             <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[11px] leading-relaxed font-semibold rounded-tl-none shadow-sm ${
                               isHome
@@ -2593,7 +2614,7 @@ Explore actualizado: Redirecting to /explore`);
                         )}
 
                         {/* Real-time simulation text */}
-                        {!isConnected && simulatedText && simulatedStatus === 'talking' && (
+                        {(!isConnected || geminiActive) && simulatedText && simulatedStatus === 'talking' && (
                           <div className="flex justify-start">
                             <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[11px] leading-relaxed font-semibold rounded-tl-none shadow-sm ${
                               isHome

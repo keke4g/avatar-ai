@@ -35,7 +35,7 @@ export function useGeneralActions({
 }: GeneralActionsDeps) {
 
   const runIntelligentFallback = useCallback((prompt: string) => {
-    console.log("[Eterna Audit] runIntelligentFallback: Started.");
+    console.log("[Eterna-Gemini] Ejecutando fallback sin conexión (offline mode) para prompt:", prompt);
     setThinkingContext('general');
     setSimulatedStatus('thinking');
     setSimulatedText(language === 'es' ? 'Pensando...' : 'Thinking...');
@@ -187,6 +187,7 @@ export function useGeneralActions({
   }, [language, currentUser, messages, reviews, intentContext, setThinkingContext, setSimulatedStatus, setSimulatedText, setChatHistory, speak]);
 
   const callGeminiAvatarAPI = useCallback(async (prompt: string) => {
+    console.log("[Eterna-Gemini] Iniciando consulta a Gemini API con prompt:", prompt);
     // 1. Cancelar petición Gemini previa si está en curso
     if (geminiAbortControllerRef.current) {
       geminiAbortControllerRef.current.abort();
@@ -249,7 +250,7 @@ export function useGeneralActions({
       }
 
       // Inserción nativa en el historial visual
-      console.log("[Eterna Voice Console] Gemini API assistant response:", data.reply);
+      console.log("[Eterna-Gemini] Respuesta recibida de la API de Gemini:", data.reply);
       setChatHistory(prev => [...prev, { role: 'assistant', content: data.reply }]);
 
       // Limpiar texto provisional para evitar burbuja duplicada en la UI
@@ -270,17 +271,17 @@ export function useGeneralActions({
 
       if (err.name === 'AbortError') {
         if (didTimeout) {
-          console.warn("[Eterna REST Integration] Gemini timeout (25s)");
+          console.warn("[Eterna-Gemini] Tiempo de espera agotado (25s) para prompt:", prompt);
           const errorMsg = language === 'es'
             ? "Ocurrió un error al comunicarse con Eterna: Tiempo de espera agotado"
             : "An error occurred while communicating with Eterna: Timeout";
           setChatHistory(prev => [...prev, { role: 'assistant', content: errorMsg }]);
           runIntelligentFallback(prompt);
         } else {
-          console.log("[Eterna REST Integration] Petición Gemini abortada (nueva petición).");
+          console.log("[Eterna-Gemini] Petición Gemini abortada (nueva petición).");
         }
       } else {
-        console.error("[Eterna REST Integration] Error al consultar Gemini REST API:", error);
+        console.error("[Eterna-Gemini] Error al consultar Gemini REST API:", error);
         const errorMsg = language === 'es'
           ? `Ocurrió un error al comunicarse con Eterna: ${err.message || 'Error de conexión'}`
           : `An error occurred while communicating with Eterna: ${err.message || 'Connection error'}`;

@@ -65,6 +65,20 @@ export default function AdminPage() {
   const [verificationFee, setVerificationFee] = useState(29);
   const [commissionRate, setCommissionRate] = useState(1.5);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
+  const [geminiActive, setGeminiActive] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('auraswap_gemini_active') !== 'false';
+    }
+    return true;
+  });
+
+  const toggleGemini = () => {
+    const newVal = !geminiActive;
+    setGeminiActive(newVal);
+    localStorage.setItem('auraswap_gemini_active', String(newVal));
+    window.dispatchEvent(new CustomEvent('auraswap:gemini-active-changed', { detail: { active: newVal } }));
+  };
+
 
   // Property Form Drawer States
   const [propertyDrawerOpen, setPropertyDrawerOpen] = useState(false);
@@ -1717,6 +1731,30 @@ export default function AdminPage() {
                     </div>
                     <span className="text-[10px] text-brand-gray-400 leading-normal mt-0.5">
                       {t('admin.settingsCommDesc')}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-2 pt-4 border-t border-brand-gray-100 mt-2">
+                    <label className="text-xs font-black text-brand-black flex items-center justify-between">
+                      <span>Modo Cerebro Gemini</span>
+                      <button
+                        type="button"
+                        onClick={toggleGemini}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 ${
+                          geminiActive ? 'bg-brand-accent' : 'bg-brand-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            geminiActive ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </label>
+                    <span className="text-[10px] text-brand-gray-400 leading-normal">
+                      {geminiActive 
+                        ? "Conectada a Gemini: Eterna procesará cada mensaje directamente con Gemini Flash." 
+                        : "Desconectada: Eterna usará la API del servidor local o el motor viejo."}
                     </span>
                   </div>
 
