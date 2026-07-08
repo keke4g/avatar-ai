@@ -1,4 +1,5 @@
 import { Property } from '../../types';
+import { formatCount } from '../../textHelpers';
 
 export interface EternaProperty extends Property {
   price?: number;
@@ -15,8 +16,8 @@ export const generatePropertySummary = (property: EternaProperty, lang: 'es' | '
 
   if (lang === 'es') {
     const gravamenText = isDebtFree ? 'libre de gravamen' : 'con gravamen activo';
-    const bedText = bedrooms === 1 ? '1 habitación' : `${bedrooms} habitaciones`;
-    const bathText = bathrooms === 1 ? '1 baño' : `${bathrooms} baños`;
+    const bedText = formatCount(bedrooms, 'habitación', 'habitaciones', 'feminine', true);
+    const bathText = formatCount(bathrooms, 'baño', 'baños', 'masculine', true);
     
     return `Estamos en "${t}", ubicada en ${loc} (${c}). Esta exclusiva propiedad cuenta con ${bedText}, ${bathText} y se encuentra ${gravamenText}. ¿Deseas que te explique los detalles de sus características, expediente jurídico o modalidades de adquisición?`;
   } else {
@@ -83,7 +84,7 @@ export const resolveLocalPropertyQA = (prompt: string, property: EternaProperty,
   if (clean.includes('baño') || clean.includes('banos') || clean.includes('bathroom') || clean.includes('restroom')) {
     const baths = property.bathrooms || 1;
     if (lang === 'es') {
-      return `La propiedad dispone de ${baths} ${baths === 1 ? 'baño completo' : 'baños completos'}.`;
+      return `La propiedad dispone de ${formatCount(baths, 'baño completo', 'baños completos', 'masculine', true)}.`;
     } else {
       return `The property features ${baths} ${baths === 1 ? 'bathroom' : 'bathrooms'}.`;
     }
@@ -93,7 +94,7 @@ export const resolveLocalPropertyQA = (prompt: string, property: EternaProperty,
   if (clean.includes('habitacion') || clean.includes('cuarto') || clean.includes('recamara') || clean.includes('dormitorio') || clean.includes('bedroom') || clean.includes('room')) {
     const beds = property.bedrooms || 1;
     if (lang === 'es') {
-      return `Cuenta con ${beds} ${beds === 1 ? 'dormitorio registrado' : 'dormitorios registrados'}.`;
+      return `Cuenta con ${formatCount(beds, 'dormitorio registrado', 'dormitorios registrados', 'masculine', true)}.`;
     } else {
       return `It features ${beds} registered ${beds === 1 ? 'bedroom' : 'bedrooms'}.`;
     }

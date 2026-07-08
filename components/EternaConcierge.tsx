@@ -9,6 +9,7 @@ import { VideoAvatar } from './VideoAvatar';
 import { useSwap } from '../lib/context/SwapContext';
 import { useLiveContext } from '../lib/context/LiveContext';
 import { GUIDED_FLOWS } from '../lib/concierge/guidedFlows';
+import { formatCount, formatSentencePart } from '../lib/textHelpers';
 import { 
   Sparkles, X, Send, Mic, MicOff, 
   HelpCircle, Volume2, VolumeX, Minimize2,
@@ -1085,11 +1086,11 @@ Do not invent any other routes. If the user asks you to go to a section, politel
           }
           
           const bedsLabel = language === 'es' 
-            ? `${legacyProp.bedrooms} recámara${legacyProp.bedrooms !== 1 ? 's' : ''}`
+            ? formatCount(legacyProp.bedrooms || 0, 'recámara', 'recámaras', 'feminine', true)
             : `${legacyProp.bedrooms} bedroom${legacyProp.bedrooms !== 1 ? 's' : ''}`;
             
           const bathsLabel = language === 'es'
-            ? `${legacyProp.bathrooms} baño${legacyProp.bathrooms !== 1 ? 's' : ''}`
+            ? formatCount(legacyProp.bathrooms || 0, 'baño', 'baños', 'masculine', true)
             : `${legacyProp.bathrooms} bathroom${legacyProp.bathrooms !== 1 ? 's' : ''}`;
             
           card += `🛏️ ${bedsLabel}\n\n`;
@@ -1098,7 +1099,7 @@ Do not invent any other routes. If the user asks you to go to a section, politel
           const parkingCount = legacyProp.parking ?? 0;
           if (parkingCount > 0) {
             const parkLabel = language === 'es'
-              ? `${parkingCount} estacionamiento${parkingCount !== 1 ? 's' : ''}`
+              ? formatCount(parkingCount, 'estacionamiento', 'estacionamientos', 'masculine', true)
               : `${parkingCount} parking space${parkingCount !== 1 ? 's' : ''}`;
             card += `🚗 ${parkLabel}\n\n`;
           }
@@ -1465,10 +1466,21 @@ Explore actualizado: Redirecting to /explore`);
         })) || []
       };
 
+      const countItems = [
+        { count: activeProperty.bedrooms || 0, singular: 'habitación', plural: 'habitaciones', gender: 'feminine' as const },
+        { count: activeProperty.bathrooms || 0, singular: 'baño', plural: 'baños', gender: 'masculine' as const },
+        (activeProperty.parkingSpaces !== undefined && activeProperty.parkingSpaces !== null) 
+          ? { count: activeProperty.parkingSpaces, singular: 'estacionamiento', plural: 'estacionamientos', gender: 'masculine' as const } 
+          : null
+      ].filter(Boolean) as any[];
+
+      const resumenCaracteristicas = `Esta propiedad cuenta con ${formatSentencePart(countItems, true)}.`;
+
       activePropertyDossier = JSON.stringify({
         id: activeProperty.id,
         titulo: activePropertyTitle,
         descripcion: activePropertyDescription,
+        resumenCaracteristicas,
         amenidades: activeProperty.amenities || [],
         expedienteJuridico: legalStatus,
         modalidadesYMetodosPago: paymentMethods

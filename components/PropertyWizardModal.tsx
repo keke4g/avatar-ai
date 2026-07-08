@@ -11,6 +11,7 @@ import ImageUploadDropzone from './ImageUploadDropzone';
 import VideoUploadDropzone from './VideoUploadDropzone';
 import { PropertyValidator } from '../lib/services/PropertyValidator';
 import { useSwap } from '../lib/context/SwapContext';
+import { formatCount } from '../lib/textHelpers';
 
 
 interface PropertyWizardModalProps {
@@ -2213,13 +2214,13 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                     </p>
 
                     <div className="flex items-center flex-wrap gap-2 text-[10px] text-brand-gray-500 font-bold mt-2 bg-brand-gray-150/40 p-2 rounded-lg">
-                      <span>{bedrooms} Rec</span>
+                      <span>{formatCount(bedrooms || 0, 'recámara', 'recámaras', 'feminine')}</span>
                       <span>•</span>
-                      <span>{bathrooms + halfBathrooms * 0.5} Baños</span>
+                      <span>{formatCount(bathrooms + halfBathrooms * 0.5, 'baño', 'baños', 'masculine')}</span>
                       {parkingSpaces > 0 && (
                         <>
                           <span>•</span>
-                          <span>{parkingSpaces} Est</span>
+                          <span>{formatCount(parkingSpaces, 'estacionamiento', 'estacionamientos', 'masculine')}</span>
                         </>
                       )}
                       {surfaceTotal && (
@@ -3851,7 +3852,9 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                         </div>
                         <div>
                           <p className="text-brand-gray-400 font-bold">Habitabilidad</p>
-                          <p className="font-semibold text-brand-black">{bedrooms} Rec • {bathrooms} Baños • {parkingSpaces} Est</p>
+                          <p className="font-semibold text-brand-black">
+                            {formatCount(bedrooms || 0, 'recámara', 'recámaras', 'feminine')} • {formatCount(bathrooms || 0, 'baño', 'baños', 'masculine')} • {formatCount(parkingSpaces || 0, 'estacionamiento', 'estacionamientos', 'masculine')}
+                          </p>
                         </div>
                       </div>
 

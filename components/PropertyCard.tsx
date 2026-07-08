@@ -8,6 +8,7 @@ import { Heart, ChevronLeft, ChevronRight, Star, ShieldCheck } from 'lucide-reac
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '../lib/context/LanguageContext';
 import { getActiveOfferings } from '../lib/propertyOfferings';
+import { formatCount, formatBathrooms } from '../lib/textHelpers';
 
 interface PropertyCardProps {
   property: Property;
@@ -251,9 +252,9 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
 
           {/* Key Specs Row */}
           <div className="flex items-center gap-2 text-xs text-brand-gray-500 font-medium mt-0.5 font-semibold">
-            <span>{t('details.bedroomCount', { count: property.bedrooms })}</span>
+            <span>{language === 'es' ? formatCount(property.bedrooms || 0, 'habitación', 'habitaciones', 'feminine') : `${property.bedrooms || 0} bedroom${property.bedrooms !== 1 ? 's' : ''}`}</span>
             <span>•</span>
-            <span>{t('details.bathroomCount', { count: property.bathrooms })}</span>
+            <span>{formatBathrooms(property.bathrooms || 0, property.halfBathrooms || 0, language === 'es' ? 'es' : 'en')}</span>
             {!showOfferingBadges && (
               <>
                 <span>•</span>

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSwap } from '../../lib/context/SwapContext';
 import { useTranslation } from '../../lib/context/LanguageContext';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { formatCount, formatBathrooms } from '../../lib/textHelpers';
 import PropertyCard from '../../components/PropertyCard';
 import ImageUploadDropzone from '../../components/ImageUploadDropzone';
 import { 
@@ -628,9 +629,9 @@ function DashboardPageContent() {
                       {myProp.title}
                     </p>
                     <div className="flex items-center gap-2 text-[10px] text-brand-gray-500 font-semibold mt-1">
-                      <span>{t('details.bedroomCount', { count: myProp.bedrooms })}</span>
+                      <span>{language === 'es' ? formatCount(myProp.bedrooms || 0, 'habitación', 'habitaciones', 'feminine') : `${myProp.bedrooms || 0} bedroom${myProp.bedrooms !== 1 ? 's' : ''}`}</span>
                       <span>•</span>
-                      <span>{t('details.bathroomCount', { count: myProp.bathrooms })}</span>
+                      <span>{formatBathrooms(myProp.bathrooms || 0, myProp.halfBathrooms || 0, language === 'es' ? 'es' : 'en')}</span>
                       <span>•</span>
                       <span className="text-brand-accent font-bold">
                         {language === 'es'

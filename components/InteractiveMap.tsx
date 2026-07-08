@@ -6,6 +6,7 @@ import { Star, ShieldCheck, Compass, Info } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslation } from '../lib/context/LanguageContext';
 import { hasValidCoordinates } from '../lib/searchFilters';
+import { formatCount, formatBathrooms } from '../lib/textHelpers';
 
 interface InteractiveMapProps {
   properties: Property[];
@@ -309,7 +310,7 @@ export default function InteractiveMap({
 
               <div className="flex items-center justify-between gap-4">
                 <span className="text-[10px] text-brand-gray-500 font-bold uppercase tracking-wider">
-                  {t('details.bedroomCount', { count: selectedProperty.bedrooms })} • {
+                   {language === 'es' ? formatCount(selectedProperty.bedrooms || 0, 'habitación', 'habitaciones', 'feminine') : `${selectedProperty.bedrooms || 0} bedroom${selectedProperty.bedrooms !== 1 ? 's' : ''}`} • {
                     language === 'es' 
                       ? `Swap ${t(`valueRatings.${selectedProperty.valueRating}`).startsWith('valueRatings.') ? selectedProperty.valueRating : t(`valueRatings.${selectedProperty.valueRating}`)}` 
                       : `${selectedProperty.valueRating} Swap`

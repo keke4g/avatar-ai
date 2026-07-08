@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { formatCount, formatBathrooms } from '../../../lib/textHelpers';
 import { useSwap } from '../../../lib/context/SwapContext';
 import { useTranslation } from '../../../lib/context/LanguageContext';
 import { useRouter } from 'next/navigation';
@@ -8,7 +9,8 @@ import {
   Star, ShieldCheck, Heart, Share, Calendar, MapPin, Sparkles, AlertCircle,
   BedDouble, Bath, Users, ArrowRight, ChevronLeft, ChevronRight,
   Wifi, Waves, Coffee, Monitor, Wind, Key, Flame, Compass, MessageSquareCode,
-  ZoomIn, ZoomOut, Maximize, Download, ExternalLink, Play, FileText, Info, ShieldAlert, Award, TrendingUp, BarChart2, FileCheck, RefreshCw
+  ZoomIn, ZoomOut, Maximize, Download, ExternalLink, Play, FileText, Info, ShieldAlert, Award, TrendingUp, BarChart2, FileCheck, RefreshCw,
+  Car, Building, Home
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -90,14 +92,76 @@ const OFFERING_BADGE_META: Record<PropertyOfferingMode, { label: string; classNa
   },
 };
 
+interface SpecFieldConfig {
+  key: keyof Property;
+  labelEs: string;
+  labelEn: string;
+  format?: (value: any, lang: 'es' | 'en') => string;
+}
+
+const SPEC_FIELDS: SpecFieldConfig[] = [
+  { key: 'developmentName', labelEs: 'Desarrollo', labelEn: 'Development' },
+  { key: 'subdivisionName', labelEs: 'Fraccionamiento', labelEn: 'Subdivision' },
+  { key: 'privateNeighborhood', labelEs: 'Privada', labelEn: 'Gated Community', format: (v, lang) => typeof v === 'boolean' ? (v ? (lang === 'es' ? 'Sí' : 'Yes') : (lang === 'es' ? 'No' : 'No')) : String(v) },
+  { key: 'phaseStage', labelEs: 'Etapa/Fase', labelEn: 'Phase/Stage' },
+  { key: 'lotNumber', labelEs: 'Número de lote', labelEn: 'Lot Number' },
+  { key: 'blockNumber', labelEs: 'Manzana', labelEn: 'Block' },
+  { key: 'condominiumRegime', labelEs: 'Régimen de condominio', labelEn: 'Condominium Regime', format: (v, lang) => v ? (lang === 'es' ? 'Sí' : 'Yes') : (lang === 'es' ? 'No' : 'No') },
+  { key: 'maintenanceFeeAmount', labelEs: 'Mantenimiento mensual', labelEn: 'Monthly Maintenance', format: (v) => `$${v} USD` },
+  { key: 'neighborhood', labelEs: 'Colonia / Barrio', labelEn: 'Neighborhood' },
+  { key: 'postalCode', labelEs: 'Código Postal', labelEn: 'Postal Code' },
+  { key: 'streetName', labelEs: 'Calle', labelEn: 'Street' },
+  { key: 'streetNumber', labelEs: 'Número exterior', labelEn: 'Street Number' },
+  { key: 'locationReference', labelEs: 'Referencia de ubicación', labelEn: 'Location Reference' },
+  { key: 'levelsCount', labelEs: 'Niveles', labelEn: 'Levels' },
+  { key: 'constructionAge', labelEs: 'Antigüedad', labelEn: 'Age', format: (v, lang) => v === 0 ? (lang === 'es' ? 'Nueva' : 'Brand New') : `${v} ${lang === 'es' ? 'años' : 'years'}` },
+  { key: 'conservationStateId', labelEs: 'Estado de conservación', labelEn: 'Conservation State' },
+  { key: 'constructionTypeId', labelEs: 'Tipo de construcción', labelEn: 'Construction Type' },
+  { key: 'surfaceTotal', labelEs: 'Superficie de terreno', labelEn: 'Total Land Area', format: (v) => `${v} m²` },
+  { key: 'surfaceBuilt', labelEs: 'Superficie de construcción', labelEn: 'Built Area', format: (v) => `${v} m²` },
+  { key: 'surfaceFront', labelEs: 'Frente', labelEn: 'Frontage', format: (v) => `${v} m` },
+  { key: 'surfaceDepth', labelEs: 'Fondo', labelEn: 'Depth', format: (v) => `${v} m` },
+  { key: 'surfaceGarden', labelEs: 'Superficie de jardín', labelEn: 'Garden Area', format: (v) => `${v} m²` },
+  { key: 'surfaceTerrace', labelEs: 'Superficie de terraza', labelEn: 'Terrace Area', format: (v) => `${v} m²` },
+  { key: 'surfaceRoofGarden', labelEs: 'Superficie de Roof Garden', labelEn: 'Roof Garden Area', format: (v) => `${v} m²` },
+  { key: 'surfacePatio', labelEs: 'Superficie de patio', labelEn: 'Patio Area', format: (v) => `${v} m²` },
+  { key: 'viewTypeId', labelEs: 'Vista', labelEn: 'View' },
+  { key: 'orientationId', labelEs: 'Orientación', labelEn: 'Orientation' },
+  { key: 'internalCode', labelEs: 'Clave Interna', labelEn: 'Internal Code' }
+];
+
+const SERVICES_FIELDS: SpecFieldConfig[] = [
+  { key: 'servicesWater', labelEs: 'Agua potable', labelEn: 'Drinking Water', format: (v, lang) => v ? (lang === 'es' ? 'Disponible/Activo' : 'Available/Active') : '' },
+  { key: 'servicesElectricity', labelEs: 'Electricidad', labelEn: 'Electricity', format: (v, lang) => v ? (lang === 'es' ? 'Disponible/Activo' : 'Available/Active') : '' },
+  { key: 'servicesSewerage', labelEs: 'Drenaje / Alcantarillado', labelEn: 'Sewerage', format: (v, lang) => v ? (lang === 'es' ? 'Disponible/Activo' : 'Available/Active') : '' },
+  { key: 'servicesNatGas', labelEs: 'Gas Natural', labelEn: 'Natural Gas', format: (v, lang) => v ? (lang === 'es' ? 'Disponible/Activo' : 'Available/Active') : '' },
+  { key: 'servicesLpGas', labelEs: 'Gas LP', labelEn: 'LP Gas', format: (v, lang) => v ? (lang === 'es' ? 'Disponible/Activo' : 'Available/Active') : '' },
+  { key: 'servicesInternet', labelEs: 'Conexión a Internet', labelEn: 'Internet Access' },
+  { key: 'servicesGarbage', labelEs: 'Recolección de basura', labelEn: 'Garbage Collection', format: (v, lang) => v ? (lang === 'es' ? 'Disponible/Activa' : 'Available/Active') : '' }
+];
+
+const SECURITY_FIELDS: SpecFieldConfig[] = [
+  { key: 'securityCctv', labelEs: 'Sistema de CCTV / Cámaras', labelEn: 'CCTV Camera System', format: (v, lang) => v ? (lang === 'es' ? 'Instalado/Activo' : 'Installed/Active') : '' },
+  { key: 'securityGuardhouse', labelEs: 'Caseta de vigilancia', labelEn: 'Security Guardhouse', format: (v, lang) => v ? (lang === 'es' ? 'Disponible' : 'Available') : '' },
+  { key: 'security24_7', labelEs: 'Seguridad 24/7', labelEn: '24/7 Security Service', format: (v, lang) => v ? (lang === 'es' ? 'Activa' : 'Active') : '' },
+  { key: 'securityBiometric', labelEs: 'Acceso biométrico / digital', labelEn: 'Biometric/Digital Access', format: (v, lang) => v ? (lang === 'es' ? 'Instalado' : 'Installed') : '' }
+];
+
 export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps) {
   const router = useRouter();
   const { properties, myProperties, requestSwap, favorites, toggleFavorite, currentUser, swaps, reviews, users, createLead } = useSwap();
   const { t, language } = useTranslation();
   const { setActiveProperty, clearActiveProperty } = useLiveContext();
 
-  // Find property dynamically
   const property = properties.find((p) => p.id === id);
+
+  const allAmenities = useMemo(() => {
+    if (!property) return [];
+    return [
+      ...(property.amenities || []),
+      ...(property.metadata?.customAmenities || [])
+    ];
+  }, [property]);
 
   const mediaItems = useMemo(() => {
     const items: { type: 'image' | 'video'; url: string }[] = [];
@@ -959,30 +1023,111 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           })()}
 
           {/* Core specs highlights */}
-          <div className="grid grid-cols-3 gap-4 border-b border-brand-gray-200/80 pb-6">
-            <div className="flex flex-col gap-1 items-start">
-              <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
-                <Users className="w-4 h-4 text-brand-gray-500" />
-                <span>{t('details.guests')}</span>
+          <div className="flex flex-wrap gap-x-8 gap-y-4 border-b border-brand-gray-200/80 pb-6">
+            {/* Guests: Hide for SALE */}
+            {selectedMode !== 'SALE' && property.maxGuests !== undefined && property.maxGuests !== null && property.maxGuests > 0 && (
+              <div className="flex flex-col gap-1 items-start min-w-[100px]">
+                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
+                  <Users className="w-4 h-4 text-brand-gray-500" />
+                  <span>{t('details.guests')}</span>
+                </div>
+                <span className="text-xs text-brand-gray-500">
+                  {language === 'es' ? `Capacidad para ${formatCount(property.maxGuests, 'persona', 'personas', 'feminine')}` : `${property.maxGuests} guest${property.maxGuests !== 1 ? 's' : ''}`}
+                </span>
               </div>
-              <span className="text-xs text-brand-gray-500">{t('details.maxGuests', { count: property.maxGuests })}</span>
-            </div>
+            )}
 
-            <div className="flex flex-col gap-1 items-start">
-              <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
-                <BedDouble className="w-4 h-4 text-brand-gray-500" />
-                <span>{t('details.bedrooms')}</span>
+            {/* Bedrooms (Always show if > 0) */}
+            {property.bedrooms !== undefined && property.bedrooms !== null && property.bedrooms > 0 && (
+              <div className="flex flex-col gap-1 items-start min-w-[100px]">
+                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
+                  <BedDouble className="w-4 h-4 text-brand-gray-500" />
+                  <span>{language === 'es' ? 'Habitaciones' : 'Bedrooms'}</span>
+                </div>
+                <span className="text-xs text-brand-gray-500">
+                  {language === 'es' ? formatCount(property.bedrooms, 'habitación', 'habitaciones', 'feminine') : `${property.bedrooms} bedroom${property.bedrooms !== 1 ? 's' : ''}`}
+                </span>
               </div>
-              <span className="text-xs text-brand-gray-500">{t('details.bedroomCount', { count: property.bedrooms })}</span>
-            </div>
+            )}
 
-            <div className="flex flex-col gap-1 items-start">
-              <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
-                <Bath className="w-4 h-4 text-brand-gray-500" />
-                <span>{t('details.bathrooms')}</span>
+            {/* Bathrooms / Half Bathrooms (Always show if full > 0 or half > 0) */}
+            {((property.bathrooms !== undefined && property.bathrooms !== null && property.bathrooms > 0) || 
+              (property.halfBathrooms !== undefined && property.halfBathrooms !== null && property.halfBathrooms > 0)) && (
+              <div className="flex flex-col gap-1 items-start min-w-[100px]">
+                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
+                  <Bath className="w-4 h-4 text-brand-gray-500" />
+                  <span>{t('details.bathrooms')}</span>
+                </div>
+                <span className="text-xs text-brand-gray-500">
+                  {formatBathrooms(property.bathrooms || 0, property.halfBathrooms || 0, language === 'es' ? 'es' : 'en')}
+                </span>
               </div>
-              <span className="text-xs text-brand-gray-500">{t('details.bathroomCount', { count: property.bathrooms })}</span>
-            </div>
+            )}
+
+            {/* Estacionamientos (Always show if > 0) */}
+            {property.parkingSpaces !== undefined && property.parkingSpaces !== null && property.parkingSpaces > 0 && (
+              <div className="flex flex-col gap-1 items-start min-w-[100px]">
+                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
+                  <Car className="w-4 h-4 text-brand-gray-500" />
+                  <span>{language === 'es' ? 'Estacionamiento' : 'Parking'}</span>
+                </div>
+                <span className="text-xs text-brand-gray-500">
+                  {language === 'es' ? formatCount(property.parkingSpaces, 'cajón', 'cajones', 'masculine') : `${property.parkingSpaces} space${property.parkingSpaces !== 1 ? 's' : ''}`}
+                </span>
+              </div>
+            )}
+
+            {/* levelsCount (Show for SALE if > 0) */}
+            {selectedMode === 'SALE' && property.levelsCount !== undefined && property.levelsCount !== null && property.levelsCount > 0 && (
+              <div className="flex flex-col gap-1 items-start min-w-[100px]">
+                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
+                  <Building className="w-4 h-4 text-brand-gray-500" />
+                  <span>{language === 'es' ? 'Niveles' : 'Levels'}</span>
+                </div>
+                <span className="text-xs text-brand-gray-500">
+                  {language === 'es' ? formatCount(property.levelsCount, 'nivel', 'niveles', 'masculine') : `${property.levelsCount} level${property.levelsCount !== 1 ? 's' : ''}`}
+                </span>
+              </div>
+            )}
+
+            {/* Construction Area (Show for SALE if > 0) */}
+            {selectedMode === 'SALE' && property.surfaceBuilt !== undefined && property.surfaceBuilt !== null && property.surfaceBuilt > 0 && (
+              <div className="flex flex-col gap-1 items-start min-w-[100px]">
+                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
+                  <Building className="w-4 h-4 text-brand-gray-500" />
+                  <span>{language === 'es' ? 'Construcción' : 'Built Area'}</span>
+                </div>
+                <span className="text-xs text-brand-gray-500">
+                  {property.surfaceBuilt} m²
+                </span>
+              </div>
+            )}
+
+            {/* Land Area (Show for SALE if > 0) */}
+            {selectedMode === 'SALE' && property.surfaceTotal !== undefined && property.surfaceTotal !== null && property.surfaceTotal > 0 && (
+              <div className="flex flex-col gap-1 items-start min-w-[100px]">
+                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
+                  <Home className="w-4 h-4 text-brand-gray-500" />
+                  <span>{language === 'es' ? 'Terreno' : 'Lot Size'}</span>
+                </div>
+                <span className="text-xs text-brand-gray-500">
+                  {property.surfaceTotal} m²
+                </span>
+              </div>
+            )}
+
+            {/* Swap Specifics (Show for SWAP if present) */}
+            {selectedMode === 'SWAP' && property.valueRating && (
+              <div className="flex flex-col gap-1 items-start min-w-[100px]">
+                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
+                  <RefreshCw className="w-4 h-4 text-brand-gray-500" />
+                  <span>{language === 'es' ? 'Categoría' : 'Swap Tier'}</span>
+                </div>
+                <span className="text-xs text-brand-gray-500 text-brand-accent font-bold">
+                  {property.valueRating} Swap
+                </span>
+              </div>
+            )}
           </div>
 
           {/* 1. Descripción */}
@@ -1043,11 +1188,11 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
 
           {/* 5. Amenidades */}
-          {property.amenities && property.amenities.length > 0 && (
+          {allAmenities.length > 0 && (
             <div className="border-b border-brand-gray-200/80 pb-6">
               <h3 className="text-base font-bold text-brand-black mb-4">{t('details.whatOffers')}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {property.amenities.map((amenity) => {
+                {allAmenities.map((amenity) => {
                   const Icon = AMENITY_ICONS[amenity] || Compass;
                   const translatedAmenity = t(`amenities.${amenity}`);
                   const displayAmenity = translatedAmenity.startsWith('amenities.') ? amenity : translatedAmenity;
@@ -1063,63 +1208,91 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           )}
 
           {/* 6. Ficha Técnica */}
-          <div className="border-b border-brand-gray-200/80 pb-6">
-            <h3 className="text-base font-bold text-brand-black mb-3">
-              {language === 'es' ? 'Ficha Técnica de Construcción' : 'Construction Specifications'}
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5 text-sm text-brand-gray-500 font-semibold">
-              {property.developmentName && (
-                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                  <span className="text-brand-gray-400">{language === 'es' ? 'Desarrollo' : 'Development'}</span>
-                  <span className="text-brand-black">{property.developmentName}</span>
+          {(() => {
+            const visibleSpecs = SPEC_FIELDS.map(cfg => {
+              const value = property[cfg.key];
+              if (value === undefined || value === null || value === '' || value === false) return null;
+              const label = language === 'es' ? cfg.labelEs : cfg.labelEn;
+              const displayVal = cfg.format ? cfg.format(value, language === 'es' ? 'es' : 'en') : String(value);
+              return { key: cfg.key, label, value: displayVal };
+            }).filter(Boolean) as { key: string; label: string; value: string }[];
+
+            if (visibleSpecs.length === 0) return null;
+
+            return (
+              <div className="border-b border-brand-gray-200/80 pb-6">
+                <h3 className="text-base font-bold text-brand-black mb-3">
+                  {language === 'es' ? 'Ficha Técnica de Construcción' : 'Construction Specifications'}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5 text-sm text-brand-gray-500 font-semibold">
+                  {visibleSpecs.map(spec => (
+                    <div key={spec.key} className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                      <span className="text-brand-gray-400">{spec.label}</span>
+                      <span className="text-brand-black">{spec.value}</span>
+                    </div>
+                  ))}
                 </div>
-              )}
-              {property.parkingSpaces !== undefined && property.parkingSpaces !== null && (
-                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                  <span className="text-brand-gray-400">{language === 'es' ? 'Estacionamientos' : 'Parking Spaces'}</span>
-                  <span className="text-brand-black">{property.parkingSpaces}</span>
+              </div>
+            );
+          })()}
+
+          {/* Servicios y Suministros */}
+          {(() => {
+            const visibleServices = SERVICES_FIELDS.map(cfg => {
+              const value = property[cfg.key];
+              if (value === undefined || value === null || value === '' || value === false) return null;
+              const label = language === 'es' ? cfg.labelEs : cfg.labelEn;
+              const displayVal = cfg.format ? cfg.format(value, language === 'es' ? 'es' : 'en') : String(value);
+              return { key: cfg.key, label, value: displayVal };
+            }).filter(Boolean) as { key: string; label: string; value: string }[];
+
+            if (visibleServices.length === 0) return null;
+
+            return (
+              <div className="border-b border-brand-gray-200/80 pb-6">
+                <h3 className="text-base font-bold text-brand-black mb-3">
+                  {language === 'es' ? 'Servicios y Suministros' : 'Services & Utilities'}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5 text-sm text-brand-gray-500 font-semibold">
+                  {visibleServices.map(srv => (
+                    <div key={srv.key} className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                      <span className="text-brand-gray-400">{srv.label}</span>
+                      <span className="text-brand-black">{srv.value}</span>
+                    </div>
+                  ))}
                 </div>
-              )}
-              {property.levelsCount !== undefined && property.levelsCount !== null && (
-                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                  <span className="text-brand-gray-400">{language === 'es' ? 'Niveles' : 'Levels'}</span>
-                  <span className="text-brand-black">{property.levelsCount}</span>
+              </div>
+            );
+          })()}
+
+          {/* Seguridad y Vigilancia */}
+          {(() => {
+            const visibleSecurity = SECURITY_FIELDS.map(cfg => {
+              const value = property[cfg.key];
+              if (value === undefined || value === null || value === '' || value === false) return null;
+              const label = language === 'es' ? cfg.labelEs : cfg.labelEn;
+              const displayVal = cfg.format ? cfg.format(value, language === 'es' ? 'es' : 'en') : String(value);
+              return { key: cfg.key, label, value: displayVal };
+            }).filter(Boolean) as { key: string; label: string; value: string }[];
+
+            if (visibleSecurity.length === 0) return null;
+
+            return (
+              <div className="border-b border-brand-gray-200/80 pb-6">
+                <h3 className="text-base font-bold text-brand-black mb-3">
+                  {language === 'es' ? 'Seguridad y Vigilancia' : 'Security & Safety'}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5 text-sm text-brand-gray-500 font-semibold">
+                  {visibleSecurity.map(sec => (
+                    <div key={sec.key} className="flex justify-between border-b border-brand-gray-100 pb-1.5">
+                      <span className="text-brand-gray-400">{sec.label}</span>
+                      <span className="text-brand-black">{sec.value}</span>
+                    </div>
+                  ))}
                 </div>
-              )}
-              {property.constructionAge !== undefined && property.constructionAge !== null && (
-                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                  <span className="text-brand-gray-400">{language === 'es' ? 'Antigüedad' : 'Age'}</span>
-                  <span className="text-brand-black">
-                    {property.constructionAge === 0 ? (language === 'es' ? 'Nueva' : 'Brand New') : `${property.constructionAge} ${language === 'es' ? 'años' : 'years'}`}
-                  </span>
-                </div>
-              )}
-              {property.conservationStateId && (
-                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                  <span className="text-brand-gray-400">{language === 'es' ? 'Estado' : 'Conservation'}</span>
-                  <span className="text-brand-black">{property.conservationStateId}</span>
-                </div>
-              )}
-              {property.constructionTypeId && (
-                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                  <span className="text-brand-gray-400">{language === 'es' ? 'Estilo' : 'Style'}</span>
-                  <span className="text-brand-black">{property.constructionTypeId}</span>
-                </div>
-              )}
-              {property.surfaceTotal !== undefined && property.surfaceTotal !== null && (
-                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                  <span className="text-brand-gray-400">{language === 'es' ? 'Terreno total' : 'Total Lot'}</span>
-                  <span className="text-brand-black">{property.surfaceTotal} m²</span>
-                </div>
-              )}
-              {property.surfaceBuilt !== undefined && property.surfaceBuilt !== null && (
-                <div className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                  <span className="text-brand-gray-400">{language === 'es' ? 'Construcción' : 'Built Area'}</span>
-                  <span className="text-brand-black">{property.surfaceBuilt} m²</span>
-                </div>
-              )}
-            </div>
-          </div>
+              </div>
+            );
+          })()}
 
           {/* 7. Multimedia Avanzada (Pestañas) - Consolidated Property Media rendering */}
           {(() => {
@@ -1624,6 +1797,12 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                       );
                     })}
                   </div>
+                  {property.desiredExchange && (
+                    <div className="p-4 bg-brand-gray-50 border border-brand-gray-300 rounded-2xl text-xs font-semibold text-brand-black mt-3.5 flex flex-col gap-1 w-full">
+                      <span className="text-brand-gray-500 font-bold uppercase tracking-wider text-[9px]">{language === 'es' ? 'Preferencia de Intercambio Deseada:' : 'Desired Exchange Preference:'}</span>
+                      <span className="text-brand-black font-extrabold text-xs">{property.desiredExchange}</span>
+                    </div>
+                  )}
                 </>
               )}
             </div>
