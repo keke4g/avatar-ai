@@ -16,7 +16,9 @@ export class SupabaseStorageService implements IStorageService {
 
     const { data, error } = await supabase.storage
       .from(this.bucketName)
-      .upload(filePath, file);
+      .upload(filePath, file, {
+        contentType: file.type,
+      });
 
     if (error) {
       console.error('[SupabaseStorageService] Upload error:', error.message);

@@ -1105,17 +1105,26 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
                 {activeMediaTab === 'video' && (
                   <div className="w-full h-full bg-brand-black flex items-center justify-center relative">
-                    <div className="flex flex-col items-center gap-3 text-white text-center p-6">
-                      <div className="w-16 h-16 rounded-full bg-brand-accent/90 flex items-center justify-center text-white text-xl animate-pulse cursor-pointer shadow-md hover:scale-105 transition-transform">
-                        ▶
+                    {property.metadata?.videoUrl ? (
+                      <video 
+                        src={property.metadata.videoUrl} 
+                        className="w-full h-full object-contain animate-in fade-in duration-300" 
+                        controls 
+                        playsInline
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-3 text-white text-center p-6">
+                        <div className="w-16 h-16 rounded-full bg-brand-accent/90 flex items-center justify-center text-white text-xl animate-pulse cursor-pointer shadow-md hover:scale-105 transition-transform">
+                          ▶
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black">{language === 'es' ? 'Video Descriptivo y Tomas con Drone' : 'Walkthrough Video & Drone Footage'}</h4>
+                          <p className="text-[10px] text-brand-gray-400 font-semibold mt-1">
+                            {property.metadata?.videoPlaceholder || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="text-sm font-black">{language === 'es' ? 'Video Descriptivo y Tomas con Drone' : 'Walkthrough Video & Drone Footage'}</h4>
-                        <p className="text-[10px] text-brand-gray-400 font-semibold mt-1">
-                          {property.metadata?.videoPlaceholder || 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}
-                        </p>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )}
 

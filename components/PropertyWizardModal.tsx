@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Property, PropertyOffering, PropertyOfferingMode, PropertyOfferingStatus, PropertyBillingPeriod, PropertyOfferingVisibility } from '../lib/types';
 import { useTranslation } from '../lib/context/LanguageContext';
 import ImageUploadDropzone from './ImageUploadDropzone';
+import VideoUploadDropzone from './VideoUploadDropzone';
 import { PropertyValidator } from '../lib/services/PropertyValidator';
 import { useSwap } from '../lib/context/SwapContext';
 
@@ -593,6 +594,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
   const [images, setImages] = useState<string[]>([]);
   const [imagesMetadata, setImagesMetadata] = useState<Record<string, any>>({});
   const [videoPlaceholder, setVideoPlaceholder] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
   const [virtualTourPlaceholder, setVirtualTourPlaceholder] = useState('');
 
   // STEP 8: Commercial & SEO
@@ -797,6 +799,9 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setCustomAmenities(initialData.metadata?.customAmenities || []);
       setImages(initialData.images || []);
       setImagesMetadata(initialData.metadata?.imagesMetadata || {});
+      setVideoPlaceholder(initialData.metadata?.videoPlaceholder || '');
+      setVideoUrl(initialData.metadata?.videoUrl || '');
+      setVirtualTourPlaceholder(initialData.metadata?.virtualTourPlaceholder || '');
       
       const modes = (initialData.offerings || []).map(o => o.mode);
       if (modes.length > 0) {
@@ -947,6 +952,9 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setCustomAmenities([]);
       setImages([]);
       setImagesMetadata({});
+      setVideoPlaceholder('');
+      setVideoUrl('');
+      setVirtualTourPlaceholder('');
     }
   }, [initialData, isOpen]);
 
@@ -1921,6 +1929,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       metadata: {
         publisherType,
         videoPlaceholder,
+        videoUrl,
         virtualTourPlaceholder,
         uiPropertyType: type,
         halfBathrooms,
@@ -3645,6 +3654,14 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                             <span>⚠</span> <span>{fieldErrors.images}</span>
                           </p>
                         )}
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-black text-brand-gray-500 uppercase tracking-wider">Video Local (MP4, MOV, WEBM)</span>
+                        <VideoUploadDropzone
+                          videoUrl={videoUrl}
+                          onChange={setVideoUrl}
+                        />
                       </div>
 
                       <div className="flex flex-col gap-1.5">
