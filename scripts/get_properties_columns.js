@@ -68,23 +68,16 @@ function request(path) {
 }
 
 async function checkSchema() {
-  // Query OpenAPI root
-  console.log('Fetching OpenAPI spec from /rest/v1/');
-  const res = await request('/rest/v1/');
+  const res = await request('/rest/v1/properties?select=*&limit=1');
   console.log('Status code:', res.status);
   
-  if (res.status === 200) {
-    const spec = res.body;
-    if (spec && spec.definitions && spec.definitions.properties) {
-      const propertiesDef = spec.definitions.properties;
-      console.log('Properties table definition properties keys:', Object.keys(propertiesDef.properties));
-      fs.writeFileSync('properties_schema.json', JSON.stringify(propertiesDef, null, 2));
-      console.log('Saved properties schema to properties_schema.json');
-    } else {
-      console.log('Could not find properties definition in spec. definitions keys:', Object.keys(spec?.definitions || {}));
-    }
+  if (res.status === 200 && res.body && res.body.length > 0) {
+    const columns = Object.keys(res.body[0]);
+    console.log('REAL COLUMNS count:', columns.length);
+    console.log('REAL COLUMNS:', columns);
+    fs.writeFileSync('properties_columns_real.json', JSON.stringify(res.body[0], null, 2));
   } else {
-    console.log('Error/No data from OpenAPI root:', res.body);
+    console.log('Error/No data from properties:', res.body);
   }
 }
 

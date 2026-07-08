@@ -2,6 +2,8 @@ import { supabase } from '../supabaseClient';
 import { Property, PropertyOffering, User, SwapRequest, ChatMessage, Notification, SwapStatus, SwapTravelDetails, Lead } from '../types';
 import { ensurePropertyOfferings, normalizeOfferings, syncPropertyOfferings } from '../propertyOfferings';
 import { IPropertyService, IUserService, ISwapService, IMessageService, INotificationService, ILeadService } from './types';
+import { PropertyMapper } from './PropertyMapper';
+import { PropertyValidator } from './PropertyValidator';
 import { searchProperties } from '../search/SearchEngine';
 import { PropertySearchFilters, SearchResult, ProviderCapabilities } from '../search/types';
 import { PROPERTY_TYPE_MAPPING } from '../searchFilters';
@@ -12,50 +14,6 @@ import { searchLogger } from '../search/searchLogger';
 const HYBRID_PROPERTY_SELECT = '*, property_images(image_url, display_order), profiles:public_profiles_view!host_id(name, avatar_url, is_verified), property_offerings(*, property_offering_availability(*), property_offering_pricing_rules(*))';
 const LEGACY_PROPERTY_SELECT = '*, property_images(image_url, display_order), profiles:public_profiles_view!host_id(name, avatar_url, is_verified)';
 
-let cachedPropertiesColumns: string[] | null = null;
-
-async function getPropertiesColumns(): Promise<string[]> {
-  if (cachedPropertiesColumns) return cachedPropertiesColumns;
-
-  const fallbackColumns = [
-    'id', 'host_id', 'title', 'description', 'type', 'value_rating', 'location', 'country', 'address',
-    'latitude', 'longitude', 'bedrooms', 'bathrooms', 'max_guests', 'aura_score', 'amenities', 'rules',
-    'is_published', 'is_featured', 'created_at', 'featured_until', 'featured_rank', 'internal_code',
-    'primary_operation', 'owner_profile_id', 'company_id', 'development_name', 'subdivision_name',
-    'private_neighborhood', 'phase_stage', 'lot_number', 'block_number', 'condominium_regime',
-    'maintenance_fee_amount', 'neighborhood', 'postal_code', 'street_name', 'street_number',
-    'location_reference', 'show_public_address', 'search_radius_meters', 'nearby_schools',
-    'nearby_hospitals', 'nearby_malls', 'half_bathrooms', 'parking_spaces', 'levels_count',
-    'construction_age', 'conservation_state_id', 'construction_type_id', 'surface_total',
-    'surface_built', 'surface_front', 'surface_depth', 'surface_garden', 'surface_terrace',
-    'surface_roof_garden', 'surface_patio', 'legal_debt_free', 'legal_public_deed', 'legal_tax_current',
-    'legal_services_paid', 'legal_owner_type', 'legal_is_mortgaged'
-  ];
-
-  try {
-    const { data } = await supabase.from('properties').select().limit(1);
-    if (data && data.length > 0) {
-      cachedPropertiesColumns = Object.keys(data[0]);
-      return cachedPropertiesColumns;
-    }
-  } catch (e) {
-    console.warn('[SupabasePropertyService] Failed to dynamically discover properties columns, falling back.', e);
-  }
-
-  cachedPropertiesColumns = fallbackColumns;
-  return fallbackColumns;
-}
-
-async function filterPropertiesPayload(payload: Record<string, any>): Promise<Record<string, any>> {
-  const allowed = await getPropertiesColumns();
-  const filtered: Record<string, any> = {};
-  for (const key of Object.keys(payload)) {
-    if (allowed.includes(key)) {
-      filtered[key] = payload[key];
-    }
-  }
-  return filtered;
-}
 
 const isMissingOfferingsRelationError = (error: any): boolean => {
   return error?.code === 'PGRST200' || error?.code === '42P01';
@@ -154,150 +112,7 @@ const mapPostgresOffering = (row: any): PropertyOffering => ({
 
 // Helper to map normalized postgres records to UI expected Property type
 const mapPostgresProperty = (row: any): Property => {
-  // Sort normalized images by display order
-  const images = row.property_images
-    ? [...row.property_images]
-        .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-        .map((img) => img.image_url)
-    : [];
-
-  const hostProfile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-
-  const property: Property = {
-    id: row.id,
-    internalCode: row.internal_code,
-    primaryOperation: row.primary_operation,
-    ownerProfileId: row.owner_profile_id,
-    companyId: row.company_id,
-    title: row.title,
-    description: row.description,
-    type: row.type,
-    location: row.location,
-    country: row.country,
-    address: row.address,
-    valueRating: row.value_rating,
-    images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80'],
-    amenities: row.amenities || [],
-    auraScore: row.aura_score || 95,
-    bedrooms: row.bedrooms || 1,
-    bathrooms: row.bathrooms || 1,
-    maxGuests: row.max_guests || 2,
-    hostId: row.host_id,
-    hostName: hostProfile?.name || 'Verified Host',
-    hostAvatar: hostProfile?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-    hostVerified: hostProfile?.is_verified ?? true,
-    hostRating: row.hostRating ?? 4.95,
-    hostReviewsCount: row.hostReviewsCount ?? 1,
-    availableStart: row.availableStart || row.created_at?.split('T')[0] || '2026-06-01',
-    availableEnd: row.availableEnd || '2026-12-31',
-    latitude: row.latitude !== null && row.latitude !== undefined ? Number(row.latitude) : null,
-    longitude: row.longitude !== null && row.longitude !== undefined ? Number(row.longitude) : null,
-    placeId: row.place_id || null,
-    formattedAddress: row.formatted_address || null,
-    city: row.city || null,
-    state: row.state || null,
-    geometrySource: row.geometry_source || null,
-    isPublished: row.is_published ?? true,
-    isFeatured: row.is_featured ?? false,
-    featuredUntil: row.featured_until || null,
-    featuredRank: row.featured_rank || 0,
-    rules: row.rules || [],
-    reviews: [], // Loaded on-demand in Phase 4B
-    offerings: row.property_offerings ? row.property_offerings.map(mapPostgresOffering) : [],
-
-    // Development info
-    developmentName: row.development_name,
-    subdivisionName: row.subdivision_name,
-    privateNeighborhood: row.private_neighborhood,
-    phaseStage: row.phase_stage,
-    lotNumber: row.lot_number,
-    blockNumber: row.block_number,
-    condominiumRegime: row.condominium_regime,
-    maintenanceFeeAmount: row.maintenance_fee_amount == null ? 0 : Number(row.maintenance_fee_amount),
-
-    // Detailed Location
-    neighborhood: row.neighborhood,
-    postalCode: row.postal_code,
-    streetName: row.street_name,
-    streetNumber: row.street_number,
-    locationReference: row.location_reference,
-    showPublicAddress: row.show_public_address,
-
-    // Extra features
-    halfBathrooms: row.half_bathrooms || 0,
-    parkingSpaces: row.parking_spaces || 0,
-    levelsCount: row.levels_count || 1,
-    constructionAge: row.construction_age,
-    conservationStateId: row.conservation_state_id,
-    constructionTypeId: row.construction_type_id,
-
-    // Surfaces
-    surfaceTotal: row.surface_total == null ? null : Number(row.surface_total),
-    surfaceBuilt: row.surface_built == null ? null : Number(row.surface_built),
-    surfaceFront: row.surface_front == null ? null : Number(row.surface_front),
-    surfaceDepth: row.surface_depth == null ? null : Number(row.surface_depth),
-    surfaceGarden: row.surface_garden == null ? 0 : Number(row.surface_garden),
-    surfaceTerrace: row.surface_terrace == null ? 0 : Number(row.surface_terrace),
-    surfaceRoofGarden: row.surface_roof_garden == null ? 0 : Number(row.surface_roof_garden),
-    surfacePatio: row.surface_patio == null ? 0 : Number(row.surface_patio),
-
-    // Legal
-    legalDebtFree: row.legal_debt_free,
-    legalPublicDeed: row.legal_public_deed,
-    legalTaxCurrent: row.legal_tax_current,
-    legalServicesPaid: row.legal_services_paid,
-    legalOwnerType: row.legal_owner_type,
-    legalIsMortgaged: row.legal_is_mortgaged,
-
-    // Services
-    servicesWater: row.services_water,
-    servicesElectricity: row.services_electricity,
-    servicesSewerage: row.services_sewerage,
-    servicesNatGas: row.services_nat_gas,
-    servicesLpGas: row.services_lp_gas,
-    servicesInternet: row.services_internet,
-    servicesGarbage: row.services_garbage,
-
-    // Security
-    securityCctv: row.security_cctv,
-    securityGuardhouse: row.security_guardhouse,
-    security24_7: row.security_24_7,
-    securityBiometric: row.security_biometric,
-
-    // View and Orientation
-    viewTypeId: row.view_type_id,
-    orientationId: row.orientation_id,
-
-    // IA
-    aiSummary: row.ai_summary,
-    aiDescription: row.ai_description,
-    aiTags: row.ai_tags || [],
-    aiKeywords: row.ai_keywords || [],
-    aiScoreOverride: row.ai_score_override == null ? null : Number(row.ai_score_override),
-    aiRecommendations: row.ai_recommendations || [],
-
-    // Workflow Folder Status
-    folderStatus: row.folder_status,
-
-    // Owner private info
-    ownerPrivateName: row.owner_private_name,
-    ownerPrivatePhone: row.owner_private_phone,
-    ownerPrivateEmail: row.owner_private_email,
-    ownerContactTime: row.owner_contact_time,
-
-    // SEO
-    metaTitle: row.meta_title,
-    metaDescription: row.meta_description,
-    metaKeywords: row.meta_keywords || [],
-
-    // IDs Aux
-    qrCodeUrl: row.qr_code_url,
-    shortCode: row.short_code,
-    shortLink: row.short_link,
-    updatedAt: row.updated_at
-  };
-
-  return ensurePropertyOfferings(property);
+  return ensurePropertyOfferings(PropertyMapper.mapPostgresToClient(row));
 };
 
 export class SupabasePropertyService implements IPropertyService {
@@ -429,43 +244,37 @@ export class SupabasePropertyService implements IPropertyService {
   }
 
   async create(property: Partial<Property> & { title: string; hostId: string }): Promise<Property> {
-    const rawPayload = {
-      host_id: property.hostId,
-      title: property.title,
-      description: property.description || '',
-      type: property.type || 'Apartment',
-      value_rating: property.valueRating || 'Premium',
-      location: property.location || '',
-      country: property.country || '',
-      address: property.address || '',
-      latitude: property.latitude ?? null,
-      longitude: property.longitude ?? null,
-      place_id: property.placeId ?? null,
-      formatted_address: property.formattedAddress ?? null,
-      city: property.city ?? null,
-      state: property.state ?? null,
-      geometry_source: property.geometrySource ?? null,
-      bedrooms: property.bedrooms || 1,
-      bathrooms: property.bathrooms || 1,
-      max_guests: property.maxGuests || 2,
-      aura_score: property.auraScore || 95,
-      amenities: property.amenities || [],
-      rules: property.rules || [],
-      is_published: property.isPublished ?? true,
-      is_featured: (property as any).isFeatured ?? false
-    };
+    const tStartVal = performance.now();
+    const validation = PropertyValidator.validatePropertyBeforeInsert(property);
+    const tEndVal = performance.now();
 
-    const filteredPayload = await filterPropertiesPayload(rawPayload);
+    if (!validation.success) {
+      console.log('[Property Validation] ❌ Validation failed for create:');
+      validation.errors.forEach(err => console.log(`  ❌ ${err.field}: ${err.message}`));
+      throw new Error(`[Property Validation Error] ${JSON.stringify(validation.errors)}`);
+    } else {
+      console.log(`[Property Validation] [Validator] ✔ ${Math.round(tEndVal - tStartVal)} ms`);
+    }
 
+    const tStartMap = performance.now();
+    const filteredPayload = PropertyMapper.mapClientToPostgres(property);
+    const tEndMap = performance.now();
+    console.log(`[Property Validation] [Mapper] ✔ ${Math.round(tEndMap - tStartMap)} ms`);
+
+    const tStartInsert = performance.now();
     // 1. Create property record
     const { data, error } = await supabase
       .from('properties')
       .insert(filteredPayload)
       .select()
       .single();
+    const tEndInsert = performance.now();
 
     if (error) {
+      console.log(`[Property Validation] [Supabase Insert] ❌ Failed after ${Math.round(tEndInsert - tStartInsert)} ms: ${error.message}`);
       throw new Error(`[SupabasePropertyService] Error creating property: ${error.message}`);
+    } else {
+      console.log(`[Property Validation] [Supabase Insert] ✔ ${Math.round(tEndInsert - tStartInsert)} ms`);
     }
 
     // 2. Insert property images
@@ -481,42 +290,9 @@ export class SupabasePropertyService implements IPropertyService {
       console.error('[SupabasePropertyService] Error saving property images:', imgError);
     }
 
-    const propertyToNormalize = {
-      id: data.id,
-      title: property.title,
-      description: property.description || '',
-      type: property.type || 'Apartment',
-      valueRating: property.valueRating || 'Premium',
-      location: property.location || '',
-      country: property.country || '',
-      address: property.address || '',
-      images: property.images || [],
-      amenities: property.amenities || [],
-      auraScore: property.auraScore || 95,
-      bedrooms: property.bedrooms || 1,
-      bathrooms: property.bathrooms || 1,
-      maxGuests: property.maxGuests || 2,
-      hostId: property.hostId,
-      hostName: property.hostName || '',
-      hostAvatar: property.hostAvatar || '',
-      hostVerified: property.hostVerified ?? true,
-      hostRating: property.hostRating || 4.95,
-      hostReviewsCount: property.hostReviewsCount || 1,
-      availableStart: property.availableStart || data.created_at?.split('T')[0] || '2026-06-01',
-      availableEnd: property.availableEnd || '2026-12-31',
-      latitude: property.latitude !== undefined && property.latitude !== null ? Number(property.latitude) : null,
-      longitude: property.longitude !== undefined && property.longitude !== null ? Number(property.longitude) : null,
-      placeId: property.placeId ?? data.place_id ?? null,
-      formattedAddress: property.formattedAddress ?? data.formatted_address ?? null,
-      city: property.city ?? data.city ?? null,
-      state: property.state ?? data.state ?? null,
-      geometrySource: property.geometrySource ?? data.geometry_source ?? null,
-      isPublished: property.isPublished ?? true,
-      isFeatured: property.isFeatured ?? false,
-      featuredUntil: property.featuredUntil ?? null,
-      featuredRank: property.featuredRank ?? 0,
-      rules: property.rules || [],
-    } as Property;
+    const propertyToNormalize = PropertyMapper.mapPostgresToClient(data);
+    propertyToNormalize.images = property.images || [];
+    propertyToNormalize.offerings = property.offerings || [];
 
     const offeringsToInsert = normalizeOfferings(property.offerings || [], propertyToNormalize);
 
@@ -558,7 +334,6 @@ export class SupabasePropertyService implements IPropertyService {
       .insert(offeringsRows);
 
     if (offeringError && !isMissingOfferingsRelationError(offeringError)) {
-      // Requisito 2: rollback property to avoid corrupted/incomplete states
       await supabase.from('properties').delete().eq('id', data.id);
       throw new Error(`[SupabasePropertyService] Error creating property offerings (rolled back property): ${offeringError.message}`);
     }
@@ -568,40 +343,39 @@ export class SupabasePropertyService implements IPropertyService {
   }
 
   async update(id: string, property: Partial<Property>): Promise<Property> {
-    const rawPayload = {
-      title: property.title,
-      description: property.description,
-      type: property.type,
-      value_rating: property.valueRating,
-      location: property.location,
-      country: property.country,
-      address: property.address,
-      latitude: property.latitude,
-      longitude: property.longitude,
-      place_id: property.placeId,
-      formatted_address: property.formattedAddress,
-      city: property.city,
-      state: property.state,
-      geometry_source: property.geometrySource,
-      bedrooms: property.bedrooms,
-      bathrooms: property.bathrooms,
-      max_guests: property.maxGuests,
-      amenities: property.amenities,
-      rules: property.rules,
-      is_published: property.isPublished
-    };
+    const tStartVal = performance.now();
+    const current = await this.getById(id);
+    const merged = current ? { ...current, ...property } : property;
+    const validation = PropertyValidator.validatePropertyBeforeInsert(merged);
+    const tEndVal = performance.now();
 
-    const filteredPayload = await filterPropertiesPayload(rawPayload);
+    if (!validation.success) {
+      console.log('[Property Validation] ❌ Validation failed for update:');
+      validation.errors.forEach(err => console.log(`  ❌ ${err.field}: ${err.message}`));
+      throw new Error(`[Property Validation Error] ${JSON.stringify(validation.errors)}`);
+    } else {
+      console.log(`[Property Validation] [Validator] ✔ ${Math.round(tEndVal - tStartVal)} ms`);
+    }
 
+    const tStartMap = performance.now();
+    const filteredPayload = PropertyMapper.mapClientToPostgres(property);
+    const tEndMap = performance.now();
+    console.log(`[Property Validation] [Mapper] ✔ ${Math.round(tEndMap - tStartMap)} ms`);
+
+    const tStartUpdate = performance.now();
     const { data, error } = await supabase
       .from('properties')
       .update(filteredPayload)
       .eq('id', id)
       .select()
       .single();
+    const tEndUpdate = performance.now();
 
     if (error) {
+      console.log(`[Property Validation] [Supabase Update] ❌ Failed after ${Math.round(tEndUpdate - tStartUpdate)} ms: ${error.message}`);
       throw new Error(`[SupabasePropertyService] Error updating property: ${error.message}`);
+    } else {
+      console.log(`[Property Validation] [Supabase Update] ✔ ${Math.round(tEndUpdate - tStartUpdate)} ms`);
     }
 
     // Synchronize normalized property images table

@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Property, PropertyOffering, PropertyOfferingMode, PropertyOfferingStatus, PropertyBillingPeriod, PropertyOfferingVisibility } from '../lib/types';
 import { useTranslation } from '../lib/context/LanguageContext';
 import ImageUploadDropzone from './ImageUploadDropzone';
+import { PropertyValidator } from '../lib/services/PropertyValidator';
 
 interface PropertyWizardModalProps {
   isOpen: boolean;
@@ -304,6 +305,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
   const [step, setStep] = useState<WizardStep>(0);
   const [localDeleteConfirm, setLocalDeleteConfirm] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Swap limits
   const [swapMinValue, setSwapMinValue] = useState<number | ''>('');
@@ -993,14 +995,6 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
   // Update/render the wizard mini map when lat/lng change
   useEffect(() => {
     if (!leafletLoaded || step !== 2 || !isOpen) return;
-    if (latitude === null || longitude === null) {
-      if (wizardMapRef.current) {
-        wizardMapRef.current.remove();
-        wizardMapRef.current = null;
-        wizardMarkerRef.current = null;
-      }
-      return;
-    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const L = (window as any).L;
@@ -1009,37 +1003,74 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     const container = document.getElementById('wizard-preview-map');
     if (!container) return;
 
+    let mapLat = latitude;
+    let mapLng = longitude;
+    let hasMarker = true;
+
+    if (mapLat === null || mapLng === null) {
+      hasMarker = false;
+      // Default fallback map center based on country
+      mapLat = 19.4326;
+      mapLng = -99.1332;
+      if (country && (country.toUpperCase().includes('ESP') || country.toUpperCase().includes('SPAIN'))) {
+        mapLat = 40.4168;
+        mapLng = -3.7038;
+      }
+    }
+
     try {
       if (!wizardMapRef.current) {
         const map = L.map('wizard-preview-map', {
           zoomControl: true,
           scrollWheelZoom: false,
           attributionControl: false
-        }).setView([latitude, longitude], 13);
+        }).setView([mapLat, mapLng], hasMarker ? 13 : 5);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
           maxZoom: 19,
         }).addTo(map);
 
-        const customIcon = L.divIcon({
-          className: 'custom-leaflet-marker-selected',
-          html: `<div class="bg-brand-black text-white px-2 py-0.5 rounded-full border border-brand-black font-black text-[9px] shadow-premium">📍</div>`
+        let marker: any = null;
+        if (hasMarker) {
+          const customIcon = L.divIcon({
+            className: 'custom-leaflet-marker-selected',
+            html: `<div class="bg-brand-black text-white px-2 py-0.5 rounded-full border border-brand-black font-black text-[9px] shadow-premium">📍</div>`
+          });
+          marker = L.marker([mapLat, mapLng], { icon: customIcon }).addTo(map);
+          wizardMarkerRef.current = marker;
+        }
+
+        // Click event listener to allow manual selection on map
+        map.on('click', (e: any) => {
+          const { lat, lng } = e.latlng;
+          setLatitude(lat);
+          setLongitude(lng);
+          setGeometrySource('manual');
         });
 
-        const marker = L.marker([latitude, longitude], { icon: customIcon }).addTo(map);
-
         wizardMapRef.current = map;
-        wizardMarkerRef.current = marker;
       } else {
         const map = wizardMapRef.current;
-        const marker = wizardMarkerRef.current;
-        map.setView([latitude, longitude], 13);
-        if (marker) {
-          marker.setLatLng([latitude, longitude]);
+        map.setView([mapLat, mapLng], hasMarker ? 13 : map.getZoom());
+
+        // Update or recreate marker
+        if (wizardMarkerRef.current) {
+          if (hasMarker) {
+            wizardMarkerRef.current.setLatLng([mapLat, mapLng]);
+          } else {
+            wizardMarkerRef.current.remove();
+            wizardMarkerRef.current = null;
+          }
+        } else if (hasMarker) {
+          const customIcon = L.divIcon({
+            className: 'custom-leaflet-marker-selected',
+            html: `<div class="bg-brand-black text-white px-2 py-0.5 rounded-full border border-brand-black font-black text-[9px] shadow-premium">📍</div>`
+          });
+          const marker = L.marker([mapLat, mapLng], { icon: customIcon }).addTo(map);
+          wizardMarkerRef.current = marker;
         }
       }
 
-      // Leaflet requires invalidateSize when container is shown dynamically
       setTimeout(() => {
         if (wizardMapRef.current) {
           wizardMapRef.current.invalidateSize();
@@ -1048,7 +1079,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     } catch (e) {
       console.error('[Wizard Map Init Error]:', e);
     }
-  }, [leafletLoaded, latitude, longitude, step, isOpen]);
+  }, [leafletLoaded, step, isOpen, latitude, longitude, country]);
 
   // Clean up wizard map on unmount/step change
   useEffect(() => {
@@ -1580,8 +1611,32 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     }
   };
 
-  const handleNext = () => {
+  const geocodeManualAddress = async (queryStr: string): Promise<{ lat: number; lng: number } | null> => {
+    return new Promise((resolve) => {
+      if (typeof window === 'undefined' || !(window as any).google || !(window as any).google.maps) {
+        resolve(null);
+        return;
+      }
+      try {
+        const geocoder = new (window as any).google.maps.Geocoder();
+        geocoder.geocode({ address: queryStr }, (results: any, status: any) => {
+          if (status === 'OK' && results && results.length > 0) {
+            const loc = results[0].geometry.location;
+            resolve({ lat: loc.lat(), lng: loc.lng() });
+          } else {
+            resolve(null);
+          }
+        });
+      } catch (e) {
+        console.error('[Geocoding Error]:', e);
+        resolve(null);
+      }
+    });
+  };
+
+  const handleNext = async () => {
     setValidationError(null);
+    setFieldErrors({});
 
     // ── Smart scroll gate: if user hasn't reached the bottom yet, scroll them there
     if (scrollInfo.hasOverflow && !hasReviewedAll) {
@@ -1593,32 +1648,74 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       return;
     }
 
-    // Validation checks per step
-    if (step === 1) {
-      if (!title.trim()) {
-        setValidationError("Por favor, ingresa el título del anuncio.");
-        setTimeout(scrollToError, 80);
-        return;
+    let currentLat = latitude;
+    let currentLng = longitude;
+
+    // Paso 2: Geolocalización asíncrona de fallback si faltan coordenadas
+    if (step === 2 && (currentLat === null || currentLng === null)) {
+      setValidationError("Geocodificando ubicación...");
+      
+      // Intento 1: Dirección completa
+      const query1 = [address, location, country].filter(Boolean).join(', ');
+      if (query1.trim()) {
+        const res1 = await geocodeManualAddress(query1);
+        if (res1) {
+          currentLat = res1.lat;
+          currentLng = res1.lng;
+          setLatitude(res1.lat);
+          setLongitude(res1.lng);
+          setGeometrySource('google_geocoding');
+        }
       }
-      if (!shortDescription.trim()) {
-        setValidationError("Por favor, ingresa el resumen / descripción de la propiedad.");
-        setTimeout(scrollToError, 80);
-        return;
+
+      // Intento 2: Fallback jerárquico
+      if (currentLat === null || currentLng === null) {
+        const query2 = [neighborhood, location, stateName, country].filter(Boolean).join(', ');
+        if (query2.trim()) {
+          const res2 = await geocodeManualAddress(query2);
+          if (res2) {
+            currentLat = res2.lat;
+            currentLng = res2.lng;
+            setLatitude(res2.lat);
+            setLongitude(res2.lng);
+            setGeometrySource('google_geocoding');
+          }
+        }
       }
+      
+      setValidationError(null);
     }
-    if (step === 2) {
-      if (!location || !country) {
-        setValidationError("Por favor, selecciona una ubicación válida usando el buscador.");
-        setTimeout(scrollToError, 80);
-        return;
-      }
-    }
-    if (step === 3) {
-      if (selectedModes.length === 0) {
-        setValidationError("Por favor, selecciona al menos una modalidad comercial.");
-        setTimeout(scrollToError, 80);
-        return;
-      }
+
+    // Compilar datos del paso actual para validación estructurada
+    const stepData: Record<string, any> = {
+      title,
+      description: shortDescription,
+      location,
+      country,
+      latitude: currentLat,
+      longitude: currentLng,
+      selectedModes,
+      type,
+      bedrooms,
+      bathrooms,
+      levelsCount,
+      swapPreferences,
+      monthlyPrice,
+      nightlyPrice,
+      salePrice,
+      images
+    };
+
+    const stepValidation = PropertyValidator.validateStep(step, stepData);
+    if (!stepValidation.success) {
+      const errMap: Record<string, string> = {};
+      stepValidation.errors.forEach(err => {
+        errMap[err.field] = err.message;
+      });
+      setFieldErrors(errMap);
+      setValidationError("Por favor corrige los errores del formulario para avanzar.");
+      setTimeout(scrollToError, 80);
+      return;
     }
 
     const nextStep = activeSteps[currentActiveIndex + 1];
@@ -1629,6 +1726,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
 
   const handleBack = () => {
     setValidationError(null);
+    setFieldErrors({});
     const prevStep = activeSteps[currentActiveIndex - 1];
     if (prevStep) {
       setStep(prevStep.id);
@@ -1754,12 +1852,12 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       legalPublicDeed,
       legalTaxCurrent,
       legalServicesPaid,
-      legalOwnerType,
+      legalOwnerType: legalOwnerType as any,
       legalIsMortgaged,
-      legalLienType,
+      legalLienType: legalLienType as any,
       legalLienObservations,
-      legalRegime,
-      legalLandUse,
+      legalRegime: legalRegime as any,
+      legalLandUse: legalLandUse as any,
       legalRestrictions,
       legalDocumentationComplete,
       legalJuridicalResponsible,
@@ -1769,7 +1867,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       appraisalExpert,
       appraisalValidity,
       appreciationLevel,
-      commercialStatus,
+      commercialStatus: commercialStatus as any,
       servicesWater: true,
       servicesElectricity: true,
       servicesSewerage: true,
@@ -1788,7 +1886,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       offerings,
       desiredExchange: swapPreferences,
       isDemo: initialData?.isDemo ?? false,
-      folderStatus: 'DRAFT',
+      folderStatus: 'DRAFT' as any,
       metaTitle: metaTitle || (title ? `${title} | AuraSwap` : ''),
       metaDescription: metaDescription || shortDescription,
       metadata: {
@@ -1841,6 +1939,19 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
         swapPriority
       }
     };
+
+    // Validar por completo antes de enviar a Supabase
+    const validation = PropertyValidator.validatePropertyBeforeInsert(compiledPropertyData);
+    if (!validation.success) {
+      const errMap: Record<string, string> = {};
+      validation.errors.forEach(err => {
+        errMap[err.field] = err.message;
+      });
+      setFieldErrors(errMap);
+      setValidationError("No pudimos publicar tu propiedad. Revisa los errores marcados abajo.");
+      setTimeout(scrollToError, 80);
+      return;
+    }
 
     localStorage.removeItem('auraswap_draft_property');
     onSubmit(compiledPropertyData);
@@ -2210,8 +2321,15 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                           value={title}
                           onChange={(e) => setTitle(e.target.value)}
                           placeholder="Ej. Moderna Villa con alberca en Marina Mazatlán"
-                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
+                          className={`w-full p-3 rounded-xl bg-brand-gray-50 border text-xs font-semibold outline-none focus:border-brand-accent ${
+                            fieldErrors.title ? 'border-brand-rose focus:border-brand-rose' : 'border-brand-gray-200'
+                          }`}
                         />
+                        {fieldErrors.title && (
+                          <p className="text-[10px] text-brand-rose mt-0.5 font-bold flex items-center gap-1 animate-in fade-in duration-200">
+                            <span>⚠</span> <span>{fieldErrors.title}</span>
+                          </p>
+                        )}
                       </div>
 
                       <div className="flex flex-col gap-1.5">
@@ -2235,12 +2353,18 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                             setShortDescription(e.target.value);
                             setDescription(e.target.value); // Sync to description to prevent double input
                           }}
-                          placeholder="Describe brevemente la distribución de la propiedad, habitaciones, accesos y ventajas (máx. 160 caracteres)"
-                          maxLength={160}
-                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent resize-none font-semibold leading-relaxed"
+                          placeholder="Describe la distribución de la propiedad, habitaciones, accesos y ventajas (mín. 30 caracteres)"
+                          className={`w-full p-3 rounded-xl bg-brand-gray-50 border text-xs font-semibold outline-none focus:border-brand-accent resize-none leading-relaxed ${
+                            fieldErrors.description ? 'border-brand-rose focus:border-brand-rose' : 'border-brand-gray-200'
+                          }`}
                         />
+                        {fieldErrors.description && (
+                          <p className="text-[10px] text-brand-rose mt-0.5 font-bold flex items-center gap-1 animate-in fade-in duration-200">
+                            <span>⚠</span> <span>{fieldErrors.description}</span>
+                          </p>
+                        )}
                         <span className="text-[10px] text-right text-brand-gray-400 font-bold">
-                          {shortDescription.length}/160 caracteres
+                          {shortDescription.length} caracteres
                         </span>
                       </div>
 
@@ -2288,28 +2412,42 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
 
                     <div className="flex flex-col gap-3">
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500">Búsqueda rápida o Ciudad</label>
+                        <label className="text-xs font-bold text-brand-gray-500">Búsqueda rápida o Ciudad <span className="text-red-500">*</span></label>
                         <input
                           type="text"
                           required
                           value={location}
                           onChange={(e) => setLocation(e.target.value)}
                           placeholder="Ej. Culiacán, Sinaloa"
-                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
+                          className={`w-full p-3 rounded-xl bg-brand-gray-50 border text-xs font-semibold outline-none focus:border-brand-accent ${
+                            fieldErrors.location ? 'border-brand-rose focus:border-brand-rose' : 'border-brand-gray-200'
+                          }`}
                         />
+                        {fieldErrors.location && (
+                          <p className="text-[10px] text-brand-rose mt-0.5 font-bold flex items-center gap-1 animate-in fade-in duration-200">
+                            <span>⚠</span> <span>{fieldErrors.location}</span>
+                          </p>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500">País</label>
+                          <label className="text-xs font-bold text-brand-gray-500">País <span className="text-red-500">*</span></label>
                           <input
                             type="text"
                             required
                             value={country}
                             onChange={(e) => setCountry(e.target.value)}
                             placeholder="Ej. Mexico"
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
+                            className={`w-full p-3 rounded-xl bg-brand-gray-50 border text-xs font-semibold outline-none focus:border-brand-accent ${
+                              fieldErrors.country ? 'border-brand-rose focus:border-brand-rose' : 'border-brand-gray-200'
+                            }`}
                           />
+                          {fieldErrors.country && (
+                            <p className="text-[10px] text-brand-rose mt-0.5 font-bold flex items-center gap-1 animate-in fade-in duration-200">
+                              <span>⚠</span> <span>{fieldErrors.country}</span>
+                            </p>
+                          )}
                         </div>
 
                         <div className="flex flex-col gap-1.5">
@@ -2371,6 +2509,18 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                           Mostrar dirección completa públicamente (sino se mostrará aproximada).
                         </label>
                       </div>
+
+                      {/* Map Container */}
+                      <div className="flex flex-col gap-1.5 mt-3">
+                        <label className="text-xs font-bold text-brand-gray-500">Ubicación en el mapa</label>
+                        <div 
+                          id="wizard-preview-map" 
+                          className="w-full h-48 rounded-2xl overflow-hidden border border-brand-gray-200 z-10"
+                        />
+                        <span className="text-[10px] text-brand-gray-400 font-bold leading-normal">
+                          💡 Si la geocodificación no encuentra tu dirección exacta, haz click directamente en el mapa para colocar el marcador manualmente.
+                        </span>
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -2429,6 +2579,11 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                           </button>
                         );
                       })}
+                      {fieldErrors.selectedModes && (
+                        <p className="text-[10px] text-brand-rose mt-1.5 font-bold flex items-center gap-1 animate-in fade-in duration-200">
+                          <span>⚠</span> <span>{fieldErrors.selectedModes}</span>
+                        </p>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -2456,21 +2611,35 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                           <label className="text-[10px] font-bold text-brand-gray-500">Recámaras</label>
                           <input
                             type="number"
-                            min="1"
+                            min="0"
                             value={bedrooms}
-                            onChange={(e) => setBedrooms(Number(e.target.value) || 1)}
-                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                            onChange={(e) => setBedrooms(Number(e.target.value) || 0)}
+                            className={`w-full p-2.5 rounded-xl border text-xs font-semibold outline-none ${
+                              fieldErrors.bedrooms ? 'border-brand-rose focus:border-brand-rose' : 'border-brand-gray-200'
+                            }`}
                           />
+                          {fieldErrors.bedrooms && (
+                            <p className="text-[9px] text-brand-rose mt-0.5 font-bold leading-tight">
+                              {fieldErrors.bedrooms}
+                            </p>
+                          )}
                         </div>
                         <div className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-brand-gray-500">Baños Completos</label>
                           <input
                             type="number"
-                            min="1"
+                            min="0"
                             value={bathrooms}
-                            onChange={(e) => setBathrooms(Number(e.target.value) || 1)}
-                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                            onChange={(e) => setBathrooms(Number(e.target.value) || 0)}
+                            className={`w-full p-2.5 rounded-xl border text-xs font-semibold outline-none ${
+                              fieldErrors.bathrooms ? 'border-brand-rose focus:border-brand-rose' : 'border-brand-gray-200'
+                            }`}
                           />
+                          {fieldErrors.bathrooms && (
+                            <p className="text-[9px] text-brand-rose mt-0.5 font-bold leading-tight">
+                              {fieldErrors.bathrooms}
+                            </p>
+                          )}
                         </div>
                         <div className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-brand-gray-500">Medios Baños</label>
@@ -2496,14 +2665,21 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                           />
                         </div>
                         <div className="flex flex-col gap-1">
-                          <label className="text-[10px] font-bold text-brand-gray-500">Niveles totales</label>
+                          <label className="text-[10px] font-bold text-brand-gray-500">Niveles / Piso</label>
                           <input
                             type="number"
-                            min="1"
+                            min="0"
                             value={levelsCount}
-                            onChange={(e) => setLevelsCount(Number(e.target.value) || 1)}
-                            className="w-full p-2.5 rounded-xl border border-brand-gray-200 text-xs font-semibold"
+                            onChange={(e) => setLevelsCount(Number(e.target.value) || 0)}
+                            className={`w-full p-2.5 rounded-xl border text-xs font-semibold outline-none ${
+                              fieldErrors.levelsCount ? 'border-brand-rose focus:border-brand-rose' : 'border-brand-gray-200'
+                            }`}
                           />
+                          {fieldErrors.levelsCount && (
+                            <p className="text-[9px] text-brand-rose mt-0.5 font-bold leading-tight">
+                              {fieldErrors.levelsCount}
+                            </p>
+                          )}
                         </div>
                         <div className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-brand-gray-500">Edad (Años)</label>
@@ -2762,8 +2938,15 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                           value={swapPreferences}
                           onChange={(e) => setSwapPreferences(e.target.value)}
                           placeholder="Ej. Casa o Depto frente al mar en Mazatlán o Sinaloa"
-                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
+                          className={`w-full p-3 rounded-xl bg-brand-gray-50 border text-xs font-semibold outline-none focus:border-brand-accent ${
+                            fieldErrors.swapPreferences ? 'border-brand-rose focus:border-brand-rose' : 'border-brand-gray-200'
+                          }`}
                         />
+                        {fieldErrors.swapPreferences && (
+                          <p className="text-[10px] text-brand-rose mt-0.5 font-bold flex items-center gap-1 animate-in fade-in duration-200">
+                            <span>⚠</span> <span>{fieldErrors.swapPreferences}</span>
+                          </p>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
@@ -2895,14 +3078,21 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                       {/* Price fields depending on short / monthly modes */}
                       <div className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500">Renta Mensual ($ USD)</label>
+                          <label className="text-xs font-bold text-brand-gray-500">Renta Mensual ($ USD) <span className="text-red-500">*</span></label>
                           <input
                             type="number"
                             value={monthlyPrice}
                             onChange={(e) => setMonthlyPrice(Number(e.target.value) || 0)}
                             placeholder="Monto al mes"
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent"
+                            className={`w-full p-3 rounded-xl bg-brand-gray-50 border text-xs font-semibold outline-none focus:border-brand-accent ${
+                              fieldErrors.rentPrice ? 'border-brand-rose focus:border-brand-rose' : 'border-brand-gray-200'
+                            }`}
                           />
+                          {fieldErrors.rentPrice && (
+                            <p className="text-[10px] text-brand-rose mt-0.5 font-bold flex items-center gap-1 animate-in fade-in duration-200">
+                              <span>⚠</span> <span>{fieldErrors.rentPrice}</span>
+                            </p>
+                          )}
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-bold text-brand-gray-500">Depósito Requerido ($ USD)</label>
@@ -3059,8 +3249,15 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                             value={salePrice}
                             onChange={(e) => setSalePrice(Number(e.target.value) || 0)}
                             placeholder="Monto total"
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none focus:border-brand-accent text-brand-black"
+                            className={`w-full p-3 rounded-xl bg-brand-gray-50 border text-xs font-semibold outline-none focus:border-brand-accent text-brand-black ${
+                              fieldErrors.salePrice ? 'border-brand-rose focus:border-brand-rose' : 'border-brand-gray-200'
+                            }`}
                           />
+                          {fieldErrors.salePrice && (
+                            <p className="text-[10px] text-brand-rose mt-0.5 font-bold flex items-center gap-1 animate-in fade-in duration-200">
+                              <span>⚠</span> <span>{fieldErrors.salePrice}</span>
+                            </p>
+                          )}
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-xs font-bold text-brand-gray-500">Moneda</label>
@@ -3370,13 +3567,18 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
 
                     <div className="flex flex-col gap-3">
                       <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-black text-brand-gray-500 uppercase tracking-wider">Imágenes</span>
+                        <span className="text-[10px] font-black text-brand-gray-500 uppercase tracking-wider">Imágenes <span className="text-red-500">*</span></span>
                         <ImageUploadDropzone
                           images={images}
                           onChange={setImages}
                           imagesMetadata={imagesMetadata}
                           onMetadataChange={setImagesMetadata}
                         />
+                        {fieldErrors.images && (
+                          <p className="text-[10px] text-brand-rose mt-1 font-bold flex items-center gap-1 animate-in fade-in duration-200">
+                            <span>⚠</span> <span>{fieldErrors.images}</span>
+                          </p>
+                        )}
                       </div>
 
                       <div className="flex flex-col gap-1.5">

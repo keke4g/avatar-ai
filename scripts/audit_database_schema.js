@@ -32,13 +32,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const cleanedUrl = supabaseUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '').replace('https://', '');
 
-function request(path) {
+function request(path, method = 'OPTIONS') {
   return new Promise((resolve) => {
     const options = {
       hostname: cleanedUrl,
       port: 443,
       path: path,
-      method: 'GET',
+      method: method,
       headers: {
         'apikey': supabaseAnonKey,
         'Authorization': `Bearer ${supabaseAnonKey}`,
@@ -67,25 +67,17 @@ function request(path) {
   });
 }
 
-async function checkSchema() {
-  // Query OpenAPI root
-  console.log('Fetching OpenAPI spec from /rest/v1/');
-  const res = await request('/rest/v1/');
+async function audit() {
+  console.log('Sending OPTIONS request to /rest/v1/properties...');
+  const res = await request('/rest/v1/properties', 'OPTIONS');
   console.log('Status code:', res.status);
   
   if (res.status === 200) {
-    const spec = res.body;
-    if (spec && spec.definitions && spec.definitions.properties) {
-      const propertiesDef = spec.definitions.properties;
-      console.log('Properties table definition properties keys:', Object.keys(propertiesDef.properties));
-      fs.writeFileSync('properties_schema.json', JSON.stringify(propertiesDef, null, 2));
-      console.log('Saved properties schema to properties_schema.json');
-    } else {
-      console.log('Could not find properties definition in spec. definitions keys:', Object.keys(spec?.definitions || {}));
-    }
+    fs.writeFileSync('properties_options.json', JSON.stringify(res.body, null, 2));
+    console.log('Successfully saved OPTIONS info to properties_options.json');
   } else {
-    console.log('Error/No data from OpenAPI root:', res.body);
+    console.log('Error from OPTIONS request:', res.body);
   }
 }
 
-checkSchema();
+audit();
