@@ -799,9 +799,14 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setCustomAmenities(initialData.metadata?.customAmenities || []);
       setImages(initialData.images || []);
       setImagesMetadata(initialData.metadata?.imagesMetadata || {});
-      setVideoPlaceholder(initialData.metadata?.videoPlaceholder || '');
-      setVideoUrl(initialData.metadata?.videoUrl || '');
-      setVirtualTourPlaceholder(initialData.metadata?.virtualTourPlaceholder || '');
+      
+      const loadedVideoUrl = initialData.media?.find(m => m.mediaType === 'VIDEO')?.url || initialData.metadata?.videoUrl || '';
+      const loadedYoutubeUrl = initialData.media?.find(m => m.mediaType === 'YOUTUBE' || m.mediaType === 'VIMEO')?.url || initialData.metadata?.videoPlaceholder || '';
+      const loadedVirtualTour = initialData.media?.find(m => m.mediaType === 'MATTERPORT' || m.mediaType === 'VIRTUAL_TOUR')?.url || initialData.metadata?.virtualTourPlaceholder || '';
+
+      setVideoUrl(loadedVideoUrl);
+      setVideoPlaceholder(loadedYoutubeUrl);
+      setVirtualTourPlaceholder(loadedVirtualTour);
       
       const modes = (initialData.offerings || []).map(o => o.mode);
       if (modes.length > 0) {
@@ -1926,11 +1931,61 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       metaTitle: metaTitle || (title ? `${title} | AuraSwap` : ''),
       metaDescription: metaDescription || shortDescription,
       hostId: currentUser?.id || initialData?.hostId || '',
+      media: (() => {
+        const list: any[] = [];
+        let order = 0;
+
+        // 1. Add images
+        images.forEach((imgUrl) => {
+          list.push({
+            mediaType: 'IMAGE',
+            url: imgUrl,
+            displayOrder: order++,
+            isPrimary: order === 1,
+            metadata: {}
+          });
+        });
+
+        // 2. Add local video if exists
+        if (videoUrl) {
+          list.push({
+            mediaType: 'VIDEO',
+            url: videoUrl,
+            displayOrder: order++,
+            isPrimary: false,
+            metadata: {}
+          });
+        }
+
+        // 3. Add YouTube / Vimeo recorrido video
+        if (videoPlaceholder) {
+          const type = (videoPlaceholder.includes('vimeo.com') || videoPlaceholder.includes('player.vimeo.com')) 
+            ? 'VIMEO' 
+            : 'YOUTUBE';
+          list.push({
+            mediaType: type,
+            url: videoPlaceholder,
+            displayOrder: order++,
+            isPrimary: false,
+            metadata: {}
+          });
+        }
+
+        // 4. Add Matterport 3D Tour
+        if (virtualTourPlaceholder) {
+          list.push({
+            mediaType: 'MATTERPORT',
+            url: virtualTourPlaceholder,
+            displayOrder: order++,
+            isPrimary: false,
+            metadata: {}
+          });
+        }
+
+        return list;
+      })(),
       metadata: {
         publisherType,
-        videoPlaceholder,
-        videoUrl,
-        virtualTourPlaceholder,
         uiPropertyType: type,
         halfBathrooms,
         imagesMetadata,

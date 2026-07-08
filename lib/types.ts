@@ -133,6 +133,31 @@ export interface CustomFieldValue {
   value: string;
 }
 
+export type PropertyMediaType = 'IMAGE' | 'VIDEO' | 'YOUTUBE' | 'VIMEO' | 'MATTERPORT' | 'VIRTUAL_TOUR' | 'DRONE' | 'FLOORPLAN' | 'DOCUMENT';
+
+export interface PropertyMedia {
+  id: string;
+  propertyId: string;
+  mediaType: PropertyMediaType;
+  storageBucket?: string | null;
+  storagePath?: string | null;
+  url: string;
+  thumbnailUrl?: string | null;
+  title?: string | null;
+  description?: string | null;
+  displayOrder: number;
+  isPrimary: boolean;
+  metadata: Record<string, any>;
+  mimeType?: string | null;
+  fileSize?: number | null;
+  durationSeconds?: number | null;
+  width?: number | null;
+  height?: number | null;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string | null;
+}
+
 export interface Property {
   id: string;
   internalCode?: string;
@@ -177,10 +202,7 @@ export interface Property {
   metadata?: Record<string, any>;
   isDemo?: boolean;
   is_demo?: boolean;
-  videoUrl?: string | null;
-  youtubeUrl?: string | null;
-  video_url?: string | null;
-  youtube_url?: string | null;
+  media?: PropertyMedia[];
 
   // Development info
   developmentName?: string | null;

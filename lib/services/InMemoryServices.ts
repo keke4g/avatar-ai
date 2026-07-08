@@ -169,7 +169,14 @@ export class InMemoryPropertyService implements IPropertyService {
   }
 
   async create(property: Partial<Property> & { title: string; hostId: string }): Promise<Property> {
-    // Auto-fill verified host metadata from administrator settings
+    const media = property.media || [];
+    const imagesFromMedia = media
+      .filter((m: any) => m.mediaType === 'IMAGE')
+      .map((m: any) => m.url);
+    const finalImages = imagesFromMedia.length > 0 
+      ? imagesFromMedia 
+      : (property.images && property.images.length > 0 ? property.images : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80']);
+
     const newProperty: Property = {
       ...property,
       id: `prop-${Date.now()}`,
@@ -180,7 +187,8 @@ export class InMemoryPropertyService implements IPropertyService {
       country: property.country || '',
       address: property.address || '',
       valueRating: property.valueRating || 'Premium',
-      images: property.images && property.images.length > 0 ? property.images : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80'],
+      media: media,
+      images: finalImages,
       amenities: property.amenities || [],
       auraScore: Math.floor(Math.random() * 10) + 90, // Random premium compatibility score (90-99%)
       bedrooms: Number(property.bedrooms) || 1,
@@ -221,9 +229,20 @@ export class InMemoryPropertyService implements IPropertyService {
     const newOfferingsPayload = propertyData.offerings !== undefined ? propertyData.offerings : existingOfferings;
     const syncedOfferings = syncPropertyOfferings(existingOfferings, newOfferingsPayload);
 
+    const existingMedia = this.properties[index].media || [];
+    const media = propertyData.media !== undefined ? propertyData.media : existingMedia;
+    const imagesFromMedia = media
+      .filter((m: any) => m.mediaType === 'IMAGE')
+      .map((m: any) => m.url);
+    const finalImages = imagesFromMedia.length > 0
+      ? imagesFromMedia
+      : (propertyData.images !== undefined ? propertyData.images : this.properties[index].images);
+
     const updatedProperty: Property = ensurePropertyOfferings({
       ...this.properties[index],
       ...propertyData,
+      media,
+      images: finalImages,
       offerings: syncedOfferings,
       // Enforce numerical conversions for form bindings
       bedrooms: propertyData.bedrooms !== undefined ? Number(propertyData.bedrooms) : this.properties[index].bedrooms,

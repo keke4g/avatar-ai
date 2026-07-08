@@ -1,4 +1,5 @@
-import { Property, PropertyOffering } from '../types';
+import { Property, PropertyOffering, PropertyMedia } from '../types';
+import { PropertyMediaMapper } from './PropertyMediaMapper';
 import { PROPERTY_COLUMNS } from '../db/propertySchema';
 
 // Excepciones específicas de conversión camelCase <-> snake_case
@@ -99,18 +100,6 @@ export class PropertyMapper {
    * Convierte un objeto frontend camelCase a un objeto snake_case filtrado por la whitelist.
    */
   public static mapClientToPostgres(property: Partial<Property>): Record<string, any> {
-    // Map metadata nested values to database columns
-    if (property.metadata) {
-      if (property.metadata.videoUrl) {
-        property.video_url = property.metadata.videoUrl;
-      }
-      if (property.metadata.videoPlaceholder) {
-        property.youtube_url = property.metadata.videoPlaceholder;
-      }
-    }
-    if (property.videoUrl) property.video_url = property.videoUrl;
-    if (property.youtubeUrl) property.youtube_url = property.youtubeUrl;
-
     const rawPayload: Record<string, any> = {};
 
     const uuidColumns = [
@@ -144,35 +133,30 @@ export class PropertyMapper {
     const property: Record<string, any> = {};
 
     for (const [key, value] of Object.entries(row)) {
-      if (key === 'profiles' || key === 'property_images' || key === 'property_offerings') {
+      if (key === 'profiles' || key === 'property_images' || key === 'property_offerings' || key === 'property_media') {
         continue;
       }
       const camelKey = toCamelCase(key);
       property[camelKey] = value;
     }
 
-    const images = row.property_images
-      ? [...row.property_images]
-          .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-          .map((img) => img.image_url)
-      : [];
+    // Process and sort unified media records
+    const rawMedia = row.property_media || [];
+    const media = rawMedia
+      .filter((m: any) => !m.deleted_at)
+      .map((m: any) => PropertyMediaMapper.mapPostgresToClient(m))
+      .sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0));
+
+    // Extract images for backwards compatibility with carousel / cards
+    const images = media
+      .filter((m: any) => m.mediaType === 'IMAGE')
+      .map((m: any) => m.url);
 
     const hostProfile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-    const videoUrl = row.video_url || null;
-    const youtubeUrl = row.youtube_url || null;
-    const metadata = {
-      ...(row.metadata || {}),
-      videoUrl: videoUrl,
-      videoPlaceholder: youtubeUrl,
-    };
 
     return {
       ...property,
-      videoUrl,
-      youtubeUrl,
-      video_url: videoUrl,
-      youtube_url: youtubeUrl,
-      metadata,
+      media,
       images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80'],
       hostName: hostProfile?.name || 'Verified Host',
       hostAvatar: hostProfile?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',

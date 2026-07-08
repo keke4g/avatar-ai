@@ -3,6 +3,7 @@ import { InMemoryPropertyService, InMemoryUserService, InMemorySwapService, InMe
 import { SupabasePropertyService, SupabaseUserService, SupabaseSwapService, SupabaseMessageService, SupabaseNotificationService, SupabaseLeadService } from './SupabaseServices';
 import { IStorageService, SupabaseStorageService, InMemoryStorageService } from './StorageService';
 import { InMemoryReviewService, SupabaseReviewService } from './ReviewService';
+import { SupabasePropertyMediaService } from './SupabasePropertyMediaService';
 
 // Dynamically select backend persistence model
 export const useSupabase = process.env.NEXT_PUBLIC_PROPERTY_PROVIDER === 'supabase' || 
@@ -17,6 +18,7 @@ export class ServiceFactory {
   private static _notificationService: INotificationService;
   private static _reviewService: IReviewService;
   private static _leadService: ILeadService;
+  private static _propertyMediaService: SupabasePropertyMediaService;
 
   public static getPropertyService(): IPropertyService {
     if (!this._propertyService) {
@@ -88,5 +90,12 @@ export class ServiceFactory {
         : new InMemoryLeadService();
     }
     return this._leadService;
+  }
+
+  public static getPropertyMediaService(): SupabasePropertyMediaService {
+    if (!this._propertyMediaService) {
+      this._propertyMediaService = new SupabasePropertyMediaService();
+    }
+    return this._propertyMediaService;
   }
 }

@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { Property, PropertyOffering, User, SwapRequest, ChatMessage, Notification, SwapStatus, SwapTravelDetails, Lead } from '../types';
+import { Property, PropertyOffering, PropertyMedia, User, SwapRequest, ChatMessage, Notification, SwapStatus, SwapTravelDetails, Lead } from '../types';
 import { ensurePropertyOfferings, normalizeOfferings, syncPropertyOfferings } from '../propertyOfferings';
 import { IPropertyService, IUserService, ISwapService, IMessageService, INotificationService, ILeadService } from './types';
 import { PropertyMapper } from './PropertyMapper';
@@ -11,8 +11,10 @@ import { searchCache } from '../search/SearchCache';
 import { measureExecution } from '../search/measureExecution';
 import { searchLogger } from '../search/searchLogger';
 
-const HYBRID_PROPERTY_SELECT = '*, property_images(image_url, display_order), profiles:public_profiles_view!host_id(name, avatar_url, is_verified), property_offerings(*, property_offering_availability(*), property_offering_pricing_rules(*))';
-const LEGACY_PROPERTY_SELECT = '*, property_images(image_url, display_order), profiles:public_profiles_view!host_id(name, avatar_url, is_verified)';
+import { SupabasePropertyMediaService } from './SupabasePropertyMediaService';
+
+const HYBRID_PROPERTY_SELECT = '*, property_media(*), profiles:public_profiles_view!host_id(name, avatar_url, is_verified), property_offerings(*, property_offering_availability(*), property_offering_pricing_rules(*))';
+const LEGACY_PROPERTY_SELECT = '*, property_media(*), profiles:public_profiles_view!host_id(name, avatar_url, is_verified)';
 
 
 const isMissingOfferingsRelationError = (error: any): boolean => {
@@ -318,21 +320,27 @@ export class SupabasePropertyService implements IPropertyService {
       console.log(`[Property Validation] [Supabase Insert] ✔ ${Math.round(tEndInsert - tStartInsert)} ms`);
     }
 
-    // 2. Insert property images
-    const imagesToInsert = property.images && property.images.length > 0 
-      ? property.images.map((url, idx) => ({ property_id: data.id, image_url: url, display_order: idx }))
-      : [{ property_id: data.id, image_url: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80', display_order: 0 }];
+    // 2. Synchronize consolidated media
+    const mediaService = new SupabasePropertyMediaService();
+    const mediaToSync = property.media && property.media.length > 0
+      ? property.media
+      : (property.images || []).map((url, idx) => ({
+          mediaType: 'IMAGE' as const,
+          url,
+          displayOrder: idx,
+          isPrimary: idx === 0,
+          metadata: {}
+        }));
 
-    const { error: imgError } = await supabase
-      .from('property_images')
-      .insert(imagesToInsert);
-
-    if (imgError) {
-      console.error('[SupabasePropertyService] Error saving property images:', imgError);
+    try {
+      await mediaService.saveBatch(data.id, mediaToSync);
+    } catch (mediaError) {
+      console.error('[SupabasePropertyService] Error syncing property media during creation:', mediaError);
     }
 
     const propertyToNormalize = PropertyMapper.mapPostgresToClient(data);
     propertyToNormalize.images = property.images || [];
+    propertyToNormalize.media = mediaToSync as any;
     propertyToNormalize.offerings = property.offerings || [];
 
     const offeringsToInsert = normalizeOfferings(property.offerings || [], propertyToNormalize);
@@ -461,28 +469,27 @@ export class SupabasePropertyService implements IPropertyService {
       console.log(`[Property Validation] [Supabase Update] ✔ ${Math.round(tEndUpdate - tStartUpdate)} ms`);
     }
 
-    // Synchronize normalized property images table
-    if (property.images) {
-      const { error: deleteErr } = await supabase
-        .from('property_images')
-        .delete()
-        .eq('property_id', id);
-
-      if (deleteErr) {
-        console.error('[SupabasePropertyService] Error clearing old property images:', deleteErr.message);
-      } else if (property.images.length > 0) {
-        const imagesToInsert = property.images.map((url, idx) => ({
-          property_id: id,
-          image_url: url,
-          display_order: idx
+    // Synchronize consolidated media
+    if (property.media !== undefined || property.images !== undefined) {
+      const mediaService = new SupabasePropertyMediaService();
+      let mediaToSync: Partial<PropertyMedia>[] | undefined = property.media;
+      
+      if (mediaToSync === undefined && property.images !== undefined) {
+        // Fallback: convert images to IMAGE media records
+        mediaToSync = property.images.map((url, idx) => ({
+          mediaType: 'IMAGE' as const,
+          url,
+          displayOrder: idx,
+          isPrimary: idx === 0,
+          metadata: {}
         }));
-        
-        const { error: insertErr } = await supabase
-          .from('property_images')
-          .insert(imagesToInsert);
+      }
 
-        if (insertErr) {
-          console.error('[SupabasePropertyService] Error inserting new property images:', insertErr.message);
+      if (mediaToSync) {
+        try {
+          await mediaService.saveBatch(id, mediaToSync);
+        } catch (mediaError) {
+          console.error('[SupabasePropertyService] Error syncing property media during update:', mediaError);
         }
       }
     }

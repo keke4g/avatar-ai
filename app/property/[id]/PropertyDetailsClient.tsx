@@ -103,17 +103,21 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
     const items: { type: 'image' | 'video'; url: string }[] = [];
     if (!property) return items;
 
-    // Add images
-    if (property.images && property.images.length > 0) {
-      property.images.forEach(url => {
-        items.push({ type: 'image', url });
+    // Load from property.media if available, otherwise fallback to property.images
+    if (property.media && property.media.length > 0) {
+      property.media.forEach(m => {
+        if (m.mediaType === 'IMAGE') {
+          items.push({ type: 'image', url: m.url });
+        } else if (m.mediaType === 'VIDEO') {
+          items.push({ type: 'video', url: m.url });
+        }
       });
-    }
-
-    // Add local video if exists from video_url, videoUrl or metadata.videoUrl
-    const localVideoUrl = property.video_url || property.videoUrl || property.metadata?.videoUrl;
-    if (localVideoUrl) {
-      items.push({ type: 'video', url: localVideoUrl });
+    } else {
+      if (property.images && property.images.length > 0) {
+        property.images.forEach(url => {
+          items.push({ type: 'image', url });
+        });
+      }
     }
 
     return items;
@@ -197,7 +201,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   const [financingTermYears, setFinancingTermYears] = useState(20);
 
   // Multimedia Tab States
-  const [activeMediaTab, setActiveMediaTab] = useState<'photos' | 'video' | 'virtual' | 'blueprints'>('photos');
+  const [activeMediaTab, setActiveMediaTab] = useState<string>('');
+  const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   // Keyboard and helper functions for Premium Gallery
   const handlePrevImage = () => {
     if (mediaItems.length === 0) return;
@@ -1116,117 +1121,231 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             </div>
           </div>
 
-          {/* 7. Multimedia Avanzada (Pestañas) - Only show if video, tour, or blueprints exist */}
-          {!!(property.video_url || property.metadata?.videoUrl || property.metadata?.virtualTourPlaceholder || property.metadata?.blueprintsUrl) && (
-            <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
-              <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
-                <Compass className="w-5 h-5 text-brand-accent" />
-                <span>{language === 'es' ? 'Multimedia y Recorridos' : 'Multimedia & Tours'}</span>
-              </h3>
+          {/* 7. Multimedia Avanzada (Pestañas) - Consolidated Property Media rendering */}
+          {(() => {
+            const mediaList = property.media || [];
+            const videos = mediaList.filter(m => ['VIDEO', 'YOUTUBE', 'VIMEO', 'DRONE'].includes(m.mediaType));
+            const virtualTours = mediaList.filter(m => ['MATTERPORT', 'VIRTUAL_TOUR'].includes(m.mediaType));
+            const floorplans = mediaList.filter(m => m.mediaType === 'FLOORPLAN');
+            const documents = mediaList.filter(m => m.mediaType === 'DOCUMENT');
+            
+            const hasMultimedia = videos.length > 0 || virtualTours.length > 0 || floorplans.length > 0 || documents.length > 0;
+            if (!hasMultimedia) return null;
 
-              {/* Tab Header */}
-              <div className="flex border-b border-brand-gray-100 bg-brand-gray-100 p-1 rounded-2xl">
-                <button
-                  type="button"
-                  onClick={() => setActiveMediaTab('photos')}
-                  className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'photos' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
-                >
-                  🖼️ {language === 'es' ? 'Fotos' : 'Photos'} ({property.images.length})
-                </button>
-                {(property.video_url || property.metadata?.videoUrl) && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveMediaTab('video')}
-                    className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'video' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
-                  >
-                    📹 {language === 'es' ? 'Video / Drone' : 'Video / Drone'}
-                  </button>
-                )}
-                {property.metadata?.virtualTourPlaceholder && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveMediaTab('virtual')}
-                    className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'virtual' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
-                  >
-                    🕶️ {language === 'es' ? 'Tour 3D' : '3D Tour'}
-                  </button>
-                )}
-                {property.metadata?.blueprintsUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveMediaTab('blueprints')}
-                    className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer ${activeMediaTab === 'blueprints' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
-                  >
-                    📐 {language === 'es' ? 'Planos' : 'Blueprints'}
-                  </button>
-                )}
+            // Determine active tab if not set or invalid
+            const availableTabs = [
+              videos.length > 0 && 'video',
+              virtualTours.length > 0 && 'virtual',
+              floorplans.length > 0 && 'floorplan',
+              documents.length > 0 && 'document'
+            ].filter(Boolean) as string[];
+
+            const currentTab = availableTabs.includes(activeMediaTab) ? activeMediaTab : (availableTabs[0] || '');
+
+            const getYoutubeEmbedUrl = (url: string) => {
+              let videoId = '';
+              if (url.includes('youtube.com')) {
+                const parts = url.split('v=');
+                if (parts.length > 1) videoId = parts[1].split('&')[0];
+              } else if (url.includes('youtu.be')) {
+                const parts = url.split('/');
+                videoId = parts[parts.length - 1].split('?')[0];
+              }
+              return videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0` : url;
+            };
+
+            const getVimeoEmbedUrl = (url: string) => {
+              const parts = url.split('/');
+              const videoId = parts[parts.length - 1].split('?')[0];
+              return videoId ? `https://player.vimeo.com/video/${videoId}` : url;
+            };
+
+            return (
+              <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
+                <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
+                  <Compass className="w-5 h-5 text-brand-accent" />
+                  <span>{language === 'es' ? 'Multimedia y Recorridos' : 'Multimedia & Tours'}</span>
+                </h3>
+
+                {/* Tab Header */}
+                <div className="flex border-b border-brand-gray-100 bg-brand-gray-100 p-1 rounded-2xl overflow-x-auto gap-1">
+                  {videos.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveMediaTab('video');
+                        setActiveVideoIndex(0);
+                      }}
+                      className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap px-4 ${currentTab === 'video' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                    >
+                      📹 {language === 'es' ? 'Videos' : 'Videos'} ({videos.length})
+                    </button>
+                  )}
+                  {virtualTours.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveMediaTab('virtual')}
+                      className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap px-4 ${currentTab === 'virtual' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                    >
+                      🕶️ {language === 'es' ? 'Tour 3D / VR' : '3D / VR Tour'} ({virtualTours.length})
+                    </button>
+                  )}
+                  {floorplans.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveMediaTab('floorplan')}
+                      className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap px-4 ${currentTab === 'floorplan' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                    >
+                      📐 {language === 'es' ? 'Planos' : 'Floor Plans'} ({floorplans.length})
+                    </button>
+                  )}
+                  {documents.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveMediaTab('document')}
+                      className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap px-4 ${currentTab === 'document' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                    >
+                      📄 {language === 'es' ? 'Documentación' : 'Documents'} ({documents.length})
+                    </button>
+                  )}
+                </div>
+
+                {/* Tab Content */}
+                <div className="relative rounded-3xl overflow-hidden bg-brand-gray-100 aspect-video flex flex-col items-center justify-center border border-brand-gray-200/50 shadow-inner w-full">
+                  {currentTab === 'video' && videos.length > 0 && (() => {
+                    const activeVideo = videos[activeVideoIndex] || videos[0];
+                    return (
+                      <div className="w-full h-full flex flex-col relative bg-brand-black">
+                        {/* Video Player Box */}
+                        <div className="flex-1 w-full h-full relative min-h-0">
+                          {activeVideo.mediaType === 'VIDEO' ? (
+                            <video 
+                              src={activeVideo.url} 
+                              className="w-full h-full object-contain" 
+                              controls 
+                              playsInline
+                            />
+                          ) : activeVideo.mediaType === 'VIMEO' ? (
+                            <iframe 
+                              src={getVimeoEmbedUrl(activeVideo.url)}
+                              className="w-full h-full border-0"
+                              allow="autoplay; fullscreen; picture-in-picture"
+                              allowFullScreen
+                              loading="lazy"
+                            />
+                          ) : (
+                            <iframe 
+                              src={getYoutubeEmbedUrl(activeVideo.url)}
+                              className="w-full h-full border-0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                              loading="lazy"
+                            />
+                          )}
+                        </div>
+
+                        {/* Extra Videos Thumbnails Carousel */}
+                        {videos.length > 1 && (
+                          <div className="bg-brand-black/90 p-3 flex gap-2 overflow-x-auto shrink-0 border-t border-brand-gray-900 w-full">
+                            {videos.map((vid, idx) => (
+                              <button
+                                key={vid.id || idx}
+                                onClick={() => setActiveVideoIndex(idx)}
+                                className={`relative w-24 aspect-video rounded-lg overflow-hidden border-2 shrink-0 transition-all ${idx === activeVideoIndex ? 'border-brand-accent scale-95 shadow-md' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                              >
+                                <img 
+                                  src={vid.thumbnailUrl || 'https://images.unsplash.com/photo-1598257006458-087169a1f08d?auto=format&fit=crop&w=150&q=80'} 
+                                  className="w-full h-full object-cover" 
+                                  alt={vid.title || "Video thumbnail"}
+                                />
+                                <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                  <span className="text-[10px] text-white font-bold bg-brand-black/70 px-1.5 py-0.5 rounded">
+                                    {vid.mediaType}
+                                  </span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {currentTab === 'virtual' && virtualTours.length > 0 && (() => {
+                    const activeTour = virtualTours[0];
+                    return (
+                      <div className="w-full h-full relative">
+                        <iframe 
+                          src={activeTour.url}
+                          className="w-full h-full border-0"
+                          allow="xr-spatial-tracking; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          loading="lazy"
+                        />
+                      </div>
+                    );
+                  })()}
+
+                  {currentTab === 'floorplan' && floorplans.length > 0 && (() => {
+                    const activePlan = floorplans[0];
+                    return (
+                      <div className="w-full h-full relative group bg-white flex items-center justify-center p-4">
+                        <img 
+                          src={activePlan.url} 
+                          className="max-w-full max-h-full object-contain rounded-2xl" 
+                          alt={activePlan.title || "Plano"}
+                        />
+                        <div className="absolute top-4 right-4 flex gap-2">
+                          <a 
+                            href={activePlan.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="bg-brand-black/80 hover:bg-brand-black text-white px-4 py-2.5 rounded-full text-xs font-black shadow-lg backdrop-blur-sm transition-all flex items-center gap-1.5"
+                          >
+                            <Maximize className="w-4 h-4" />
+                            <span>{language === 'es' ? 'Ver original' : 'View original'}</span>
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {currentTab === 'document' && documents.length > 0 && (
+                    <div className="w-full h-full overflow-y-auto p-6 bg-white grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {documents.map((doc, idx) => (
+                        <div 
+                          key={doc.id || idx}
+                          className="bg-brand-gray-50 border border-brand-gray-200/60 p-4 rounded-3xl shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-4 group h-fit"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 font-bold shrink-0">
+                              📄
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="text-xs font-bold text-brand-black truncate group-hover:text-brand-accent transition-colors">
+                                {doc.title || `Documento #${idx + 1}`}
+                              </h4>
+                              <p className="text-[10px] text-brand-gray-400 font-semibold">
+                                {doc.fileSize ? `${Math.round(doc.fileSize / 1024 / 1024 * 100) / 100} MB` : 'PDF'}
+                              </p>
+                            </div>
+                          </div>
+                          <a 
+                            href={doc.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-white hover:bg-brand-accent hover:text-white border border-brand-gray-200 text-brand-black p-2.5 rounded-full transition-all shrink-0 shadow-sm"
+                          >
+                            <Download className="w-4 h-4" />
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-
-              {/* Tab Content */}
-              <div className="relative rounded-2xl overflow-hidden bg-brand-gray-100 aspect-video flex items-center justify-center border border-brand-gray-200/50 shadow-inner">
-                {activeMediaTab === 'photos' && (
-                  <div 
-                    onClick={() => setIsGalleryOpen(true)}
-                    className="w-full h-full relative cursor-pointer group"
-                  >
-                    <img
-                      src={property.images[0]}
-                      alt={property.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                    />
-                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="bg-white text-brand-black px-5 py-2.5 rounded-full text-xs font-black shadow-lg">
-                        Ver todas las fotos
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {activeMediaTab === 'video' && (
-                  <div className="w-full h-full bg-brand-black flex items-center justify-center relative">
-                    <video 
-                      src={property.video_url || property.metadata?.videoUrl || ''} 
-                      className="w-full h-full object-contain animate-in fade-in duration-300" 
-                      controls 
-                      playsInline
-                    />
-                  </div>
-                )}
-
-                {activeMediaTab === 'virtual' && (
-                  <div className="w-full h-full bg-brand-black flex items-center justify-center relative">
-                    <div className="flex flex-col items-center gap-3 text-white text-center p-6">
-                      <div className="w-16 h-16 rounded-full bg-amber-500/90 flex items-center justify-center text-white text-xl cursor-pointer hover:scale-105 transition-transform shadow-md">
-                        🕶️
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-black">{language === 'es' ? 'Recorrido Virtual Interactivo 3D (Matterport)' : '3D Matterport Interactive Tour'}</h4>
-                        <p className="text-[10px] text-brand-gray-400 font-semibold mt-1">
-                          {property.metadata?.virtualTourPlaceholder}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeMediaTab === 'blueprints' && (
-                  <div className="w-full h-full bg-white flex items-center justify-center p-6 relative">
-                    <div className="flex flex-col items-center gap-3 text-brand-black text-center">
-                      <div className="w-14 h-14 rounded-2xl bg-brand-gray-100 flex items-center justify-center text-xl shadow-xs">
-                        📐
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-black">{language === 'es' ? 'Plano Arquitectónico Oficial' : 'Official Architectural Blueprint'}</h4>
-                        <p className="text-[10px] text-brand-gray-500 font-semibold mt-1">
-                          Escala 1:100 • Plantas de distribución y fachadas
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* 8. Ubicación y Mapa */}
           {property.latitude !== null && property.longitude !== null && (
@@ -2347,46 +2466,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
         </div>
       </div>
 
-      {/* 3.5. Dedicated YouTube Virtual Tour Section */}
-      {property.youtube_url && (
-        <div className="w-full bg-white border border-brand-gray-200/60 rounded-3xl p-6 md:p-8 shadow-floating mb-10 overflow-hidden flex flex-col gap-6">
-          <div>
-            <h3 className="text-base font-extrabold text-brand-black flex items-center gap-2 uppercase tracking-wider text-brand-accent">
-              <Play className="w-5 h-5 text-brand-accent" />
-              <span>{language === 'es' ? 'Recorrido Virtual / Video de YouTube' : 'Virtual Tour / YouTube Video'}</span>
-            </h3>
-            <p className="text-xs text-brand-gray-500 mt-1">
-              {language === 'es'
-                ? 'Visualiza los interiores y exteriores a través de este recorrido en video.'
-                : 'Explore the interiors and exteriors of this property via this walkthrough video.'}
-            </p>
-          </div>
 
-          <div className="relative rounded-2xl overflow-hidden aspect-video bg-brand-black border border-brand-gray-200/40 shadow-inner">
-            {(() => {
-              let videoId = '';
-              const ytUrl = property.youtube_url;
-              if (ytUrl.includes('youtube.com')) {
-                const parts = ytUrl.split('v=');
-                if (parts.length > 1) videoId = parts[1].split('&')[0];
-              } else if (ytUrl.includes('youtu.be')) {
-                const parts = ytUrl.split('/');
-                videoId = parts[parts.length - 1].split('?')[0];
-              }
-              const embedUrl = videoId ? `https://www.youtube.com/embed/${videoId}` : ytUrl;
-
-              return (
-                <iframe
-                  src={embedUrl}
-                  className="absolute inset-0 w-full h-full border-0"
-                  allowFullScreen
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                />
-              );
-            })()}
-          </div>
-        </div>
-      )}
 
       {/* 4. Elegant Interactive Swap Request Modal Sheet */}
       <AnimatePresence>
