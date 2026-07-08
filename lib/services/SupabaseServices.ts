@@ -9,8 +9,8 @@ import { searchCache } from '../search/SearchCache';
 import { measureExecution } from '../search/measureExecution';
 import { searchLogger } from '../search/searchLogger';
 
-const HYBRID_PROPERTY_SELECT = '*, property_images(image_url, display_order), profiles:host_id(name, avatar_url, is_verified), property_offerings(*, property_offering_availability(*), property_offering_pricing_rules(*))';
-const LEGACY_PROPERTY_SELECT = '*, property_images(image_url, display_order), profiles:host_id(name, avatar_url, is_verified)';
+const HYBRID_PROPERTY_SELECT = '*, property_images(image_url, display_order), profiles:public_profiles_view!host_id(name, avatar_url, is_verified), property_offerings(*, property_offering_availability(*), property_offering_pricing_rules(*))';
+const LEGACY_PROPERTY_SELECT = '*, property_images(image_url, display_order), profiles:public_profiles_view!host_id(name, avatar_url, is_verified)';
 
 const isMissingOfferingsRelationError = (error: any): boolean => {
   return error?.code === 'PGRST200' || error?.code === '42P01';
@@ -266,7 +266,7 @@ export class SupabasePropertyService implements IPropertyService {
     }
 
     const { result: searchResult, executionTime } = await measureExecution(async () => {
-      let query = supabase.from('properties').select(HYBRID_PROPERTY_SELECT);
+      let query = supabase.from('public_properties_view').select(HYBRID_PROPERTY_SELECT);
       
       if (filters.type) {
         const allowedTypes = PROPERTY_TYPE_MAPPING[filters.type] || [filters.type];
@@ -282,7 +282,7 @@ export class SupabasePropertyService implements IPropertyService {
       let { data, error } = await query;
 
       if (error && isMissingOfferingsRelationError(error)) {
-        let legacyQuery = supabase.from('properties').select(LEGACY_PROPERTY_SELECT);
+        let legacyQuery = supabase.from('public_properties_view').select(LEGACY_PROPERTY_SELECT);
         if (filters.type) {
           const allowedTypes = PROPERTY_TYPE_MAPPING[filters.type] || [filters.type];
           const capitalizedTypes = allowedTypes.map(t => {
@@ -337,13 +337,13 @@ export class SupabasePropertyService implements IPropertyService {
   }
   async getAll(): Promise<Property[]> {
     let { data, error } = await supabase
-      .from('properties')
+      .from('public_properties_view')
       .select(HYBRID_PROPERTY_SELECT);
 
     if (error && isMissingOfferingsRelationError(error)) {
       console.warn('[SupabasePropertyService] property_offerings relation not available yet. Falling back to legacy property select.');
       const legacy = await supabase
-        .from('properties')
+        .from('public_properties_view')
         .select(LEGACY_PROPERTY_SELECT);
       data = legacy.data;
       error = legacy.error;
@@ -359,7 +359,7 @@ export class SupabasePropertyService implements IPropertyService {
 
   async getById(id: string): Promise<Property | null> {
     let { data, error } = await supabase
-      .from('properties')
+      .from('public_properties_view')
       .select(HYBRID_PROPERTY_SELECT)
       .eq('id', id)
       .single();
@@ -367,7 +367,7 @@ export class SupabasePropertyService implements IPropertyService {
     if (error && isMissingOfferingsRelationError(error)) {
       console.warn('[SupabasePropertyService] property_offerings relation not available yet. Falling back to legacy property select.');
       const legacy = await supabase
-        .from('properties')
+        .from('public_properties_view')
         .select(LEGACY_PROPERTY_SELECT)
         .eq('id', id)
         .single();
@@ -766,9 +766,9 @@ export class SupabasePropertyService implements IPropertyService {
 
 export class SupabaseUserService implements IUserService {
   async getAll(): Promise<User[]> {
-    console.log('[SupabaseUserService] Querying profiles.getAll()...');
+    console.log('[SupabaseUserService] Querying public_profiles_view.getAll()...');
     const { data, error } = await supabase
-      .from('profiles')
+      .from('public_profiles_view')
       .select('*');
 
     if (error) {
@@ -776,7 +776,7 @@ export class SupabaseUserService implements IUserService {
       return [];
     }
 
-    console.log('[SupabaseUserService] Query profiles.getAll() success. Row count:', data?.length, 'Exact Data Result:', data);
+    console.log('[SupabaseUserService] Query public_profiles_view.getAll() success. Row count:', data?.length, 'Exact Data Result:', data);
     return (data || []).map((row) => ({
       id: row.id,
       name: row.name,
@@ -797,18 +797,24 @@ export class SupabaseUserService implements IUserService {
 
   async getById(id: string): Promise<User | null> {
     console.log(`[SupabaseUserService] Querying profile.getById(${id})...`);
+    
+    // Dynamically query profiles table for self to see email, or public_profiles_view for others
+    const currentUser = (await supabase.auth.getUser()).data.user;
+    const isSelf = currentUser?.id === id;
+    const targetSource = isSelf ? 'profiles' : 'public_profiles_view';
+
     const { data, error } = await supabase
-      .from('profiles')
+      .from(targetSource)
       .select('*')
       .eq('id', id)
       .single();
 
     if (error) {
-      console.error(`[SupabaseUserService] Error fetching profile ${id}. Code:`, error.code, 'Message:', error.message, 'Full Error:', error);
+      console.error(`[SupabaseUserService] Error fetching profile ${id} from ${targetSource}. Code:`, error.code, 'Message:', error.message, 'Full Error:', error);
       return null;
     }
 
-    console.log(`[SupabaseUserService] Query profile.getById(${id}) success. Exact Data Result:`, data);
+    console.log(`[SupabaseUserService] Query profile.getById(${id}) from ${targetSource} success. Exact Data Result:`, data);
 
 
     return data ? {
@@ -1225,7 +1231,7 @@ export class SupabaseMessageService implements IMessageService {
     let senderName = 'AuraSwap';
     if (!isSystem) {
       const { data: profile } = await supabase
-        .from('profiles')
+        .from('public_profiles_view')
         .select('name')
         .eq('id', senderId)
         .single();
