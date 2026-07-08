@@ -58,15 +58,25 @@ export class GeminiService {
       // const responseStream = await model.generateContentStream({ contents: ... });
       // for await (const chunk of responseStream.stream) { ... }
 
-      // Marcador de historial de conversación:
-      // En el futuro, conversationHistory (del tipo ConversationMessage[]) se puede transformar 
-      // a la estructura de Gemini { role: 'user' | 'model', parts: [{ text: string }] } 
-      // y concatenarse antes de params.message.
-      
+      const contents: any[] = [];
+
+      if (params.conversationHistory && params.conversationHistory.length > 0) {
+        params.conversationHistory.forEach((msg) => {
+          contents.push({
+            role: msg.role === "user" ? "user" : "model",
+            parts: [{ text: msg.content }]
+          });
+        });
+      }
+
+      // Add the current message
+      contents.push({
+        role: "user",
+        parts: [{ text: params.message }]
+      });
+
       const responsePromise = model.generateContent({
-        contents: [
-          { role: "user", parts: [{ text: params.message }] }
-        ]
+        contents
       });
 
       // Carrera entre la promesa de la API y el timeout

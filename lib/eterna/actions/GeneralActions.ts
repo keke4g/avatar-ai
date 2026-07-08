@@ -186,8 +186,14 @@ export function useGeneralActions({
     }, 800);
   }, [language, currentUser, messages, reviews, intentContext, setThinkingContext, setSimulatedStatus, setSimulatedText, setChatHistory, speak]);
 
-  const callGeminiAvatarAPI = useCallback(async (prompt: string) => {
-    console.log("[Eterna-Gemini] Iniciando consulta a Gemini API con prompt:", prompt);
+  const callGeminiAvatarAPI = useCallback(async (
+    prompt: string,
+    currentPropertyId?: string | null,
+    activePropertyTitle?: string | null,
+    activePropertyDescription?: string | null,
+    activePropertyDossier?: string | null
+  ) => {
+    console.log("[Eterna-Gemini] Iniciando consulta a Gemini API con prompt:", prompt, "currentPropertyId:", currentPropertyId);
     // 1. Cancelar petición Gemini previa si está en curso
     if (geminiAbortControllerRef.current) {
       geminiAbortControllerRef.current.abort();
@@ -220,11 +226,23 @@ export function useGeneralActions({
           content: h.content
         }));
 
+      if (currentPropertyId) {
+        acotadoHistory.unshift({
+          role: 'user' as const,
+          content: `[System Metadata] El usuario está visualizando el siguiente expediente de propiedad:\n${activePropertyDossier || `ID: ${currentPropertyId}. Título: "${activePropertyTitle || ''}". Descripción: "${activePropertyDescription || ''}".`}`
+        });
+      }
+
+      let customSystemPrompt = systemPrompt?.content || '';
+      if (currentPropertyId) {
+        customSystemPrompt += `\n\n---\n[System Metadata - ACTIVE PROPERTY DOSSIER]\nEl usuario está visualizando la siguiente propiedad. Utiliza este expediente para responder sus dudas legales, financieras y comerciales:\n${activePropertyDossier || `ID: ${currentPropertyId}\nTítulo: ${activePropertyTitle || 'Sin título'}\nDescripción: ${activePropertyDescription || 'Sin descripción'}`}`;
+      }
+
       const payload = {
         message: prompt,
         userId: currentUser?.id,
         conversationHistory: acotadoHistory,
-        systemPrompt: systemPrompt?.content // systemPrompt contextual local
+        systemPrompt: customSystemPrompt
       };
 
       const response = await fetch('/api/avatar', {

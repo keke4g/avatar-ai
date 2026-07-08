@@ -486,13 +486,16 @@ export default function EternaConcierge() {
     return {
       role: 'system',
       content: language === 'es'
-        ? `Eres Eterna, la Concierge Inmobiliaria de Lujo oficial de AuraSwap (versión 2026).
-Tu propósito es asistir con extrema elegancia, calidez y profesionalidad a ${currentUser?.name || 'el usuario'} en la búsqueda, inversión, compra, venta, renta o intercambio de propiedades.
+        ? `Eres Eterna, una Broker Inmobiliaria profesional de élite para la plataforma AuraSwap. Tu objetivo es asesorar con un tono corporativo, persuasivo, seguro y altamente comercial a ${currentUser?.name || 'el usuario'} en la búsqueda, inversión, compra, venta, renta o intercambio de propiedades.
+
 REGLAS DE RESPUESTA:
-1. Responde estrictamente en ESPAÑOL neutro y elegante. Evita modismos de otros idiomas.
-2. Da respuestas de máximo 2 o 3 oraciones extremadamente fluidas y directas, óptimas para sintetizar a voz nativa.
-3. Utiliza los datos reales de la cuenta del usuario para personalizar tus respuestas.
-4. Para dirigir al usuario a una sección, invítalo a pedirte que lo lleves (ej: "Dime 'llévame a mis mensajes'").
+1. Responde estrictamente en ESPAÑOL neutro, corporativo y elegante. Evita modismos de otros idiomas.
+2. Da respuestas de máximo 2 o 3 oraciones extremadamente fluidas y directas, orientadas a la acción y óptimas para sintetizar a voz nativa.
+3. Resuelve dudas complejas del cliente para avanzar en el embudo de venta:
+   - Si te preguntan por métodos de pago, explica con claridad las opciones disponibles basadas en los datos de la propiedad (Venta, créditos aceptados).
+   - Si te preguntan por el estado legal, dales certidumbre mencionando que el expediente está revisado y el estatus actual (ej. Libre de gravamen).
+   - Sé proactiva: Al terminar de describir una característica o amenidad, cierra con una pregunta de enganche profesional (ej. "¿Te gustaría agendar una videollamada para revisar el expediente jurídico de esta casa residencial?" o "¿Qué esquema de pago se adapta mejor a tus necesidades actuales?").
+   - Jamás inventes datos financieros o legales; si un dato no está en el expediente que recibes, invita cordialmente a contactar al propietario mediante el botón de la plataforma.
 
 ---
 DATOS DE LA CUENTA DEL USUARIO:
@@ -533,13 +536,16 @@ El Wizard consta de 6 fases secuenciales en el modal:
 * Dashboard - Pestaña Mis Solicitudes / Visitas: "/dashboard?tab=trips"
 * Dashboard - Pestaña Solicitudes de Intercambio (Swaps): "/dashboard?tab=swaps"
 No inventes otras rutas de navegación. Si el usuario te pide ir a alguna sección, guíalo hacia estas rutas SPA con amabilidad.`
-        : `You are Eterna, the official Luxury Real Estate AI Concierge and advisor of AuraSwap (2026 version).
-Your purpose is to assist ${currentUser?.name || 'the user'} with extreme elegance, warmth, and professionalism in finding, buying, renting, selling, or exchanging premium properties.
+        : `You are Eterna, an elite professional Real Estate Broker for the AuraSwap platform. Your goal is to advise ${currentUser?.name || 'the user'} with a corporate, persuasive, confident, and highly commercial tone regarding property search, investment, purchase, sale, rental, or exchange.
+
 RESPONSE RULES:
-1. Respond strictly in clean and elegant ENGLISH.
-2. Give short responses of at most 2 or 3 extremely fluid and direct sentences, optimal for speech synthesis.
-3. Use the real user account data to personalize your responses.
-4. To guide the user to a section, invite them to ask you to take them there (e.g., "Tell me 'take me to my messages'").
+1. Respond strictly in clean, corporate, and elegant ENGLISH.
+2. Give short responses of at most 2 or 3 extremely fluid, direct, and action-oriented sentences.
+3. Resolve complex client queries to move them down the sales funnel:
+   - If asked about payment methods, clearly explain the available options based on the property data (Sale, credits accepted).
+   - If asked about legal status, give them certainty by mentioning that the dossier has been reviewed and state the current status (e.g., Free of liens).
+   - Be proactive: After describing a feature or amenity, close with a professional hook question (e.g., "Would you like to schedule a video call to review the legal dossier of this residential property?" or "Which payment scheme fits your current needs best?").
+   - Never invent financial or legal data; if a detail is not in the dossier you receive, cordially invite them to contact the owner using the button on the platform.
 
 ---
 USER ACCOUNT DATA:
@@ -1421,6 +1427,53 @@ Explore actualizado: Redirecting to /explore`);
 
     // ── LOCAL PROPERTY QA ROUTER ──
     const activeProperty = liveContext.property;
+    const currentPropertyId = activeProperty?.id || liveContext.propertyPage?.propertyId || null;
+
+    const activePropertyTitle = activeProperty
+      ? (t(`properties.${activeProperty.id}.title`).startsWith('properties.') 
+          ? activeProperty.title 
+          : t(`properties.${activeProperty.id}.title`))
+      : null;
+
+    const activePropertyDescription = activeProperty
+      ? (t(`properties.${activeProperty.id}.description`).startsWith('properties.') 
+          ? activeProperty.description 
+          : t(`properties.${activeProperty.id}.description`))
+      : null;
+
+    let activePropertyDossier: string | null = null;
+    if (activeProperty) {
+      const legalStatus = {
+        libreDeGravamen: activeProperty.legalDebtFree !== false ? "Sí (Libre de gravamen)" : "No (Tiene gravamen activo)",
+        escriturada: activeProperty.legalPublicDeed ? "Sí (Escriturada)" : "Pendiente/No especificado",
+        predialAlCorriente: activeProperty.legalTaxCurrent ? "Sí (Al corriente)" : "No/Pendiente",
+        serviciosPagados: activeProperty.legalServicesPaid ? "Sí (Pagados al corriente)" : "No/Pendiente",
+        regimenCondominio: activeProperty.condominiumRegime ? "Sí (Régimen de Condominio)" : "No (Individual/Terreno)",
+        tipoPropietario: activeProperty.legalOwnerType || "Persona Física",
+        hipotecada: activeProperty.legalIsMortgaged ? "Sí (Tiene hipoteca activa)" : "No (Sin hipoteca)"
+      };
+
+      const paymentMethods = {
+        creditoBancario: activeProperty.offerings?.some(o => o.acceptsBankCredit) ? "Aceptado" : "No especificado/Solo contado",
+        creditoInfonavit: activeProperty.offerings?.some(o => o.acceptsInfonavit) ? "Aceptado" : "No especificado/Solo contado",
+        creditoFovissste: activeProperty.offerings?.some(o => o.acceptsFovissste) ? "Aceptado" : "No especificado/Solo contado",
+        contado: "Aceptado (Esquema estándar)",
+        esquemasAuraSwap: activeProperty.offerings?.map(o => ({
+          modalidad: o.mode,
+          precio: o.priceAmount ? `${o.priceAmount} ${o.currency}` : "N/A",
+          periodo: o.billingPeriod
+        })) || []
+      };
+
+      activePropertyDossier = JSON.stringify({
+        id: activeProperty.id,
+        titulo: activePropertyTitle,
+        descripcion: activePropertyDescription,
+        amenidades: activeProperty.amenities || [],
+        expedienteJuridico: legalStatus,
+        modalidadesYMetodosPago: paymentMethods
+      }, null, 2);
+    }
     if (activeProperty) {
       const localQAAnswer = resolveLocalPropertyQA(prompt, activeProperty, language === 'es' ? 'es' : 'en');
       if (localQAAnswer) {
@@ -1739,7 +1792,10 @@ Explore actualizado: Redirecting to /explore`);
     const isPropertySearch = ['BUY_PROPERTY', 'RENT_PROPERTY', 'SWAP_PROPERTY', 'SEARCH_PROPERTY'].includes(classification.intent);
 
     if (isPropertySearch) {
-      if (classification.confidence < 0.60) {
+      const userAlreadyResponded = (activeIntent as any) === ConversationIntent.PROPERTY_SEARCH;
+      const isBanned = !!activeProperty || userAlreadyResponded;
+
+      if (classification.confidence < 0.60 && !isBanned) {
         // Low confidence. Ask the clarifying question as requested.
         const clarifyMsg = language === 'es'
           ? '¿Quieres comprar, rentar o intercambiar una propiedad?'
@@ -1923,7 +1979,7 @@ Explore actualizado: Redirecting to /explore`);
     if (geminiActive) {
       // Gemini Flash is the default brain: send message directly to Gemini native endpoint
       console.log("[Eterna-Gemini] Brain switch is active. Sending directly to Gemini API.");
-      callGeminiAvatarAPI(prompt);
+      callGeminiAvatarAPI(prompt, currentPropertyId, activePropertyTitle, activePropertyDescription, activePropertyDossier);
     } else if (isConnected) {
       // Send to WebSocket server with Context Bridge and Secure User ID
       console.log("[Eterna Audit] handleSend: Routing to remote WebSocket backend.");
@@ -1934,7 +1990,7 @@ Explore actualizado: Redirecting to /explore`);
     } else {
       // Gemini REST integration as intelligent fallback
       console.log("[Eterna REST Integration] Routing to Gemini API endpoint `/api/avatar` as fallback.");
-      callGeminiAvatarAPI(prompt);
+      callGeminiAvatarAPI(prompt, currentPropertyId, activePropertyTitle, activePropertyDescription, activePropertyDossier);
     }
   };
 
