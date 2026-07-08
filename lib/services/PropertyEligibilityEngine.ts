@@ -17,11 +17,11 @@ export class LegalEngine {
   public static calculateStatus(property: Property): LegalEngineResult {
     const warnings: string[] = [];
 
-    // 🔴 RED: Critical legal risks
+    // 🔴 RIESGO CRÍTICO: Si NO tiene escrituras o está embargado
     if (property.legalLienType === 'Embargo') {
       warnings.push('ATENCIÓN: Inmueble con proceso de embargo activo. La venta/renta está restringida jurídicamente hasta su resolución.');
     }
-    if (property.legalPublicDeed === false) {
+    if (property.legalPublicDeed !== true) { // Se cambia === false por !== true para atrapar undefined/null
       warnings.push('La propiedad no cuenta con Escrituras Públicas inscritas. No es elegible para ningún tipo de crédito hipotecario.');
     }
 
@@ -34,43 +34,24 @@ export class LegalEngine {
       };
     }
 
-    // 🟡 YELLOW: Requires review
-    if (property.legalDebtFree === false) {
-      if (property.legalLienType === 'Banco') {
-        warnings.push('Existe una hipoteca bancaria vigente. La operación requiere liquidación o sustitución de garantía en la firma.');
-      } else if (property.legalLienType === 'Infonavit') {
-        warnings.push('El inmueble mantiene un crédito Infonavit vigente. Será necesario cancelar o sustituir el crédito antes de formalizar la venta.');
-      } else if (property.legalLienType === 'FOVISSSTE') {
-        warnings.push('El inmueble mantiene un crédito FOVISSSTE vigente. Será necesario cancelar o sustituir el crédito antes de formalizar la venta.');
-      } else if (property.legalLienType === 'Particular' || property.legalLienType === 'Hipoteca privada') {
-        warnings.push('La operación requiere revisión jurídica previa debido a gravamen particular o hipoteca privada activa.');
-      } else {
-        warnings.push(`La propiedad cuenta con gravamen activo registrado como: ${property.legalLienType || 'Otro'}.`);
-      }
+    // 🟡 ADVERTENCIA: Requiere revisión (Predial o Gravamen menor)
+    if (property.legalDebtFree !== true) {
+      warnings.push('La propiedad cuenta con un gravamen activo o hipoteca pendiente por liquidar.');
     }
-
-    if (property.legalTaxCurrent === false) {
-      warnings.push('Se detectó adeudo en el pago de Predial. Se requiere la regularización del adeudo antes de la firma de escrituras.');
-    }
-
-    if (property.legalRegime === 'Ejidal') {
-      warnings.push('Propiedad de régimen Ejidal. No es apta para créditos hipotecarios institucionales. La transacción se debe realizar mediante cesión de derechos ante la comisaría ejidal.');
-    }
-
-    if (property.legalDocumentationComplete === false) {
-      warnings.push('Documentación del expediente incompleta. Se requiere integrar el expediente técnico-jurídico antes del avalúo.');
+    if (property.legalTaxCurrent !== true) {
+      warnings.push('Se detectó adeudo en el pago de Predial o requiere actualización de pagos.');
     }
 
     if (warnings.length > 0) {
       return {
         status: 'YELLOW',
-        label: 'Requiere revisión',
-        explanation: 'El expediente cuenta con gravámenes, adeudos o regímenes especiales que requieren gestión jurídica previa para la firma.',
+        label: 'Sujeto a Revisión',
+        explanation: 'La documentación presenta advertencias o adeudos pendientes que deben solventarse antes de la firma.',
         warnings
       };
     }
 
-    // 🟢 GREEN: Complete and clean
+    // 🟢 TODO CORRECTO: Expediente limpio
     return {
       status: 'GREEN',
       label: 'Expediente Completo',

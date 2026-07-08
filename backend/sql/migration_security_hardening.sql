@@ -65,7 +65,14 @@ SELECT
   short_link,
   updated_at,
   is_demo,
-  desired_exchange
+  desired_exchange,
+  -- Columnas legales seguras para consistencia de la UI
+  legal_public_deed,
+  legal_tax_current,
+  legal_debt_free,
+  legal_services_paid,
+  legal_owner_type,
+  legal_is_mortgaged
 FROM public.properties
 WHERE is_published = true;
 

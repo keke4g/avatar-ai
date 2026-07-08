@@ -1,0 +1,1 @@
+// Temp schema check script

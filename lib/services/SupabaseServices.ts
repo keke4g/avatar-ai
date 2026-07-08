@@ -12,6 +12,51 @@ import { searchLogger } from '../search/searchLogger';
 const HYBRID_PROPERTY_SELECT = '*, property_images(image_url, display_order), profiles:public_profiles_view!host_id(name, avatar_url, is_verified), property_offerings(*, property_offering_availability(*), property_offering_pricing_rules(*))';
 const LEGACY_PROPERTY_SELECT = '*, property_images(image_url, display_order), profiles:public_profiles_view!host_id(name, avatar_url, is_verified)';
 
+let cachedPropertiesColumns: string[] | null = null;
+
+async function getPropertiesColumns(): Promise<string[]> {
+  if (cachedPropertiesColumns) return cachedPropertiesColumns;
+
+  const fallbackColumns = [
+    'id', 'host_id', 'title', 'description', 'type', 'value_rating', 'location', 'country', 'address',
+    'latitude', 'longitude', 'bedrooms', 'bathrooms', 'max_guests', 'aura_score', 'amenities', 'rules',
+    'is_published', 'is_featured', 'created_at', 'featured_until', 'featured_rank', 'internal_code',
+    'primary_operation', 'owner_profile_id', 'company_id', 'development_name', 'subdivision_name',
+    'private_neighborhood', 'phase_stage', 'lot_number', 'block_number', 'condominium_regime',
+    'maintenance_fee_amount', 'neighborhood', 'postal_code', 'street_name', 'street_number',
+    'location_reference', 'show_public_address', 'search_radius_meters', 'nearby_schools',
+    'nearby_hospitals', 'nearby_malls', 'half_bathrooms', 'parking_spaces', 'levels_count',
+    'construction_age', 'conservation_state_id', 'construction_type_id', 'surface_total',
+    'surface_built', 'surface_front', 'surface_depth', 'surface_garden', 'surface_terrace',
+    'surface_roof_garden', 'surface_patio', 'legal_debt_free', 'legal_public_deed', 'legal_tax_current',
+    'legal_services_paid', 'legal_owner_type', 'legal_is_mortgaged'
+  ];
+
+  try {
+    const { data } = await supabase.from('properties').select().limit(1);
+    if (data && data.length > 0) {
+      cachedPropertiesColumns = Object.keys(data[0]);
+      return cachedPropertiesColumns;
+    }
+  } catch (e) {
+    console.warn('[SupabasePropertyService] Failed to dynamically discover properties columns, falling back.', e);
+  }
+
+  cachedPropertiesColumns = fallbackColumns;
+  return fallbackColumns;
+}
+
+async function filterPropertiesPayload(payload: Record<string, any>): Promise<Record<string, any>> {
+  const allowed = await getPropertiesColumns();
+  const filtered: Record<string, any> = {};
+  for (const key of Object.keys(payload)) {
+    if (allowed.includes(key)) {
+      filtered[key] = payload[key];
+    }
+  }
+  return filtered;
+}
+
 const isMissingOfferingsRelationError = (error: any): boolean => {
   return error?.code === 'PGRST200' || error?.code === '42P01';
 };
@@ -384,34 +429,38 @@ export class SupabasePropertyService implements IPropertyService {
   }
 
   async create(property: Partial<Property> & { title: string; hostId: string }): Promise<Property> {
+    const rawPayload = {
+      host_id: property.hostId,
+      title: property.title,
+      description: property.description || '',
+      type: property.type || 'Apartment',
+      value_rating: property.valueRating || 'Premium',
+      location: property.location || '',
+      country: property.country || '',
+      address: property.address || '',
+      latitude: property.latitude ?? null,
+      longitude: property.longitude ?? null,
+      place_id: property.placeId ?? null,
+      formatted_address: property.formattedAddress ?? null,
+      city: property.city ?? null,
+      state: property.state ?? null,
+      geometry_source: property.geometrySource ?? null,
+      bedrooms: property.bedrooms || 1,
+      bathrooms: property.bathrooms || 1,
+      max_guests: property.maxGuests || 2,
+      aura_score: property.auraScore || 95,
+      amenities: property.amenities || [],
+      rules: property.rules || [],
+      is_published: property.isPublished ?? true,
+      is_featured: (property as any).isFeatured ?? false
+    };
+
+    const filteredPayload = await filterPropertiesPayload(rawPayload);
+
     // 1. Create property record
     const { data, error } = await supabase
       .from('properties')
-      .insert({
-        host_id: property.hostId,
-        title: property.title,
-        description: property.description || '',
-        type: property.type || 'Apartment',
-        value_rating: property.valueRating || 'Premium',
-        location: property.location || '',
-        country: property.country || '',
-        address: property.address || '',
-        latitude: property.latitude ?? null,
-        longitude: property.longitude ?? null,
-        place_id: property.placeId ?? null,
-        formatted_address: property.formattedAddress ?? null,
-        city: property.city ?? null,
-        state: property.state ?? null,
-        geometry_source: property.geometrySource ?? null,
-        bedrooms: property.bedrooms || 1,
-        bathrooms: property.bathrooms || 1,
-        max_guests: property.maxGuests || 2,
-        aura_score: property.auraScore || 95,
-        amenities: property.amenities || [],
-        rules: property.rules || [],
-        is_published: property.isPublished ?? true,
-        is_featured: (property as any).isFeatured ?? false
-      })
+      .insert(filteredPayload)
       .select()
       .single();
 
@@ -519,30 +568,34 @@ export class SupabasePropertyService implements IPropertyService {
   }
 
   async update(id: string, property: Partial<Property>): Promise<Property> {
+    const rawPayload = {
+      title: property.title,
+      description: property.description,
+      type: property.type,
+      value_rating: property.valueRating,
+      location: property.location,
+      country: property.country,
+      address: property.address,
+      latitude: property.latitude,
+      longitude: property.longitude,
+      place_id: property.placeId,
+      formatted_address: property.formattedAddress,
+      city: property.city,
+      state: property.state,
+      geometry_source: property.geometrySource,
+      bedrooms: property.bedrooms,
+      bathrooms: property.bathrooms,
+      max_guests: property.maxGuests,
+      amenities: property.amenities,
+      rules: property.rules,
+      is_published: property.isPublished
+    };
+
+    const filteredPayload = await filterPropertiesPayload(rawPayload);
+
     const { data, error } = await supabase
       .from('properties')
-      .update({
-        title: property.title,
-        description: property.description,
-        type: property.type,
-        value_rating: property.valueRating,
-        location: property.location,
-        country: property.country,
-        address: property.address,
-        latitude: property.latitude,
-        longitude: property.longitude,
-        place_id: property.placeId,
-        formatted_address: property.formattedAddress,
-        city: property.city,
-        state: property.state,
-        geometry_source: property.geometrySource,
-        bedrooms: property.bedrooms,
-        bathrooms: property.bathrooms,
-        max_guests: property.maxGuests,
-        amenities: property.amenities,
-        rules: property.rules,
-        is_published: property.isPublished
-      })
+      .update(filteredPayload)
       .eq('id', id)
       .select()
       .single();
