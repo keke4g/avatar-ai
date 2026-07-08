@@ -3,7 +3,7 @@ import { Property } from '../lib/types';
 
 interface TestCase {
   name: string;
-  property: Partial<Property>;
+  property: any;
   expectedSuccess: boolean;
   expectedFieldErrors?: string[];
 }
