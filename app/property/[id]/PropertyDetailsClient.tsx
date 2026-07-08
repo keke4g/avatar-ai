@@ -99,6 +99,74 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   // Find property dynamically
   const property = properties.find((p) => p.id === id);
 
+  const mediaItems = useMemo(() => {
+    const items: { type: 'image' | 'video' | 'youtube'; url: string }[] = [];
+    if (!property) return items;
+
+    // Add images
+    if (property.images && property.images.length > 0) {
+      property.images.forEach(url => {
+        items.push({ type: 'image', url });
+      });
+    }
+
+    // Add local video if exists
+    if (property.metadata?.videoUrl) {
+      items.push({ type: 'video', url: property.metadata.videoUrl });
+    }
+
+    // Add YouTube video if exists
+    const ytUrl = property.metadata?.videoPlaceholder || '';
+    if (ytUrl && (ytUrl.includes('youtube.com') || ytUrl.includes('youtu.be'))) {
+      items.push({ type: 'youtube', url: ytUrl });
+    }
+
+    return items;
+  }, [property]);
+
+  const renderMediaItem = (item: { type: 'image' | 'video' | 'youtube'; url: string }, className?: string) => {
+    if (item.type === 'youtube') {
+      let videoId = '';
+      if (item.url.includes('youtube.com')) {
+        const parts = item.url.split('v=');
+        if (parts.length > 1) videoId = parts[1].split('&')[0];
+      } else if (item.url.includes('youtu.be')) {
+        const parts = item.url.split('/');
+        videoId = parts[parts.length - 1].split('?')[0];
+      }
+      const embedUrl = videoId ? `https://www.youtube.com/embed/${videoId}` : item.url;
+
+      return (
+        <iframe
+          src={embedUrl}
+          className={`${className} border-0`}
+          allowFullScreen
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        />
+      );
+    }
+
+    if (item.type === 'video') {
+      return (
+        <video
+          src={item.url}
+          controls
+          className={className}
+        />
+      );
+    }
+
+    return (
+      <img
+        src={item.url}
+        alt={property?.title || ''}
+        className={className}
+        loading="lazy"
+        decoding="async"
+      />
+    );
+  };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const detailsMapRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -115,6 +183,20 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isFullScreen, setIsFullScreen] = useState(false);
 
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error(`Error enabling fullscreen: ${err.message}`);
+      });
+      setIsFullScreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+      setIsFullScreen(false);
+    }
+  };
+
   // Financing Calculator States
   const [downPaymentPct, setDownPaymentPct] = useState(20);
   const [financingTermYears, setFinancingTermYears] = useState(20);
@@ -123,23 +205,23 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   const [activeMediaTab, setActiveMediaTab] = useState<'photos' | 'video' | 'virtual' | 'blueprints'>('photos');
   // Keyboard and helper functions for Premium Gallery
   const handlePrevImage = () => {
-    if (!property?.images) return;
+    if (mediaItems.length === 0) return;
     setIsZoomed(false);
     setZoomScale(1);
     setPanOffset({ x: 0, y: 0 });
-    setGalleryIndex((prev) => (prev === 0 ? property.images.length - 1 : prev - 1));
+    setGalleryIndex((prev) => (prev === 0 ? mediaItems.length - 1 : prev - 1));
   };
 
   const handleNextImage = () => {
-    if (!property?.images) return;
+    if (mediaItems.length === 0) return;
     setIsZoomed(false);
     setZoomScale(1);
     setPanOffset({ x: 0, y: 0 });
-    setGalleryIndex((prev) => (prev === property.images.length - 1 ? 0 : prev + 1));
+    setGalleryIndex((prev) => (prev === mediaItems.length - 1 ? 0 : prev + 1));
   };
 
   useEffect(() => {
-    if (!isGalleryOpen || !property?.images) return;
+    if (!isGalleryOpen || mediaItems.length === 0) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -155,7 +237,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isGalleryOpen, galleryIndex, property]);
+  }, [isGalleryOpen, galleryIndex, mediaItems]);
 
   const handleWheel = (e: React.WheelEvent) => {
     if (!isGalleryOpen) return;
@@ -788,28 +870,37 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           onClick={() => { setGalleryIndex(0); setIsGalleryOpen(true); }}
           className="md:col-span-2 aspect-[4/3] md:aspect-square relative overflow-hidden bg-brand-gray-100 group"
         >
-          <img
-            src={getImageUrl(0)}
-            alt={property.title}
-            onError={() => handleImageError(0)}
-            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500 ease-out"
-            loading="lazy"
-            decoding="async"
-          />
+          {mediaItems[0] ? (
+            renderMediaItem(mediaItems[0], "w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500 ease-out")
+          ) : (
+            <div className="w-full h-full bg-brand-gray-100 flex items-center justify-center">
+              <Compass className="w-12 h-12 text-brand-gray-300 animate-pulse" />
+            </div>
+          )}
           <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
             <span className="bg-white/95 text-brand-black text-xs font-black px-4 py-2 rounded-full shadow-md flex items-center gap-1.5 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
               <ZoomIn className="w-3.5 h-3.5" />
               <span>{language === 'es' ? 'Ver galería' : 'View gallery'}</span>
             </span>
           </div>
+          {mediaItems[0]?.type === 'video' && (
+            <div className="absolute top-4 right-4 bg-brand-black/60 text-white p-2 rounded-full z-10 flex items-center justify-center">
+              <Play className="w-4 h-4 fill-white text-white" />
+            </div>
+          )}
+          {mediaItems[0]?.type === 'youtube' && (
+            <div className="absolute top-4 right-4 bg-brand-accent/90 text-white px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider z-10">
+              3D Tour
+            </div>
+          )}
         </div>
         
         {/* Right sub-images grid */}
         <div className="hidden md:grid md:col-span-2 grid-cols-2 gap-3">
           {Array.from({ length: 4 }).map((_, idx) => {
             const index = idx + 1;
-            const hasImage = property.images && property.images[index];
-            if (!hasImage && index >= property.images.length) {
+            const item = mediaItems[index];
+            if (!item) {
               return (
                 <div key={`fallback-${index}`} className="aspect-square bg-brand-gray-100 flex items-center justify-center border border-brand-gray-200/50">
                   <Compass className="w-8 h-8 text-brand-gray-300 animate-pulse" />
@@ -822,19 +913,22 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 onClick={() => { setGalleryIndex(index); setIsGalleryOpen(true); }}
                 className="aspect-square relative overflow-hidden bg-brand-gray-100 group"
               >
-                <img
-                  src={getImageUrl(index)}
-                  alt={`${property.title} gallery ${index}`}
-                  onError={() => handleImageError(index)}
-                  className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
-                  loading="lazy"
-                  decoding="async"
-                />
+                {renderMediaItem(item, "w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out")}
                 <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                   <span className="bg-white/95 text-brand-black text-[10px] font-black px-3 py-1.5 rounded-full shadow-sm">
-                    Ver más
+                    {language === 'es' ? 'Ver más' : 'View more'}
                   </span>
                 </div>
+                {item.type === 'video' && (
+                  <div className="absolute top-2 right-2 bg-brand-black/60 text-white p-1.5 rounded-full z-10 flex items-center justify-center">
+                    <Play className="w-3.5 h-3.5 fill-white text-white" />
+                  </div>
+                )}
+                {item.type === 'youtube' && (
+                  <div className="absolute top-2 right-2 bg-brand-accent/90 text-white px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wide z-10">
+                    3D Tour
+                  </div>
+                )}
               </div>
             );
           })}
@@ -2556,7 +2650,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               <p className="text-xs text-brand-gray-500 leading-relaxed mb-6 font-semibold">
                 {language === 'es'
                   ? 'Tu intención quedó registrada. El propietario podrá revisarla desde su panel de leads recibidos.'
-                  : 'Your intent has been recorded. The owner can review it from their received leads panel.'}
+                  : 'Your intention has been registered. The owner will be able to review it from their received leads panel.'}
               </p>
 
               <button
@@ -2572,7 +2666,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
       {/* Premium Lightbox Gallery Modal */}
       <AnimatePresence>
-        {isGalleryOpen && property?.images && (
+        {isGalleryOpen && mediaItems.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -2595,7 +2689,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     {language === 'es' ? 'Galería Premium' : 'Premium Gallery'}
                   </span>
                   <span className="text-xs font-bold text-brand-gray-300">
-                    {galleryIndex + 1} / {property.images.length}
+                    {galleryIndex + 1} / {mediaItems.length}
                   </span>
                 </div>
               </div>
@@ -2604,60 +2698,35 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    const newScale = Math.min(4, zoomScale + 0.5);
-                    setZoomScale(newScale);
-                    setIsZoomed(newScale > 1);
-                  }}
+                  onClick={toggleFullScreen}
                   className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer text-brand-gray-300 hover:text-white"
-                  title="Acercar"
-                >
-                  <ZoomIn className="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newScale = Math.max(1, zoomScale - 0.5);
-                    setZoomScale(newScale);
-                    setIsZoomed(newScale > 1);
-                    if (newScale === 1) setPanOffset({ x: 0, y: 0 });
-                  }}
-                  className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer text-brand-gray-300 hover:text-white"
-                  title="Alejar"
-                >
-                  <ZoomOut className="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsZoomed(!isZoomed);
-                    setZoomScale(isZoomed ? 1 : 2.5);
-                    if (isZoomed) setPanOffset({ x: 0, y: 0 });
-                  }}
-                  className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer text-brand-gray-300 hover:text-white"
-                  title="Restablecer"
+                  title="Fullscreen"
                 >
                   <Maximize className="w-5 h-5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = property.images[galleryIndex];
-                    link.download = `propiedad-${property.id}-foto-${galleryIndex + 1}.jpg`;
-                    link.target = '_blank';
-                    link.click();
+                    if (mediaItems[galleryIndex]) {
+                      const link = document.createElement('a');
+                      link.href = mediaItems[galleryIndex].url;
+                      link.download = `propiedad-${property.id}-media-${galleryIndex + 1}`;
+                      link.target = '_blank';
+                      link.click();
+                    }
                   }}
                   className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer text-brand-gray-300 hover:text-white"
-                  title="Descargar Foto"
+                  title="Descargar"
                 >
                   <Download className="w-5 h-5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard.writeText(property.images[galleryIndex]);
-                    alert(language === 'es' ? 'Enlace de la imagen copiado al portapapeles.' : 'Image URL copied to clipboard.');
+                    if (mediaItems[galleryIndex]) {
+                      navigator.clipboard.writeText(mediaItems[galleryIndex].url);
+                      alert(language === 'es' ? 'Enlace copiado al portapapeles.' : 'URL copied to clipboard.');
+                    }
                   }}
                   className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer text-brand-gray-300 hover:text-white"
                   title="Compartir enlace"
@@ -2680,22 +2749,28 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 <ChevronLeft className="w-6 h-6" />
               </button>
 
-              {/* Main Image with Pan & Zoom */}
+              {/* Main Media Content */}
               <div className="w-full h-full flex items-center justify-center relative">
-                <motion.img
-                  key={galleryIndex}
-                  src={property.images[galleryIndex]}
-                  alt={`${property.title} - ${galleryIndex + 1}`}
-                  animate={{ scale: zoomScale, x: panOffset.x, y: panOffset.y }}
-                  drag={isZoomed}
-                  dragConstraints={{ left: -300 * zoomScale, right: 300 * zoomScale, top: -200 * zoomScale, bottom: 200 * zoomScale }}
-                  dragElastic={0.1}
-                  onDragEnd={(e, info) => {
-                    setPanOffset({ x: info.offset.x, y: info.offset.y });
-                  }}
-                  onDoubleClick={handleDoubleClick}
-                  className={`max-w-full max-h-[75vh] object-contain rounded-xl select-none shadow-2xl transition-shadow ${isZoomed ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
-                />
+                {mediaItems[galleryIndex]?.type === 'image' ? (
+                  <motion.img
+                    key={galleryIndex}
+                    src={mediaItems[galleryIndex].url}
+                    alt={`${property.title} - ${galleryIndex + 1}`}
+                    animate={{ scale: zoomScale, x: panOffset.x, y: panOffset.y }}
+                    drag={isZoomed}
+                    dragConstraints={{ left: -300 * zoomScale, right: 300 * zoomScale, top: -200 * zoomScale, bottom: 200 * zoomScale }}
+                    dragElastic={0.1}
+                    onDragEnd={(e, info) => {
+                      setPanOffset({ x: info.offset.x, y: info.offset.y });
+                    }}
+                    onDoubleClick={handleDoubleClick}
+                    className={`max-w-full max-h-[75vh] object-contain rounded-xl select-none shadow-2xl transition-shadow ${isZoomed ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
+                  />
+                ) : (
+                  <div className="w-full max-w-4xl aspect-video rounded-xl overflow-hidden shadow-2xl bg-black flex items-center justify-center">
+                    {renderMediaItem(mediaItems[galleryIndex], "w-full h-full object-contain")}
+                  </div>
+                )}
               </div>
 
               <button
@@ -2710,7 +2785,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             {/* Bottom Thumbnail Strip */}
             <div className="bg-gradient-to-t from-black/80 to-transparent p-6 z-10">
               <div className="flex justify-center gap-2 max-w-full overflow-x-auto py-2 no-scrollbar">
-                {property.images.map((img, idx) => (
+                {mediaItems.map((item, idx) => (
                   <button
                     key={idx}
                     type="button"
@@ -2722,11 +2797,23 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     }}
                     className={`relative w-16 h-12 rounded-lg overflow-hidden shrink-0 transition-all border-2 cursor-pointer ${galleryIndex === idx ? 'border-brand-accent scale-105' : 'border-transparent opacity-50 hover:opacity-100'}`}
                   >
-                    <img
-                      src={img}
-                      alt={`Thumbnail ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                    />
+                    {item.type === 'image' ? (
+                      <img
+                        src={item.url}
+                        alt={`Thumbnail ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : item.type === 'video' ? (
+                      <div className="w-full h-full bg-brand-black flex items-center justify-center relative">
+                        <video src={item.url} className="w-full h-full object-cover opacity-60" muted />
+                        <Play className="absolute w-4 h-4 text-white fill-white" />
+                      </div>
+                    ) : (
+                      <div className="w-full h-full bg-brand-black flex items-center justify-center relative">
+                        <div className="absolute inset-0 bg-brand-accent/40" />
+                        <span className="absolute text-[8px] font-black text-white uppercase tracking-wider">3D</span>
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
