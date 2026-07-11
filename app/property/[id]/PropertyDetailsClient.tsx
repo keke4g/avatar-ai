@@ -10,7 +10,7 @@ import {
   BedDouble, Bath, Users, ArrowRight, ChevronLeft, ChevronRight,
   Wifi, Waves, Coffee, Monitor, Wind, Key, Flame, Compass, MessageSquareCode,
   ZoomIn, ZoomOut, Maximize, Download, ExternalLink, Play, FileText, Info, ShieldAlert, Award, TrendingUp, BarChart2, FileCheck, RefreshCw,
-  Car, Building, Home, PhoneCall
+  Car, Building, Home, PhoneCall, Mail, UserRound, MessageCircle, Clock3
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -1646,72 +1646,132 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             };
 
             const label = getResponsibleLabel(property, language);
+            const whatsappMessage = language === 'es'
+              ? `Hola ${broker.name}, me interesa la propiedad "${property.title}" (${property.id}). ¿Podrías darme más información?`
+              : `Hello ${broker.name}, I am interested in "${property.title}" (${property.id}). Could you share more information?`;
+            const mailSubject = language === 'es'
+              ? `Interés en propiedad AuraSwap: ${property.title}`
+              : `AuraSwap property inquiry: ${property.title}`;
 
             return (
-              <div className="bg-white border border-brand-gray-200 rounded-3xl p-6 flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between shadow-xs transition-all duration-300 hover:shadow-sm">
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left w-full lg:w-auto">
-                  <div className="relative shrink-0">
-                    <img
-                      src={broker.photo}
-                      alt={broker.name}
-                      className="w-16 h-16 rounded-full object-cover border-2 border-brand-accent/20 p-0.5 shadow-xs"
-                    />
-                    {property.hostVerified && (
-                      <span className="absolute bottom-0 right-0 bg-brand-accent text-white p-0.5 rounded-full border-2 border-white shadow-xs">
-                        <ShieldCheck className="w-3.5 h-3.5 fill-white" />
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1 w-full text-left">
-                    <div>
-                      <span className="inline-block bg-brand-accent/10 text-brand-accent px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">{label}</span>
-                    </div>
-                    <h3 className="text-xl font-black text-brand-black mt-1 leading-tight">{broker.name}</h3>
-                    <p className="text-xs font-bold text-brand-gray-650">
-                      {broker.position} <span className="text-brand-gray-300 mx-1">•</span> <span className="text-brand-gray-400">{broker.company}</span>
-                    </p>
-                    <p className="text-xs text-brand-gray-500 font-semibold mt-1 flex items-center gap-1.5 justify-start">
-                      <Sparkles className="w-3.5 h-3.5 text-brand-accent shrink-0" />
-                      <span>{language === 'es' ? 'Tiempo de respuesta:' : 'Response time:'} <span className="text-brand-accent font-black">{broker.responseTime}</span></span>
-                    </p>
-                  </div>
-                </div>
+              <section className="relative overflow-hidden border-y border-brand-gray-200/80 bg-gradient-to-br from-brand-gray-50/80 via-white to-brand-accent/[0.035] px-5 py-7 sm:px-7 sm:py-8">
+                <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-brand-accent/[0.055] blur-3xl pointer-events-none" />
 
-                <div className="grid grid-cols-2 gap-2.5 w-full lg:w-80 shrink-0">
+                <div className="relative grid gap-7 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-center">
+                  <div className="contents">
+                    <div className="flex items-center justify-between gap-4 border-b border-brand-gray-200/70 pb-4 lg:col-span-2">
+                      <div>
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-brand-accent">
+                          {language === 'es' ? 'Contacto de esta propiedad' : 'Property contact'}
+                        </span>
+                        <h3 className="mt-1 text-base font-extrabold text-brand-black">
+                          {language === 'es' ? 'Habla directamente con el responsable' : 'Speak directly with the representative'}
+                        </h3>
+                      </div>
+                      <span className="hidden sm:inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-emerald-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-emerald-700">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        {language === 'es' ? 'Disponible' : 'Available'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-4 sm:gap-5">
+                      <div className="relative shrink-0">
+                        <div className="rounded-full bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.10)] ring-1 ring-brand-gray-200">
+                          <img
+                            src={broker.photo}
+                            alt={broker.name}
+                            className="h-20 w-20 rounded-full object-cover sm:h-24 sm:w-24"
+                          />
+                        </div>
+                        {property.hostVerified && (
+                          <span className="absolute bottom-0.5 right-0.5 flex h-7 w-7 items-center justify-center rounded-full border-[3px] border-white bg-brand-accent text-white shadow-sm" title={language === 'es' ? 'Identidad verificada' : 'Verified identity'}>
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="min-w-0">
+                        <span className="inline-flex rounded-full bg-brand-accent/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.16em] text-brand-accent">
+                          {label}
+                        </span>
+                        <h4 className="mt-2 truncate text-2xl font-black leading-none text-brand-black">{broker.name}</h4>
+                        <p className="mt-2 text-xs font-bold leading-relaxed text-brand-gray-650">
+                          {broker.position}
+                          <span className="mx-1.5 text-brand-gray-300">·</span>
+                          <span className="text-brand-gray-500">{broker.company}</span>
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-gray-200 bg-white/90 px-2.5 py-1.5 text-[9px] font-extrabold text-brand-gray-600 shadow-xs">
+                            <Clock3 className="h-3 w-3 text-brand-accent" />
+                            {language === 'es' ? 'Responde en' : 'Replies in'} {broker.responseTime.toLowerCase()}
+                          </span>
+                          {property.hostVerified && (
+                            <span className="inline-flex items-center gap-1.5 text-[9px] font-extrabold text-brand-gray-500">
+                              <ShieldCheck className="h-3 w-3 text-emerald-600" />
+                              {language === 'es' ? 'Perfil verificado' : 'Verified profile'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[22px] border border-brand-gray-200/80 bg-white/90 p-3 shadow-[0_12px_30px_rgba(15,23,42,0.07)] backdrop-blur-sm">
                   {broker.whatsapp && (
                     <a
-                      href={`https://wa.me/${broker.whatsapp}?text=Hola%20${encodeURIComponent(broker.name)},%20estoy%20interesado%20en%20la%20propiedad%20"${encodeURIComponent(property.title)}"%20con%20ID%20${property.id}`}
+                      href={`https://wa.me/${broker.whatsapp}?text=${encodeURIComponent(whatsappMessage)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="h-11 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
+                      aria-label={`${language === 'es' ? 'Escribir por WhatsApp a' : 'Message on WhatsApp'} ${broker.name}`}
+                      className="group flex h-12 w-full items-center justify-between rounded-2xl bg-brand-black px-4 text-xs font-extrabold text-white transition-all duration-200 hover:bg-brand-gray-800 active:scale-[0.99]"
                     >
-                      WhatsApp
+                      <span className="flex items-center gap-2.5">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white">
+                          <MessageCircle className="h-3.5 w-3.5" />
+                        </span>
+                        {language === 'es' ? 'Escribir por WhatsApp' : 'Message on WhatsApp'}
+                      </span>
+                      <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                     </a>
                   )}
-                  {broker.phone && (
-                    <a
-                      href={`tel:${broker.phone}`}
-                      className="h-11 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-300 text-brand-black rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
-                    >
-                      Llamar
-                    </a>
-                  )}
-                  {broker.email && (
-                    <a
-                      href={`mailto:${broker.email}?subject=Interés en propiedad AuraSwap: ${encodeURIComponent(property.title)}`}
-                      className="h-11 bg-brand-gray-50 hover:bg-brand-gray-155 border border-brand-gray-300 text-brand-black rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
-                    >
-                      Correo
-                    </a>
-                  )}
-                  <button
-                    onClick={() => router.push(`/profile/${property.hostId || 'current-user'}`)}
-                    className="h-11 bg-brand-black hover:bg-brand-black/90 text-white rounded-2xl text-xs font-bold flex items-center justify-center transition-all hover:scale-[1.02] active:scale-[0.98] duration-200 shadow-xs"
-                  >
-                    Ver Perfil
-                  </button>
+
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      {broker.phone && (
+                        <a
+                          href={`tel:${broker.phone}`}
+                          className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-brand-gray-200 bg-brand-gray-50/70 text-[9px] font-extrabold text-brand-gray-700 transition-colors hover:border-brand-gray-300 hover:bg-brand-gray-100"
+                        >
+                          <PhoneCall className="h-4 w-4 text-brand-black" />
+                          {language === 'es' ? 'Llamar' : 'Call'}
+                        </a>
+                      )}
+                      {broker.email && (
+                        <a
+                          href={`mailto:${broker.email}?subject=${encodeURIComponent(mailSubject)}`}
+                          className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-brand-gray-200 bg-brand-gray-50/70 text-[9px] font-extrabold text-brand-gray-700 transition-colors hover:border-brand-gray-300 hover:bg-brand-gray-100"
+                        >
+                          <Mail className="h-4 w-4 text-brand-black" />
+                          {language === 'es' ? 'Correo' : 'Email'}
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/profile/${property.hostId || 'current-user'}`)}
+                        className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-brand-gray-200 bg-brand-gray-50/70 text-[9px] font-extrabold text-brand-gray-700 transition-colors hover:border-brand-gray-300 hover:bg-brand-gray-100 cursor-pointer"
+                      >
+                        <UserRound className="h-4 w-4 text-brand-black" />
+                        {language === 'es' ? 'Ver perfil' : 'View profile'}
+                      </button>
+                    </div>
+
+                    <p className="mt-3 px-1 text-center text-[9px] font-semibold leading-relaxed text-brand-gray-400">
+                      {language === 'es'
+                        ? 'Contacto directo y protegido dentro del expediente de AuraSwap.'
+                        : 'Direct, protected contact within the AuraSwap listing.'}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              </section>
             );
           })()}
 
