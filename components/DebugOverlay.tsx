@@ -1,40 +1,43 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-
-if (typeof window !== 'undefined') {
-  (window as any).__eternaDebugLogs = (window as any).__eternaDebugLogs || [];
-  (window as any).__eternaAddDebugLog = (msg: string) => {
-    const entry = { time: new Date().toLocaleTimeString(), message: msg };
-    (window as any).__eternaDebugLogs.push(entry);
-    window.dispatchEvent(new CustomEvent('eterna-debug-log', { detail: entry }));
-  };
-}
 
 type LogEntry = {
   time: string;
   message: string;
 };
 
+declare global {
+  interface Window {
+    __eternaDebugLogs?: LogEntry[];
+    __eternaAddDebugLog?: (message: string) => void;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.__eternaDebugLogs ??= [];
+  window.__eternaAddDebugLog = (message: string) => {
+    const entry = { time: new Date().toLocaleTimeString(), message };
+    window.__eternaDebugLogs?.push(entry);
+    window.dispatchEvent(new CustomEvent('eterna-debug-log', { detail: entry }));
+  };
+}
+
 export default function DebugOverlay() {
   const searchParams = useSearchParams();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [copied, setCopied] = useState(false);
 
-  const showOverlay = useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    const isDev = process.env.NODE_ENV === 'development';
-    const hasDebugParam = searchParams.has('debug');
-    return isDev || hasDebugParam;
-  }, [searchParams]);
+  const showOverlay = process.env.NODE_ENV === 'development' || searchParams.has('debug');
 
   useEffect(() => {
     if (!showOverlay) return;
 
     // Load any logs collected before component mount
-    if (typeof window !== 'undefined' && (window as any).__eternaDebugLogs) {
-      setLogs([...(window as any).__eternaDebugLogs]);
+    if (window.__eternaDebugLogs?.length) {
+      const initialLogs = [...window.__eternaDebugLogs];
+      queueMicrotask(() => setLogs(initialLogs));
     }
 
     const handleLogEvent = (e: Event) => {

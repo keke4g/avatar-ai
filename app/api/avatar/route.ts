@@ -13,18 +13,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const { message, userId, conversationHistory, systemPrompt } = body;
+    const { message, userId, conversationHistory, systemPrompt } = body as Record<string, unknown>;
 
     // Validación del mensaje
-    if (!message || typeof message !== "string" || message.trim() === "") {
+    if (typeof message !== "string" || message.trim() === "" || message.length > 4_000) {
       return NextResponse.json(
-        { error: "El campo 'message' es requerido y debe ser un texto no vacío." },
+        { error: "El campo 'message' debe contener entre 1 y 4,000 caracteres." },
         { status: 400 }
       );
     }
 
     // Validación opcional de conversationHistory si viene provisto
-    if (conversationHistory !== undefined && !Array.isArray(conversationHistory)) {
+    if (conversationHistory !== undefined && (!Array.isArray(conversationHistory) || conversationHistory.length > 30)) {
       return NextResponse.json(
         { error: "El campo 'conversationHistory' debe ser un arreglo si está definido." },
         { status: 400 }
@@ -32,20 +32,32 @@ export async function POST(request: Request) {
     }
 
     // Castear el historial validando la estructura básica
-    const typedHistory: ConversationMessage[] | undefined = conversationHistory
+    const typedHistory: ConversationMessage[] | undefined = Array.isArray(conversationHistory)
       ? conversationHistory.filter(
-          (msg: any) =>
-            msg &&
-            typeof msg === "object" &&
-            (msg.role === "user" || msg.role === "assistant") &&
-            typeof msg.content === "string"
+          (msg: unknown): msg is ConversationMessage => {
+            if (!msg || typeof msg !== "object") return false;
+            const candidate = msg as Record<string, unknown>;
+            return (
+              (candidate.role === "user" || candidate.role === "assistant") &&
+              typeof candidate.content === "string" &&
+              candidate.content.length <= 4_000
+            );
+          }
         )
+        .slice(-20)
       : undefined;
+
+    if (systemPrompt !== undefined && (typeof systemPrompt !== "string" || systemPrompt.length > 20_000)) {
+      return NextResponse.json(
+        { error: "El campo 'systemPrompt' no es válido o es demasiado largo." },
+        { status: 400 },
+      );
+    }
 
     // Ejecutar llamada a GeminiService
     const reply = await GeminiService.generateAvatarResponse({
-      message,
-      userId: typeof userId === "string" ? userId : undefined,
+      message: message.trim(),
+      userId: typeof userId === "string" ? userId.slice(0, 128) : undefined,
       conversationHistory: typedHistory,
       systemPrompt: typeof systemPrompt === "string" ? systemPrompt : undefined,
     });
@@ -55,12 +67,12 @@ export async function POST(request: Request) {
       provider: "gemini",
       model: "gemini-2.5-flash",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[AvatarRoute] Error en el endpoint de Avatar:", error);
     
     return NextResponse.json(
       { 
-        error: error?.message || "Ocurrió un error interno en el servidor." 
+        error: "Ocurrió un error interno en el servidor."
       },
       { status: 500 }
     );

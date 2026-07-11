@@ -66,24 +66,20 @@ export function DoubleBufferVideoPlayer({
   const videoBRef = useRef<HTMLVideoElement | null>(null);
 
   const [activeBuffer, setActiveBuffer] = useState<'A' | 'B'>('A');
-  const [srcA, setSrcA] = useState('');
-  const [srcB, setSrcB] = useState('');
+  const [srcA, setSrcA] = useState(() => getAvatarVideoUrl(state));
+  const [srcB, setSrcB] = useState<string>();
   const [opacityA, setOpacityA] = useState(1);
   const [opacityB, setOpacityB] = useState(0);
+  const [transitionDuration, setTransitionDuration] = useState(() => getTransitionDuration(state, state));
 
-  const currentStateRef = useRef<AvatarStateName>('IDLE');
-  const currentSrcRef = useRef<string>('');
+  const currentStateRef = useRef<AvatarStateName>(state);
+  const currentSrcRef = useRef<string>(srcA);
   const activeBufferRef = useRef<'A' | 'B'>('A');
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Set initial source safely
   useEffect(() => {
     preloadAllAvatarVideos();
-    const initialSrc = getAvatarVideoUrl(state);
-    setSrcA(initialSrc);
-    currentSrcRef.current = initialSrc;
-    currentStateRef.current = state;
   }, []);
 
   // Safe play helper to avoid double plays and handle errors
@@ -100,7 +96,7 @@ export function DoubleBufferVideoPlayer({
     }
     try {
       await video.play();
-    } catch (err) {
+    } catch {
       // Safe catch for autoplay blocks
     }
   }, []);
@@ -132,6 +128,7 @@ export function DoubleBufferVideoPlayer({
 
       const nextBuffer = activeBufferRef.current === 'A' ? 'B' : 'A';
       const duration = getTransitionDuration(fromState, toState);
+      setTransitionDuration(duration);
 
       if (process.env.NODE_ENV !== 'production') {
         console.log(`[ANIMATION] Crossfade transition scheduled: ${activeBufferRef.current} -> ${nextBuffer} | Duration: ${duration}ms`);
@@ -237,7 +234,7 @@ export function DoubleBufferVideoPlayer({
         style={{
           opacity: opacityA,
           zIndex: activeBuffer === 'A' ? 12 : 10,
-          transition: `opacity ${getTransitionDuration(currentStateRef.current, state)}ms ease-in-out`,
+          transition: `opacity ${transitionDuration}ms ease-in-out`,
           objectPosition
         }}
       />
@@ -255,7 +252,7 @@ export function DoubleBufferVideoPlayer({
         style={{
           opacity: opacityB,
           zIndex: activeBuffer === 'B' ? 12 : 10,
-          transition: `opacity ${getTransitionDuration(currentStateRef.current, state)}ms ease-in-out`,
+          transition: `opacity ${transitionDuration}ms ease-in-out`,
           objectPosition
         }}
       />

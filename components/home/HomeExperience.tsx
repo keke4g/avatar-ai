@@ -143,12 +143,14 @@ export default function HomeExperience() {
 
       {/* Floating Theme Switcher Button */}
       <button
+        type="button"
         onClick={toggleTheme}
         className={`absolute top-24 right-6 lg:right-12 z-40 p-2.5 rounded-full border transition-all duration-300 shadow-premium cursor-pointer ${
           isDark
             ? "bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20"
             : "bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50 hover:border-zinc-300"
         }`}
+        aria-label={isDark ? "Activar modo claro" : "Activar modo oscuro"}
         title={isDark ? "Modo Claro" : "Modo Oscuro"}
       >
         {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -182,13 +184,14 @@ export default function HomeExperience() {
                 ? (isDark ? 'bg-zinc-950/90' : 'bg-white/95') 
                 : 'bg-transparent'
             }`}>
-              {actions.map((act, index) => {
+              {actions.map((act) => {
                 const IconComp = act.icon;
                 return (
-                  <div
-                    key={index}
+                  <button
+                    key={act.text}
+                    type="button"
                     onClick={() => handleCardClick(act.text)}
-                    className={`group relative w-full rounded-2xl p-3 transition-all duration-250 cursor-pointer flex items-center gap-4 hover:-translate-y-[3px] transition-all duration-300 ${
+                    className={`group relative w-full rounded-2xl p-3 cursor-pointer flex items-center gap-4 hover:-translate-y-[3px] transition-all duration-300 ${
                       isDark
                         ? "bg-white/[0.02] border border-white/5 hover:border-blue-500/15 hover:bg-white/[0.05] hover:shadow-[0_0_15px_rgba(59,130,246,0.04)]"
                         : "bg-white border border-zinc-200/80 hover:border-blue-500/35 hover:bg-zinc-50/50 hover:shadow-[0_4px_20px_rgba(0,0,0,0.02)]"
@@ -209,7 +212,7 @@ export default function HomeExperience() {
                         {act.sub}
                       </span>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>

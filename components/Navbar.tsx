@@ -13,13 +13,11 @@ export default function Navbar() {
   const pathname = usePathname();
   const { 
     swaps, 
-    currentUser, 
+    currentUser: sessionUser,
     logoutMock, 
-    properties, 
     notifications, 
     messages, 
     markAllNotificationsAsRead,
-    markNotificationAsRead,
     logoutToast,
     setLogoutToast
   } = useSwap();
@@ -28,8 +26,13 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notiDropdownOpen, setNotiDropdownOpen] = useState(false);
-  const [hasClearedBadge, setHasClearedBadge] = useState(false);
   const [isHomeDark, setIsHomeDark] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const currentUser = isHydrated ? sessionUser : null;
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -112,7 +115,7 @@ export default function Navbar() {
   }, []);
 
   // Compute pending count (unread notifications count)
-  const pendingCount = currentUser && !hasClearedBadge 
+  const pendingCount = currentUser
     ? notifications.filter((n) => !n.isRead).length 
     : 0;
 

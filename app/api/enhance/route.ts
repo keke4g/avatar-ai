@@ -10,14 +10,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Cuerpo de petición inválido.' }, { status: 400 });
     }
 
-    const { text, type } = body;
+    const { text, type } = body as Record<string, unknown>;
 
-    if (!text || typeof text !== 'string' || text.trim() === '') {
+    if (typeof text !== 'string' || text.trim() === '') {
       return NextResponse.json({ error: 'El campo "text" es requerido y no debe estar vacío.' }, { status: 400 });
     }
 
     if (type !== 'title' && type !== 'description') {
       return NextResponse.json({ error: 'El campo "type" debe ser "title" o "description".' }, { status: 400 });
+    }
+
+    const maxLength = type === 'title' ? 200 : 6_000;
+    if (text.length > maxLength) {
+      return NextResponse.json(
+        { error: `El texto supera el máximo de ${maxLength.toLocaleString('en-US')} caracteres.` },
+        { status: 400 },
+      );
     }
 
     let prompt = '';
@@ -79,8 +87,8 @@ ${text}
     });
 
     return NextResponse.json({ reply });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Enhance API] Error:', error);
-    return NextResponse.json({ error: error?.message || 'Error interno del servidor' }, { status: 500 });
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }

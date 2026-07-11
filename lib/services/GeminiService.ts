@@ -1,14 +1,16 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Content, GoogleGenerativeAI } from "@google/generative-ai";
 
-const apiKey = process.env.GOOGLE_API_KEY;
-if (!apiKey) {
-  console.warn(
-    "[GeminiService] Warning: GOOGLE_API_KEY is not defined in the environment variables."
-  );
+let geminiClient: GoogleGenerativeAI | null = null;
+
+function getGeminiClient(): GoogleGenerativeAI {
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (!apiKey) {
+    throw new Error("GOOGLE_API_KEY no está configurada.");
+  }
+
+  geminiClient ??= new GoogleGenerativeAI(apiKey);
+  return geminiClient;
 }
-
-// Inicializar la instancia del cliente Gemini
-const genAI = new GoogleGenerativeAI(apiKey || "");
 
 export interface ConversationMessage {
   role: "user" | "assistant";
@@ -35,8 +37,7 @@ export class GeminiService {
       params.systemPrompt ||
       "Eres Aura, el asistente inteligente de AuraSwap. Ayudas a usuarios con intercambios de propiedades, rentas temporales, rentas mensuales, compra y venta de inmuebles. Responde de forma profesional, clara y amigable. Mantén respuestas concisas cuando sea posible.";
 
-    // Instanciar el modelo con la instrucción de sistema
-    const model = genAI.getGenerativeModel({
+    const model = getGeminiClient().getGenerativeModel({
       model: "gemini-2.5-flash",
       systemInstruction,
     });
@@ -58,7 +59,7 @@ export class GeminiService {
       // const responseStream = await model.generateContentStream({ contents: ... });
       // for await (const chunk of responseStream.stream) { ... }
 
-      const contents: any[] = [];
+      const contents: Content[] = [];
 
       if (params.conversationHistory && params.conversationHistory.length > 0) {
         params.conversationHistory.forEach((msg) => {
