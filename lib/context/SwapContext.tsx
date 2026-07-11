@@ -127,9 +127,17 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         const userId = initialUser?.id || '';
+        const propertiesRequest = ServiceFactory.getPropertyService().getAll().then(liveProps => {
+          setProperties(liveProps);
+          if (initialUser) {
+            setMyProperties(liveProps.filter(p => p.hostId === initialUser.id));
+          }
+          setLoading(false);
+          return liveProps;
+        });
 
         Promise.all([
-          ServiceFactory.getPropertyService().getAll(),
+          propertiesRequest,
           ServiceFactory.getUserService().getAll(),
           ServiceFactory.getSwapService().getAll(),
           userId ? ServiceFactory.getMessageService().getAllForUser(userId) : Promise.resolve([]),
@@ -137,8 +145,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ServiceFactory.getSwapService().getAllTravelDetails(),
           ServiceFactory.getReviewService().getAll(),
           userId ? ServiceFactory.getLeadService().getAllForUser(userId) : Promise.resolve([])
-        ]).then(([liveProps, liveUsers, liveSwaps, liveMessages, liveNotifications, liveTravelDetails, liveReviews, liveLeads]) => {
-          setProperties(liveProps);
+        ]).then(([, liveUsers, liveSwaps, liveMessages, liveNotifications, liveTravelDetails, liveReviews, liveLeads]) => {
           setUsers(liveUsers);
           setSwaps(liveSwaps);
           setMessages(liveMessages);
@@ -147,14 +154,14 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setReviews(liveReviews);
           setLeads(liveLeads);
           
-          if (initialUser) {
-            setMyProperties(liveProps.filter(p => p.hostId === initialUser?.id));
-          }
           setCurrentUser(initialUser);
           setIsLoaded(true);
         }).catch(err => {
           console.error('[SwapContext] Live Supabase initial fetch failed:', err);
+          setError(err instanceof Error ? err.message : 'Failed to fetch live Supabase data');
           setIsLoaded(true);
+        }).finally(() => {
+          setLoading(false);
         });
       } else {
         const storedSwaps = localStorage.getItem('auraswap_swaps');
