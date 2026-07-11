@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { formatCount, formatBathrooms } from '../../../lib/textHelpers';
 import { useSwap } from '../../../lib/context/SwapContext';
 import { useTranslation } from '../../../lib/context/LanguageContext';
@@ -10,7 +10,7 @@ import {
   BedDouble, Bath, Users, ArrowRight, ChevronLeft, ChevronRight,
   Wifi, Waves, Coffee, Monitor, Wind, Key, Flame, Compass, MessageSquareCode,
   ZoomIn, ZoomOut, Maximize, Download, ExternalLink, Play, FileText, Info, ShieldAlert, Award, TrendingUp, BarChart2, FileCheck, RefreshCw,
-  Car, Building, Home
+  Car, Building, Home, PhoneCall
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -149,9 +149,14 @@ const SECURITY_FIELDS: SpecFieldConfig[] = [
 
 export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps) {
   const router = useRouter();
-  const { properties, myProperties, requestSwap, favorites, toggleFavorite, currentUser, swaps, reviews, users, createLead } = useSwap();
+  const { properties, myProperties, requestSwap, favorites, toggleFavorite, currentUser, swaps, reviews, users, createLead, loading } = useSwap();
   const { t, language } = useTranslation();
   const { setActiveProperty, clearActiveProperty } = useLiveContext();
+  const hasMounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
 
   const property = properties.find((p) => p.id === id);
 
@@ -543,6 +548,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   }, [activeOfferingModes]);
   const [leadSuccessOpen, setLeadSuccessOpen] = useState(false);
   const [selectedLeadOffering, setSelectedLeadOffering] = useState<PropertyOffering | null>(null);
+  const [leadContactPreference, setLeadContactPreference] = useState<'message' | 'call'>('message');
   const [leadMessage, setLeadMessage] = useState('');
   const [isSubmittingLead, setIsSubmittingLead] = useState(false);
   const [leadError, setLeadError] = useState('');
@@ -572,6 +578,46 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   const isSelfProperty = useMemo(() => {
     return property && currentUser && property.hostId === currentUser.id;
   }, [property, currentUser]);
+
+  useEffect(() => {
+    const handleEternaContact = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        propertyId?: string;
+        channel?: 'message' | 'call';
+        message?: string;
+      }>).detail;
+
+      if (!property || detail?.propertyId !== property.id) return;
+
+      const offering = activeSaleOffering || activeRentOffering;
+      const channel = detail.channel === 'call' ? 'call' : 'message';
+      const fallbackMessage = channel === 'call'
+        ? (language === 'es'
+            ? `Hola, me interesa "${property.title}" y quisiera solicitar una llamada con el responsable comercial.`
+            : `Hello, I am interested in "${property.title}" and would like to request a call with the advisor.`)
+        : (language === 'es'
+            ? `Hola, me interesa "${property.title}" y quisiera recibir más información.`
+            : `Hello, I am interested in "${property.title}" and would like more information.`);
+      const message = detail.message?.trim() || fallbackMessage;
+
+      if (offering) {
+        setSelectedLeadOffering(offering);
+        setLeadContactPreference(channel);
+        setLeadMessage(message);
+        setLeadError('');
+        setLeadModalOpen(true);
+        return;
+      }
+
+      if (hasSwapOffering) {
+        setSwapMessage(message);
+        setModalOpen(true);
+      }
+    };
+
+    window.addEventListener('eterna:open-property-contact', handleEternaContact);
+    return () => window.removeEventListener('eterna:open-property-contact', handleEternaContact);
+  }, [activeRentOffering, activeSaleOffering, hasSwapOffering, language, property]);
 
   // Booked ranges calculations
   const bookedRanges = useMemo(() => {
@@ -750,7 +796,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   }, [myProperties]);
 
   // If properties are still empty (initializing), render a loading skeleton
-  if (properties.length === 0) {
+  if (!hasMounted || loading) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-20 flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
@@ -819,6 +865,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   const openLeadModal = (offering: PropertyOffering | null) => {
     if (!offering) return;
     setSelectedLeadOffering(offering);
+    setLeadContactPreference('message');
     setLeadMessage('');
     setLeadError('');
     setLeadModalOpen(true);
@@ -2825,18 +2872,26 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               <form onSubmit={handleLeadSubmit} className="flex flex-col gap-5">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 rounded-full bg-brand-accent/10 text-brand-accent flex items-center justify-center shrink-0">
-                    <MessageSquareCode className="w-6 h-6" />
+                    {leadContactPreference === 'call'
+                      ? <PhoneCall className="w-6 h-6" />
+                      : <MessageSquareCode className="w-6 h-6" />}
                   </div>
                   <div>
                     <h3 className="text-lg font-extrabold text-brand-black leading-tight">
-                      {selectedLeadOffering?.mode === 'SALE'
+                      {leadContactPreference === 'call'
+                        ? (language === 'es' ? 'Solicitar una llamada' : 'Request a call')
+                        : selectedLeadOffering?.mode === 'SALE'
                         ? (language === 'es' ? 'Solicitar información' : 'Request information')
                         : (language === 'es' ? 'Consultar disponibilidad' : 'Check availability')}
                     </h3>
                     <p className="text-xs text-brand-gray-500 leading-relaxed font-semibold mt-1">
-                      {language === 'es'
-                        ? 'Comparte tu intención. El anfitrión recibirá esta solicitud como lead, sin abrir conversación todavía.'
-                        : 'Share your intent. The host will receive this as a lead, without opening a conversation yet.'}
+                      {leadContactPreference === 'call'
+                        ? (language === 'es'
+                            ? 'Eterna preparó tu solicitud. Puedes ajustarla antes de pedir que el responsable comercial te llame.'
+                            : 'Eterna prepared your request. You can edit it before asking the advisor to call you.')
+                        : (language === 'es'
+                            ? 'Eterna preparó un mensaje con tu interés. Revísalo y envíalo al responsable de la propiedad.'
+                            : 'Eterna prepared a message based on your interest. Review it and send it to the property advisor.')}
                     </p>
                   </div>
                 </div>
@@ -2883,7 +2938,9 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   >
                     {isSubmittingLead
                       ? (language === 'es' ? 'Enviando...' : 'Sending...')
-                      : (language === 'es' ? 'Enviar solicitud' : 'Send request')}
+                      : leadContactPreference === 'call'
+                        ? (language === 'es' ? 'Solicitar llamada' : 'Request call')
+                        : (language === 'es' ? 'Enviar mensaje' : 'Send message')}
                   </button>
                 </div>
               </form>
@@ -2916,12 +2973,18 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               </div>
 
               <h3 className="text-lg font-extrabold text-brand-black mb-2">
-                {language === 'es' ? 'Solicitud enviada' : 'Request sent'}
+                {leadContactPreference === 'call'
+                  ? (language === 'es' ? 'Llamada solicitada' : 'Call requested')
+                  : (language === 'es' ? 'Mensaje enviado' : 'Message sent')}
               </h3>
               <p className="text-xs text-brand-gray-500 leading-relaxed mb-6 font-semibold">
-                {language === 'es'
-                  ? 'Tu intención quedó registrada. El propietario podrá revisarla desde su panel de leads recibidos.'
-                  : 'Your intention has been registered. The owner will be able to review it from their received leads panel.'}
+                {leadContactPreference === 'call'
+                  ? (language === 'es'
+                      ? 'Tu solicitud quedó registrada. El responsable podrá revisar tu interés y ponerse en contacto contigo.'
+                      : 'Your request was registered. The advisor can review your interest and contact you.')
+                  : (language === 'es'
+                      ? 'Tu interés quedó registrado. El responsable podrá revisar el mensaje desde su panel de leads.'
+                      : 'Your interest was registered. The advisor can review the message from their leads panel.')}
               </p>
 
               <button

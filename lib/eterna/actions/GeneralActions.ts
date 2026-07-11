@@ -1,11 +1,15 @@
 import { useCallback, MutableRefObject } from 'react';
 import { IntentContext } from '../IntentRouter';
 import { ChatMessage, Review, User } from '../../types';
+import {
+  EternaChatMessage,
+  parsePropertySalesResponse,
+} from '../propertySales';
 
 interface GeneralActionsDeps {
   language: string;
   currentUser: User | null;
-  chatHistory: { role: string; content: string; route?: string }[];
+  chatHistory: EternaChatMessage[];
   systemPrompt: { role: string; content: string };
   messages: ChatMessage[];
   reviews: Review[];
@@ -14,7 +18,7 @@ interface GeneralActionsDeps {
   setThinkingContext: (ctx: 'property_search' | 'property_detail' | 'publish_property' | 'swap' | 'navigation' | 'general') => void;
   setSimulatedStatus: (status: 'disconnected' | 'connected' | 'listening' | 'thinking' | 'talking' | 'idle') => void;
   setSimulatedText: (txt: string) => void;
-  setChatHistory: React.Dispatch<React.SetStateAction<{ role: string; content: string; route?: string }[]>>;
+  setChatHistory: React.Dispatch<React.SetStateAction<EternaChatMessage[]>>;
   speak: (text: string, onEnd?: () => void) => void;
 }
 
@@ -212,8 +216,8 @@ export function useGeneralActions({
       controller.abort();
     }, 25000);
 
-    // Cambiar estado a "pensando" con contexto general
-    setThinkingContext('general');
+    // Cambiar estado a "pensando" con el contexto adecuado
+    setThinkingContext(currentPropertyId ? 'property_detail' : 'general');
     setSimulatedStatus('thinking');
     setSimulatedText(language === 'es' ? 'Pensando...' : 'Thinking...');
 
@@ -242,7 +246,8 @@ export function useGeneralActions({
         message: prompt,
         userId: currentUser?.id,
         conversationHistory: acotadoHistory,
-        systemPrompt: customSystemPrompt
+        systemPrompt: customSystemPrompt,
+        responseMode: currentPropertyId ? 'property_sales' : 'standard',
       };
 
       const response = await fetch('/api/avatar', {
@@ -267,9 +272,18 @@ export function useGeneralActions({
         throw new Error("Respuesta de Gemini inválida o vacía.");
       }
 
+      const propertySales = currentPropertyId ? parsePropertySalesResponse(data) : null;
+
       // Inserción nativa en el historial visual
       console.log("[Eterna-Gemini] Respuesta recibida de la API de Gemini:", data.reply);
-      setChatHistory(prev => [...prev, { role: 'assistant', content: data.reply }]);
+      setChatHistory(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: data.reply,
+          propertySales: propertySales || undefined,
+        },
+      ]);
 
       // Limpiar texto provisional para evitar burbuja duplicada en la UI
       setSimulatedText('');

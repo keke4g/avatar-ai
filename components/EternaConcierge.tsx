@@ -13,7 +13,7 @@ import { formatCount, formatSentencePart } from '../lib/textHelpers';
 import { 
   Sparkles, X, Send, Mic, MicOff, 
   HelpCircle, Volume2, VolumeX, Minimize2,
-  Navigation, ArrowUpRight, User, MessageSquare
+  Navigation, ArrowUpRight, User, MessageSquare, PhoneCall
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -33,7 +33,8 @@ import {
   ConversationStep
 } from '../lib/eterna/ConversationEngine';
 import { IntentClassifier } from '../lib/eterna/IntentClassifier';
-import { generatePropertySummary, resolveLocalPropertyQA } from '../lib/eterna/actions/PropertyActions';
+import { generatePropertySummary } from '../lib/eterna/actions/PropertyActions';
+import { EternaChatMessage } from '../lib/eterna/propertySales';
 import { useSearchActions } from '../lib/eterna/actions/SearchActions';
 import { useNavigationActions } from '../lib/eterna/actions/NavigationActions';
 import { useGeneralActions } from '../lib/eterna/actions/GeneralActions';
@@ -75,14 +76,19 @@ export default function EternaConcierge() {
   const [isCompact, setIsCompact] = useState(false);
   const touchStartY = useRef<number | null>(null);
   const [showTooltip, setShowTooltip] = useState(true);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [typedInput, setTypedInput] = useState('');
-  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant'; content: string; route?: string; showAuthButtons?: boolean; showPublishButton?: boolean }[]>([]);
+  const [chatHistory, setChatHistory] = useState<EternaChatMessage[]>([]);
   const [geminiActive, setGeminiActive] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('auraswap_gemini_active') !== 'false';
     }
     return true;
   });
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   useEffect(() => {
     const handleEvent = (e: Event) => {
@@ -1393,6 +1399,19 @@ Explore actualizado: Redirecting to /explore`);
   // HANDLE SEND — Intent Router → LLM fallback
   // ────────────────────────────────────────────────
 
+  const openPropertyContact = useCallback((channel: 'message' | 'call', message: string) => {
+    const property = liveContext.property;
+    if (!property) return;
+
+    window.dispatchEvent(new CustomEvent('eterna:open-property-contact', {
+      detail: {
+        propertyId: property.id,
+        channel,
+        message,
+      },
+    }));
+  }, [liveContext.property]);
+
   const handleSend = async (textToSend?: string) => {
     console.log("[Eterna Voice Console] handleSend() entry point. textToSend:", textToSend, "typedInput:", typedInput);
     // Cancel greeting timer if active
@@ -1444,25 +1463,41 @@ Explore actualizado: Redirecting to /explore`);
 
     let activePropertyDossier: string | null = null;
     if (activeProperty) {
+      const confirmedStatus = (value: boolean | undefined, positive: string, negative: string) => {
+        if (value === true) return positive;
+        if (value === false) return negative;
+        return "No especificado";
+      };
+
       const legalStatus = {
-        libreDeGravamen: activeProperty.legalDebtFree !== false ? "Sí (Libre de gravamen)" : "No (Tiene gravamen activo)",
-        escriturada: activeProperty.legalPublicDeed ? "Sí (Escriturada)" : "Pendiente/No especificado",
-        predialAlCorriente: activeProperty.legalTaxCurrent ? "Sí (Al corriente)" : "No/Pendiente",
-        serviciosPagados: activeProperty.legalServicesPaid ? "Sí (Pagados al corriente)" : "No/Pendiente",
-        regimenCondominio: activeProperty.condominiumRegime ? "Sí (Régimen de Condominio)" : "No (Individual/Terreno)",
-        tipoPropietario: activeProperty.legalOwnerType || "Persona Física",
-        hipotecada: activeProperty.legalIsMortgaged ? "Sí (Tiene hipoteca activa)" : "No (Sin hipoteca)"
+        libreDeGravamen: confirmedStatus(activeProperty.legalDebtFree, "Confirmado: libre de gravamen", "Confirmado: tiene gravamen activo"),
+        escriturada: confirmedStatus(activeProperty.legalPublicDeed, "Confirmado: escriturada", "Confirmado: no escriturada o pendiente"),
+        predialAlCorriente: confirmedStatus(activeProperty.legalTaxCurrent, "Confirmado: al corriente", "Confirmado: pendiente"),
+        serviciosPagados: confirmedStatus(activeProperty.legalServicesPaid, "Confirmado: al corriente", "Confirmado: pendiente"),
+        regimenCondominio: confirmedStatus(activeProperty.condominiumRegime, "Sí", "No"),
+        tipoPropietario: activeProperty.legalOwnerType || "No especificado",
+        hipotecada: confirmedStatus(activeProperty.legalIsMortgaged, "Confirmado: hipoteca activa", "Confirmado: sin hipoteca"),
+        documentacionCompleta: confirmedStatus(activeProperty.legalDocumentationComplete, "Confirmada como completa", "Confirmada como incompleta"),
+        usoDeSuelo: activeProperty.legalLandUse || "No especificado",
+        restricciones: activeProperty.legalRestrictions || "No especificadas",
+        ultimaActualizacion: activeProperty.legalLastUpdate || "No especificada",
       };
 
       const paymentMethods = {
-        creditoBancario: activeProperty.offerings?.some(o => o.acceptsBankCredit) ? "Aceptado" : "No especificado/Solo contado",
-        creditoInfonavit: activeProperty.offerings?.some(o => o.acceptsInfonavit) ? "Aceptado" : "No especificado/Solo contado",
-        creditoFovissste: activeProperty.offerings?.some(o => o.acceptsFovissste) ? "Aceptado" : "No especificado/Solo contado",
-        contado: "Aceptado (Esquema estándar)",
+        creditoBancario: activeProperty.offerings?.some(o => o.acceptsBankCredit === true) ? "Aceptado" : "No confirmado",
+        creditoInfonavit: activeProperty.offerings?.some(o => o.acceptsInfonavit === true) ? "Aceptado" : "No confirmado",
+        creditoFovissste: activeProperty.offerings?.some(o => o.acceptsFovissste === true) ? "Aceptado" : "No confirmado",
+        contado: activeProperty.offerings?.some(o => o.acceptsCash === true) ? "Aceptado" : "No confirmado",
+        financiamientoDesarrollador: activeProperty.offerings?.some(o => o.developerFinancing === true) ? "Disponible" : "No confirmado",
         esquemasAuraSwap: activeProperty.offerings?.map(o => ({
           modalidad: o.mode,
+          estado: o.status,
           precio: o.priceAmount ? `${o.priceAmount} ${o.currency}` : "N/A",
-          periodo: o.billingPeriod
+          periodo: o.billingPeriod,
+          precioNegociable: o.isPriceNegotiable,
+          aceptaOfertas: o.acceptsOffers,
+          disponibilidadDesde: o.availableFrom || null,
+          disponibilidadHasta: o.availableUntil || null,
         })) || []
       };
 
@@ -1480,21 +1515,57 @@ Explore actualizado: Redirecting to /explore`);
         id: activeProperty.id,
         titulo: activePropertyTitle,
         descripcion: activePropertyDescription,
+        ubicacionPublica: {
+          zona: activeProperty.location,
+          ciudad: activeProperty.city || null,
+          estado: activeProperty.state || null,
+          pais: activeProperty.country,
+          direccionMostrable: activeProperty.showPublicAddress
+            ? (activeProperty.formattedAddress || activeProperty.address || null)
+            : null,
+          referencia: activeProperty.locationReference || null,
+        },
         resumenCaracteristicas,
+        caracteristicas: {
+          habitaciones: activeProperty.bedrooms,
+          banos: activeProperty.bathrooms,
+          mediosBanos: activeProperty.halfBathrooms || 0,
+          estacionamientos: activeProperty.parkingSpaces ?? null,
+          niveles: activeProperty.levelsCount ?? null,
+          superficieTotalM2: activeProperty.surfaceTotal ?? null,
+          superficieConstruidaM2: activeProperty.surfaceBuilt ?? null,
+          antiguedadConstruccion: activeProperty.constructionAge ?? null,
+          estadoConservacion: activeProperty.conservationStateId || null,
+        },
         amenidades: activeProperty.amenities || [],
         expedienteJuridico: legalStatus,
-        modalidadesYMetodosPago: paymentMethods
+        modalidadesYMetodosPago: paymentMethods,
+        responsableComercial: {
+          nombre: activeProperty.hostName || "Responsable de la propiedad",
+          verificado: activeProperty.hostVerified,
+          tipo: activeProperty.legalOwnerType || "No especificado",
+          horarioPreferido: activeProperty.ownerContactTime || "No especificado",
+        },
       }, null, 2);
     }
+
+    // On a property page Gemini owns the conversation. Local regex flows only
+    // keep explicit navigation commands deterministic.
     if (activeProperty) {
-      const localQAAnswer = resolveLocalPropertyQA(prompt, activeProperty, language === 'es' ? 'es' : 'en');
-      if (localQAAnswer) {
+      const navigationIntent = resolveIntent(prompt);
+      const isExplicitNavigation = navigationIntent.matched
+        && navigationIntent.action === 'navigate'
+        && Boolean(navigationIntent.route);
+
+      if (!isExplicitNavigation) {
         setThinkingContext('property_detail');
-        setChatHistory(prev => [...prev, { role: 'assistant', content: localQAAnswer }]);
-        setSimulatedStatus('talking');
-        speak(localQAAnswer, () => {
-          setSimulatedStatus('idle');
-        });
+        callGeminiAvatarAPI(
+          prompt,
+          currentPropertyId,
+          activePropertyTitle,
+          activePropertyDescription,
+          activePropertyDossier,
+        );
         return;
       }
     }
@@ -2273,8 +2344,8 @@ Explore actualizado: Redirecting to /explore`);
                 >
                   <span className="text-[11px] font-bold text-white leading-none">
                     {language === 'es' 
-                      ? `¡Hola, ${currentUser?.name ? currentUser.name.split(' ')[0] : 'Usuario'}! 👋` 
-                      : `Hi, ${currentUser?.name ? currentUser.name.split(' ')[0] : 'User'}! 👋`}
+                      ? `¡Hola, ${isHydrated && currentUser?.name ? currentUser.name.split(' ')[0] : 'Usuario'}! 👋`
+                      : `Hi, ${isHydrated && currentUser?.name ? currentUser.name.split(' ')[0] : 'User'}! 👋`}
                   </span>
                   <span className="text-[10px] text-white/60 font-semibold leading-none">
                     {language === 'es' ? '¿En qué puedo ayudarte?' : 'How can I help you?'}
@@ -2321,6 +2392,8 @@ Explore actualizado: Redirecting to /explore`);
 
             {/* Glowing Orb Container */}
             <button
+              type="button"
+              aria-label={language === 'es' ? 'Abrir chat con Eterna' : 'Open Eterna chat'}
               onClick={() => {
                 setIsOpen(true);
                 setShowTooltip(false);
@@ -2658,6 +2731,80 @@ Explore actualizado: Redirecting to /explore`);
                                     >
                                       {language === 'es' ? 'Publicar Propiedad' : 'List Property'}
                                     </button>
+                                  </div>
+                                )}
+                                {msg.propertySales && liveContext.property && (
+                                  <div className="mt-3 pt-3 border-t border-brand-gray-200/70 animate-in fade-in slide-in-from-bottom-1 duration-300">
+                                    {msg.propertySales.suggestedQuestions.length > 0 && (
+                                      <div className="flex flex-wrap gap-1.5 mb-3">
+                                        {msg.propertySales.suggestedQuestions.map((question) => (
+                                          <button
+                                            key={question}
+                                            type="button"
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              handleSend(question);
+                                            }}
+                                            className="max-w-full px-2.5 py-1.5 rounded-full bg-white border border-brand-gray-200 text-[9px] leading-tight font-bold text-brand-gray-600 hover:border-brand-accent/50 hover:text-brand-accent transition-colors cursor-pointer text-left"
+                                          >
+                                            {question}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    <div className="rounded-2xl bg-white border border-brand-gray-200 p-2.5 shadow-xs">
+                                      <div className="flex items-center justify-between gap-3 mb-2">
+                                        <div>
+                                          <span className="block text-[8px] uppercase tracking-[0.16em] text-brand-gray-400 font-black">
+                                            {language === 'es' ? 'Siguiente paso' : 'Next step'}
+                                          </span>
+                                          <span className="block text-[10px] text-brand-black font-extrabold mt-0.5">
+                                            {msg.propertySales.contactIntent || msg.propertySales.stage === 'ready_to_contact'
+                                              ? (language === 'es' ? 'Conecta con el responsable' : 'Connect with the advisor')
+                                              : (language === 'es' ? '¿Te interesa avanzar?' : 'Interested in moving forward?')}
+                                          </span>
+                                        </div>
+                                        <span className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                          <ArrowUpRight className="w-3.5 h-3.5" />
+                                        </span>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            openPropertyContact(
+                                              'message',
+                                              msg.propertySales?.leadSummary || (language === 'es'
+                                                ? 'Hola, me interesa esta propiedad y quisiera recibir más información.'
+                                                : 'Hello, I am interested in this property and would like more information.'),
+                                            );
+                                          }}
+                                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-black px-2 py-2 text-[9px] font-extrabold text-white hover:bg-brand-gray-800 transition-colors cursor-pointer"
+                                        >
+                                          <MessageSquare className="w-3 h-3" />
+                                          <span>{language === 'es' ? 'Enviar mensaje' : 'Send message'}</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                             openPropertyContact(
+                                               'call',
+                                              msg.propertySales?.leadSummary || (language === 'es'
+                                                ? `Hola, me interesa "${liveContext.property?.title || 'esta propiedad'}" y quisiera solicitar una llamada con el responsable comercial.`
+                                                : `Hello, I am interested in "${liveContext.property?.title || 'this property'}" and would like to request a call with the advisor.`),
+                                             );
+                                          }}
+                                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-2 py-2 text-[9px] font-extrabold text-white hover:bg-emerald-600 transition-colors cursor-pointer"
+                                        >
+                                          <PhoneCall className="w-3 h-3" />
+                                          <span>{language === 'es' ? 'Solicitar llamada' : 'Request call'}</span>
+                                        </button>
+                                      </div>
+                                    </div>
                                   </div>
                                 )}
                               </div>
