@@ -17,9 +17,13 @@ import { AnalyticsService } from '../../lib/services/AnalyticsService';
 import confetti from 'canvas-confetti';
 import {
   ETERNA_VOICE_ENGINES,
+  DEEPGRAM_VOICE_PROFILES,
+  DeepgramVoiceProfile,
   DEFAULT_ETERNA_VOICE_ENGINE,
   EternaVoiceEngine,
   getEternaVoiceEngine,
+  getDeepgramVoiceProfile,
+  saveDeepgramVoiceProfile,
   saveEternaVoiceEngine,
 } from '../../lib/eterna/voiceConfig';
 
@@ -73,6 +77,7 @@ export default function AdminPage() {
   const [commissionRate, setCommissionRate] = useState(1.5);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
   const [voiceEngine, setVoiceEngine] = useState<EternaVoiceEngine>(DEFAULT_ETERNA_VOICE_ENGINE);
+  const [deepgramVoiceProfile, setDeepgramVoiceProfile] = useState<DeepgramVoiceProfile>(getDeepgramVoiceProfile);
   const [voiceEngineStatus, setVoiceEngineStatus] = useState<Record<EternaVoiceEngine, boolean>>({
     elevenlabs: false,
     deepgram: false,
@@ -96,6 +101,8 @@ export default function AdminPage() {
   useEffect(() => {
     const storedVoiceEngine = getEternaVoiceEngine();
     queueMicrotask(() => setVoiceEngine(storedVoiceEngine));
+    const storedDeepgramVoiceProfile = getDeepgramVoiceProfile();
+    queueMicrotask(() => setDeepgramVoiceProfile(storedDeepgramVoiceProfile));
     let active = true;
     fetch('/api/voz', { cache: 'no-store' })
       .then(response => response.ok ? response.json() : null)
@@ -440,6 +447,7 @@ export default function AdminPage() {
 
   const handleSaveSettings = () => {
     saveEternaVoiceEngine(voiceEngine);
+    saveDeepgramVoiceProfile(deepgramVoiceProfile);
     setSettingsSuccess(true);
     addAudit('SETTINGS', 'auditSettingDesc', {}, 'success');
     setTimeout(() => setSettingsSuccess(false), 3000);
@@ -1846,6 +1854,29 @@ export default function AdminPage() {
                         );
                       })}
                     </div>
+
+                    {voiceEngine === 'deepgram' && (
+                      <div className="rounded-2xl border border-brand-gray-200 bg-brand-gray-50/60 p-4">
+                        <div className="mb-3">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-brand-gray-600">Perfil vocal Deepgram</p>
+                          <p className="mt-1 text-[10px] leading-relaxed text-brand-gray-400">Elige entre el tono ejecutivo de Eterna y una voz con acento mexicano nativo.</p>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {DEEPGRAM_VOICE_PROFILES.map(profile => (
+                            <button
+                              key={profile.id}
+                              type="button"
+                              onClick={() => setDeepgramVoiceProfile(profile.id)}
+                              className={`rounded-xl border px-3 py-3 text-left transition-all ${deepgramVoiceProfile === profile.id ? 'border-brand-accent bg-white shadow-sm' : 'border-transparent bg-white/60 hover:bg-white'}`}
+                            >
+                              <span className="block text-[11px] font-black text-brand-black">{profile.name}</span>
+                              <span className="mt-0.5 block text-[10px] font-bold text-brand-gray-600">{profile.voice}</span>
+                              <span className="mt-1 block text-[9px] leading-relaxed text-brand-gray-400">{profile.description}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {voiceEngine === 'azure' && !voiceEngineStatus.azure && (
                       <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2.5 text-[10px] font-semibold leading-relaxed text-amber-800">

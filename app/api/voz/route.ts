@@ -104,18 +104,21 @@ async function synthesizeWithAzure(text: string) {
   return audioResponse(await response.arrayBuffer(), 'audio/mpeg');
 }
 
-async function synthesizeWithDeepgram(text: string) {
+async function synthesizeWithDeepgram(text: string, voiceProfile: 'executive' | 'mexico') {
   const apiKey = process.env.DEEPGRAM_API_KEY;
   if (!apiKey) {
     return Response.json({ error: 'Deepgram no está configurado.' }, { status: 503 });
   }
 
+  const voiceModel = process.env.DEEPGRAM_VOICE_MODEL || (
+    voiceProfile === 'mexico' ? 'aura-2-estrella-es' : 'aura-2-diana-es'
+  );
   const response = await fetch(
-    'https://api.deepgram.com/v1/speak?model=aura-2-estrella-es&encoding=mp3',
+    `https://api.deepgram.com/v1/speak?model=${encodeURIComponent(voiceModel)}&encoding=linear16&sample_rate=24000`,
     {
       method: 'POST',
       headers: {
-        Accept: 'audio/mpeg',
+        Accept: 'audio/l16',
         Authorization: `Token ${apiKey}`,
         'Content-Type': 'application/json',
       },
@@ -129,13 +132,15 @@ async function synthesizeWithDeepgram(text: string) {
     return Response.json({ error: 'Deepgram no pudo generar la voz.' }, { status: 502 });
   }
 
-  // Conservamos el stream para que el navegador pueda reproducir desde el primer fragmento.
+  // PCM lineal permite que el cliente programe cada fragmento inmediatamente,
+  // sin depender de un contenedor MP3 incompleto.
   return new Response(response.body, {
     headers: {
-      'Content-Type': response.headers.get('content-type') || 'audio/mpeg',
+      'Content-Type': 'audio/L16;rate=24000;channels=1',
       'Cache-Control': 'private, no-store, max-age=0',
       'X-Content-Type-Options': 'nosniff',
       'X-Voice-Engine': 'deepgram',
+      'X-Voice-Format': 'pcm_s16le_24000',
     },
   });
 }
@@ -170,6 +175,7 @@ export async function POST(req: Request) {
     const payload = body as Record<string, unknown>;
     const rawText = payload.texto;
     const engine = payload.engine as EternaVoiceEngine;
+    const deepgramVoiceProfile = payload.deepgramVoiceProfile === 'mexico' ? 'mexico' : 'executive';
 
     if (typeof rawText !== 'string' || rawText.trim().length === 0 || rawText.length > MAX_TEXT_LENGTH) {
       return Response.json(
@@ -184,7 +190,7 @@ export async function POST(req: Request) {
 
     const text = rawText.trim();
     if (engine === 'azure') return await synthesizeWithAzure(text);
-    if (engine === 'deepgram') return await synthesizeWithDeepgram(text);
+    if (engine === 'deepgram') return await synthesizeWithDeepgram(text, deepgramVoiceProfile);
     return await synthesizeWithElevenLabs(text);
   } catch (error) {
     const isTimeout = error instanceof Error && error.name === 'TimeoutError';

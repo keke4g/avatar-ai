@@ -3,6 +3,7 @@ import { StreamStatus } from './useWebSocketStream';
 import {
   ETERNA_VOICE_ENGINE_EVENT,
   EternaVoiceEngine,
+  getDeepgramVoiceProfile,
   getEternaVoiceEngine,
 } from '../lib/eterna/voiceConfig';
 
@@ -234,6 +235,8 @@ export function useEternaVoice({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioObjectUrlRef = useRef<string | null>(null);
   const speechRequestRef = useRef<AbortController | null>(null);
+  const pcmAudioContextRef = useRef<AudioContext | null>(null);
+  const pcmSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const lastSpokenTextRef = useRef<string>('');
   const lastSpokenTimestampRef = useRef<number>(0);
   const speechSessionActiveRef = useRef<boolean>(false);
@@ -370,6 +373,10 @@ export function useEternaVoice({
       URL.revokeObjectURL(audioObjectUrlRef.current);
       audioObjectUrlRef.current = null;
     }
+    pcmSourcesRef.current.forEach(source => {
+      try { source.stop(); } catch {}
+    });
+    pcmSourcesRef.current = [];
 
     // Check if recognition is running
     const wasRecognitionActive = recognitionRef.current && recognitionActiveRef.current;
@@ -501,10 +508,76 @@ export function useEternaVoice({
         const response = await fetch('/api/voz', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ texto: text, engine }),
+          body: JSON.stringify({
+            texto: text,
+            engine,
+            deepgramVoiceProfile: engine === 'deepgram' ? getDeepgramVoiceProfile() : undefined,
+          }),
           signal: controller.signal,
         });
         if (!response.ok) throw new Error(`Voice engine ${engine} returned ${response.status}`);
+
+        if (engine === 'deepgram' && response.body && response.headers.get('X-Voice-Format') === 'pcm_s16le_24000') {
+          const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+          if (!AudioContextClass) throw new Error('Web Audio no está disponible');
+
+          const context = pcmAudioContextRef.current || new AudioContextClass();
+          pcmAudioContextRef.current = context;
+          await context.resume();
+
+          const reader = response.body.getReader();
+          const sampleRate = 24_000;
+          let pendingByte: number | null = null;
+          let nextStartTime = context.currentTime + 0.04;
+          let scheduledSources = 0;
+          let streamEnded = false;
+
+          const finishPcmIfReady = () => {
+            if (streamEnded && scheduledSources === 0 && speechSessionActiveRef.current) handleEnd();
+          };
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (!value?.byteLength || controller.signal.aborted) continue;
+
+            const bytes = pendingByte === null
+              ? value
+              : Uint8Array.from([pendingByte, ...value]);
+            pendingByte = bytes.byteLength % 2 === 1 ? bytes[bytes.byteLength - 1] : null;
+            const sampleCount = Math.floor(bytes.byteLength / 2);
+            if (!sampleCount) continue;
+
+            const audioBuffer = context.createBuffer(1, sampleCount, sampleRate);
+            const channel = audioBuffer.getChannelData(0);
+            for (let index = 0; index < sampleCount; index += 1) {
+              const offset = index * 2;
+              const sample = (bytes[offset] | (bytes[offset + 1] << 8));
+              channel[index] = (sample >= 0x8000 ? sample - 0x10000 : sample) / 0x8000;
+            }
+
+            const source = context.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(context.destination);
+            scheduledSources += 1;
+            pcmSourcesRef.current.push(source);
+            source.onended = () => {
+              scheduledSources -= 1;
+              pcmSourcesRef.current = pcmSourcesRef.current.filter(item => item !== source);
+              finishPcmIfReady();
+            };
+            source.start(Math.max(nextStartTime, context.currentTime + 0.02));
+            nextStartTime = Math.max(nextStartTime, context.currentTime + 0.02) + audioBuffer.duration;
+
+            if (scheduledSources === 1) {
+              console.log('[VOICE STATE] deepgram PCM playback start');
+            }
+          }
+
+          streamEnded = true;
+          finishPcmIfReady();
+          return;
+        }
 
         const audioBlob = await response.blob();
         if (!speechSessionActiveRef.current || controller.signal.aborted) return;
@@ -605,6 +678,10 @@ export function useEternaVoice({
       URL.revokeObjectURL(audioObjectUrlRef.current);
       audioObjectUrlRef.current = null;
     }
+    pcmSourcesRef.current.forEach(source => {
+      try { source.stop(); } catch {}
+    });
+    pcmSourcesRef.current = [];
 
     // Bypasses COOLDOWN when user interrupts, goes straight to LISTENING
     enterListeningState();
@@ -647,6 +724,10 @@ export function useEternaVoice({
       URL.revokeObjectURL(audioObjectUrlRef.current);
       audioObjectUrlRef.current = null;
     }
+    pcmSourcesRef.current.forEach(source => {
+      try { source.stop(); } catch {}
+    });
+    pcmSourcesRef.current = [];
 
     enterListeningState();
     addVoiceDebugLog(`startConversationMode completed. voiceMode after: ${voiceModeRef.current}`);
@@ -674,6 +755,10 @@ export function useEternaVoice({
       URL.revokeObjectURL(audioObjectUrlRef.current);
       audioObjectUrlRef.current = null;
     }
+    pcmSourcesRef.current.forEach(source => {
+      try { source.stop(); } catch {}
+    });
+    pcmSourcesRef.current = [];
     if (recognitionRef.current) {
       try {
         if (recognitionActiveRef.current) {
@@ -950,6 +1035,10 @@ export function useEternaVoice({
       speechRequestRef.current?.abort();
       audioRef.current?.pause();
       if (audioObjectUrlRef.current) URL.revokeObjectURL(audioObjectUrlRef.current);
+      pcmSourcesRef.current.forEach(source => {
+        try { source.stop(); } catch {}
+      });
+      pcmSourcesRef.current = [];
     };
   }, []);
 
