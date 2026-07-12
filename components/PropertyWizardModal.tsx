@@ -511,9 +511,6 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
   const [locationReference, setLocationReference] = useState('');
   const [showPublicAddress, setShowPublicAddress] = useState(true);
 
-  const autocompleteInputRef = useRef<HTMLInputElement | null>(null);
-  const autocompleteRef = useRef<any>(null);
-
   // STEP 4: Specs & Features
   const [bedrooms, setBedrooms] = useState(2);
   const [bathrooms, setBathrooms] = useState(2);
@@ -782,14 +779,20 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setDescription(initialData.description || '');
       const loadedUiType = (initialData.metadata?.uiPropertyType as UIType) || mapDbToUiType(initialData.type as DBType);
       setType(loadedUiType);
-      setLocation(initialData.location || '');
+      const normalizeLocationPart = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+      const savedLocationParts = (initialData.location || '').split(',').map(part => part.trim()).filter(Boolean);
+      const savedCountry = normalizeLocationPart(initialData.country || '');
+      const savedCity = initialData.city || savedLocationParts
+        .filter(part => !savedCountry || normalizeLocationPart(part) !== savedCountry)
+        .pop() || '';
+      setLocation(savedCity);
       setCountry(initialData.country || '');
       setAddress(initialData.address || '');
       setLatitude(initialData.latitude !== undefined && initialData.latitude !== null ? Number(initialData.latitude) : null);
       setLongitude(initialData.longitude !== undefined && initialData.longitude !== null ? Number(initialData.longitude) : null);
       setPlaceId(initialData.placeId || null);
       setFormattedAddress(initialData.formattedAddress || null);
-      setCity(initialData.city || null);
+      setCity(savedCity || null);
       setStateName(initialData.state || null);
       setGeometrySource(initialData.geometrySource || null);
       setBedrooms(initialData.bedrooms || 2);
@@ -964,263 +967,19 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     }
   }, [initialData, isOpen]);
 
-  const handleAddressChange = (val: string) => {
-    setAddress(val);
-    if (val !== formattedAddress) {
-      setLatitude(null);
-      setLongitude(null);
-      setPlaceId(null);
-      setGeometrySource('manual');
-    }
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const wizardMapRef = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const wizardMarkerRef = useRef<any>(null);
-  const [leafletLoaded, setLeafletLoaded] = useState(false);
-
-  // Load Leaflet globally for the wizard if not loaded
+  // Google Maps se carga únicamente para resolver coordenadas en segundo plano.
+  // El usuario ya no necesita buscar ni colocar marcadores manualmente.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (step !== 2 || !isOpen) return;
-
-    const loadLeaflet = async () => {
-      if (!document.getElementById('leaflet-css-cdn')) {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-        link.id = 'leaflet-css-cdn';
-        document.head.appendChild(link);
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((window as any).L) {
-        setLeafletLoaded(true);
-        return;
-      }
-
-      return new Promise<void>((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-        script.id = 'leaflet-js-cdn';
-        script.onload = () => {
-          setLeafletLoaded(true);
-          resolve();
-        };
-        script.onerror = () => reject(new Error('Failed to load Leaflet'));
-        document.head.appendChild(script);
-      });
-    };
-
-    loadLeaflet().catch(err => console.error('[Wizard Leaflet Load Error]:', err));
-  }, [step, isOpen]);
-
-  // Update/render the wizard mini map when lat/lng change
-  useEffect(() => {
-    if (!leafletLoaded || step !== 2 || !isOpen) return;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const L = (window as any).L;
-    if (!L) return;
-
-    const container = document.getElementById('wizard-preview-map');
-    if (!container) return;
-
-    let mapLat = latitude;
-    let mapLng = longitude;
-    let hasMarker = true;
-
-    if (mapLat === null || mapLng === null) {
-      hasMarker = false;
-      // Default fallback map center based on country
-      mapLat = 19.4326;
-      mapLng = -99.1332;
-      if (country && (country.toUpperCase().includes('ESP') || country.toUpperCase().includes('SPAIN'))) {
-        mapLat = 40.4168;
-        mapLng = -3.7038;
-      }
-    }
-
-    try {
-      if (!wizardMapRef.current) {
-        const map = L.map('wizard-preview-map', {
-          zoomControl: true,
-          scrollWheelZoom: false,
-          attributionControl: false
-        }).setView([mapLat, mapLng], hasMarker ? 13 : 5);
-
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-          maxZoom: 19,
-        }).addTo(map);
-
-        let marker: any = null;
-        if (hasMarker) {
-          const customIcon = L.divIcon({
-            className: 'custom-leaflet-marker-selected',
-            html: `<div class="bg-brand-black text-white px-2 py-0.5 rounded-full border border-brand-black font-black text-[9px] shadow-premium">📍</div>`
-          });
-          marker = L.marker([mapLat, mapLng], { icon: customIcon }).addTo(map);
-          wizardMarkerRef.current = marker;
-        }
-
-        // Click event listener to allow manual selection on map
-        map.on('click', (e: any) => {
-          const { lat, lng } = e.latlng;
-          setLatitude(lat);
-          setLongitude(lng);
-          setGeometrySource('manual');
-        });
-
-        wizardMapRef.current = map;
-      } else {
-        const map = wizardMapRef.current;
-        map.setView([mapLat, mapLng], hasMarker ? 13 : map.getZoom());
-
-        // Update or recreate marker
-        if (wizardMarkerRef.current) {
-          if (hasMarker) {
-            wizardMarkerRef.current.setLatLng([mapLat, mapLng]);
-          } else {
-            wizardMarkerRef.current.remove();
-            wizardMarkerRef.current = null;
-          }
-        } else if (hasMarker) {
-          const customIcon = L.divIcon({
-            className: 'custom-leaflet-marker-selected',
-            html: `<div class="bg-brand-black text-white px-2 py-0.5 rounded-full border border-brand-black font-black text-[9px] shadow-premium">📍</div>`
-          });
-          const marker = L.marker([mapLat, mapLng], { icon: customIcon }).addTo(map);
-          wizardMarkerRef.current = marker;
-        }
-      }
-
-      setTimeout(() => {
-        if (wizardMapRef.current) {
-          wizardMapRef.current.invalidateSize();
-        }
-      }, 150);
-    } catch (e) {
-      console.error('[Wizard Map Init Error]:', e);
-    }
-  }, [leafletLoaded, step, isOpen, latitude, longitude, country]);
-
-  // Clean up wizard map on unmount/step change
-  useEffect(() => {
-    return () => {
-      if (wizardMapRef.current) {
-        try {
-          wizardMapRef.current.remove();
-        } catch {
-        }
-        wizardMapRef.current = null;
-        wizardMarkerRef.current = null;
-      }
-    };
-  }, [step, isOpen]);
-
-  useEffect(() => {
-    if (step !== 2 || !isOpen) return;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let autocompleteInstance: any = null;
-
-    const initAutocomplete = () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = (window as any).google;
-      if (!g || !g.maps || !g.maps.places) {
-        setTimeout(initAutocomplete, 200);
-        return;
-      }
-
-      const input = autocompleteInputRef.current;
-      if (!input) return;
-
-      if (autocompleteRef.current) return;
-
-      try {
-        autocompleteInstance = new g.maps.places.Autocomplete(input, {
-          types: ['address'],
-          fields: ['address_components', 'geometry', 'formatted_address', 'place_id']
-        });
-
-        autocompleteRef.current = autocompleteInstance;
-
-        autocompleteInstance.addListener('place_changed', () => {
-          const place = autocompleteInstance.getPlace();
-          if (!place || !place.geometry || !place.geometry.location) {
-            console.warn('Place chosen has no geometry / location details');
-            return;
-          }
-
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          const pId = place.place_id;
-          const fAddress = place.formatted_address;
-
-          let cityVal = '';
-          let stateVal = '';
-          let countryVal = '';
-
-          if (place.address_components) {
-            for (const component of place.address_components) {
-              const types = component.types;
-              if (types.includes('locality')) {
-                cityVal = component.long_name;
-              } else if (types.includes('administrative_area_level_1')) {
-                stateVal = component.long_name;
-              } else if (types.includes('country')) {
-                countryVal = component.long_name;
-              }
-            }
-          }
-
-          setLatitude(lat);
-          setLongitude(lng);
-          setPlaceId(pId || null);
-          setFormattedAddress(fAddress || null);
-          setCity(cityVal || null);
-          setStateName(stateVal || null);
-          setGeometrySource('google_places');
-
-          if (fAddress) setAddress(fAddress);
-          if (cityVal) setLocation(cityVal);
-          if (countryVal) setCountry(countryVal);
-        });
-      } catch (e) {
-        console.error('[Autocomplete Init Error]:', e);
-      }
-    };
-
+    if (step !== 2 || !isOpen || typeof window === 'undefined') return;
+    if ((window as any).google?.maps) return;
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY || '';
-    if (apiKey) {
-      const scriptId = 'google-maps-places-script';
-      let script = document.getElementById(scriptId) as HTMLScriptElement | null;
-      if (!script) {
-        script = document.createElement('script');
-        script.id = scriptId;
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => {
-          initAutocomplete();
-        };
-        document.head.appendChild(script);
-      } else {
-        initAutocomplete();
-      }
-    }
-
-    return () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const g = (window as any).google;
-      if (autocompleteRef.current && g && g.maps && g.maps.event) {
-        try {
-          g.maps.event.clearInstanceListeners(autocompleteRef.current);
-        } catch {}
-        autocompleteRef.current = null;
-      }
-    };
+    if (!apiKey || document.getElementById('google-maps-geocoder-script')) return;
+    const script = document.createElement('script');
+    script.id = 'google-maps-geocoder-script';
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
   }, [step, isOpen]);
 
   // Auto-save to localStorage
@@ -1243,6 +1002,12 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       formattedAddress,
       city,
       stateName,
+      neighborhood,
+      postalCode,
+      streetName,
+      streetNumber,
+      locationReference,
+      showPublicAddress,
       bedrooms,
       bathrooms,
       halfBathrooms,
@@ -1333,6 +1098,12 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     formattedAddress,
     city,
     stateName,
+    neighborhood,
+    postalCode,
+    streetName,
+    streetNumber,
+    locationReference,
+    showPublicAddress,
     bedrooms,
     bathrooms,
     halfBathrooms,
@@ -1425,6 +1196,12 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
             if (parsed.formattedAddress) setFormattedAddress(parsed.formattedAddress);
             if (parsed.city) setCity(parsed.city);
             if (parsed.stateName) setStateName(parsed.stateName);
+            if (parsed.neighborhood) setNeighborhood(parsed.neighborhood);
+            if (parsed.postalCode) setPostalCode(parsed.postalCode);
+            if (parsed.streetName) setStreetName(parsed.streetName);
+            if (parsed.streetNumber) setStreetNumber(parsed.streetNumber);
+            if (parsed.locationReference) setLocationReference(parsed.locationReference);
+            if (parsed.showPublicAddress !== undefined) setShowPublicAddress(parsed.showPublicAddress);
             if (parsed.bedrooms) setBedrooms(parsed.bedrooms);
             if (parsed.bathrooms) setBathrooms(parsed.bathrooms);
             if (parsed.halfBathrooms) setHalfBathrooms(parsed.halfBathrooms);
@@ -1660,6 +1437,26 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     });
   };
 
+  const invalidateResolvedLocation = () => {
+    setLatitude(null);
+    setLongitude(null);
+    setPlaceId(null);
+    setFormattedAddress(null);
+    setGeometrySource(null);
+  };
+
+  const buildLocationValues = () => {
+    const cleanCity = (city || '').trim();
+    const cleanState = (stateName || '').trim();
+    const publicLocation = [neighborhood.trim(), cleanCity].filter(Boolean).join(', ');
+    const streetLine = [streetName.trim(), streetNumber.trim()].filter(Boolean).join(' ');
+    const fullAddress = [streetLine, neighborhood.trim(), cleanCity, cleanState, postalCode.trim(), country.trim()]
+      .filter(Boolean)
+      .join(', ');
+
+    return { cleanCity, publicLocation, fullAddress };
+  };
+
   const handleNext = async () => {
     setValidationError(null);
     setFieldErrors({});
@@ -1677,12 +1474,19 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     let currentLat = latitude;
     let currentLng = longitude;
 
+    const { cleanCity, publicLocation, fullAddress } = buildLocationValues();
+
+    if (step === 2) {
+      setLocation(publicLocation);
+      setAddress(fullAddress);
+    }
+
     // Paso 2: Geolocalización asíncrona de fallback si faltan coordenadas
     if (step === 2 && (currentLat === null || currentLng === null)) {
       // setValidationError("Geocodificando ubicación...");
       
       // Intento 1: Dirección completa
-      const query1 = [address, location, country].filter(Boolean).join(', ');
+      const query1 = fullAddress;
       if (query1.trim()) {
         const res1 = await geocodeManualAddress(query1);
         console.log('[GeoTrace] [Fase A] Geocoder Intento 1 devuelto:', res1);
@@ -1697,7 +1501,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
 
       // Intento 2: Fallback jerárquico
       if (currentLat === null || currentLng === null) {
-        const query2 = [neighborhood, location, stateName, country].filter(Boolean).join(', ');
+        const query2 = [cleanCity, stateName, country].filter(Boolean).join(', ');
         if (query2.trim()) {
           const res2 = await geocodeManualAddress(query2);
           console.log('[GeoTrace] [Fase A] Geocoder Intento 2 devuelto:', res2);
@@ -1722,7 +1526,8 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     const stepData: Record<string, any> = {
       title,
       description: shortDescription,
-      location,
+      location: step === 2 ? publicLocation : location,
+      city: cleanCity,
       country,
       latitude: currentLat,
       longitude: currentLng,
@@ -2541,117 +2346,93 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                       <p className="text-xs text-brand-gray-500 mt-0.5">Ingresa la localización exacta e indica qué mostrar públicamente.</p>
                     </div>
 
-                    <div className="flex flex-col gap-3">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500">Búsqueda rápida o Ciudad <span className="text-red-500">*</span></label>
-                        <input
-                          type="text"
-                          required
-                          value={location}
-                          onChange={(e) => setLocation(e.target.value)}
-                          placeholder="Ej. Culiacán, Sinaloa"
-                          className={`w-full p-3 rounded-xl bg-brand-gray-50 border text-xs font-semibold outline-none focus:border-brand-accent ${
-                            fieldErrors.location ? 'border-brand-rose focus:border-brand-rose' : 'border-brand-gray-200'
-                          }`}
-                        />
-                        {fieldErrors.location && (
-                          <p className="text-[10px] text-brand-rose mt-0.5 font-bold flex items-center gap-1 animate-in fade-in duration-200">
-                            <span>⚠</span> <span>{fieldErrors.location}</span>
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500">País <span className="text-red-500">*</span></label>
-                          <input
-                            type="text"
-                            required
-                            value={country}
-                            onChange={(e) => setCountry(e.target.value)}
-                            placeholder="Ej. Mexico"
-                            className={`w-full p-3 rounded-xl bg-brand-gray-50 border text-xs font-semibold outline-none focus:border-brand-accent ${
-                              fieldErrors.country ? 'border-brand-rose focus:border-brand-rose' : 'border-brand-gray-200'
-                            }`}
-                          />
-                          {fieldErrors.country && (
-                            <p className="text-[10px] text-brand-rose mt-0.5 font-bold flex items-center gap-1 animate-in fade-in duration-200">
-                              <span>⚠</span> <span>{fieldErrors.country}</span>
-                            </p>
-                          )}
+                    <div className="flex flex-col gap-4">
+                      <section className="rounded-2xl border border-brand-gray-200 bg-white p-4 shadow-sm">
+                        <div className="mb-4 flex items-start gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-accent/10 text-brand-accent">
+                            <MapPin className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <h5 className="text-xs font-black text-brand-black">Zona de la propiedad</h5>
+                            <p className="mt-0.5 text-[10px] font-medium leading-relaxed text-brand-gray-500">Esta información ayuda a encontrar el anuncio y se muestra en su ubicación principal.</p>
+                          </div>
                         </div>
 
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500">Colonia / Fraccionamiento</label>
-                          <input
-                            type="text"
-                            value={neighborhood}
-                            onChange={(e) => setNeighborhood(e.target.value)}
-                            placeholder="Ej. Tres Ríos"
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
-                          />
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div className="flex flex-col gap-1.5" data-error={fieldErrors.city ? 'true' : 'false'}>
+                            <label htmlFor="property-city" className="text-xs font-bold text-brand-gray-600">Ciudad <span className="text-brand-rose">*</span></label>
+                            <input id="property-city" type="text" required autoComplete="address-level2" value={city || ''}
+                              onChange={(e) => { const value = e.target.value; setCity(value); setLocation(value); invalidateResolvedLocation(); }}
+                              placeholder="Ej. Culiacán"
+                              className={`w-full rounded-xl border bg-brand-gray-50 p-3 text-xs font-semibold outline-none transition focus:bg-white focus:ring-2 focus:ring-brand-accent/10 ${fieldErrors.city ? 'border-brand-rose' : 'border-brand-gray-200 focus:border-brand-accent'}`}
+                            />
+                            {fieldErrors.city && <p className="text-[10px] font-bold text-brand-rose">⚠ {fieldErrors.city}</p>}
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label htmlFor="property-state" className="text-xs font-bold text-brand-gray-600">Estado / Provincia</label>
+                            <input id="property-state" type="text" autoComplete="address-level1" value={stateName || ''}
+                              onChange={(e) => { setStateName(e.target.value); invalidateResolvedLocation(); }} placeholder="Ej. Sinaloa"
+                              className="w-full rounded-xl border border-brand-gray-200 bg-brand-gray-50 p-3 text-xs font-semibold outline-none transition focus:border-brand-accent focus:bg-white focus:ring-2 focus:ring-brand-accent/10" />
+                          </div>
+                          <div className="flex flex-col gap-1.5" data-error={fieldErrors.country ? 'true' : 'false'}>
+                            <label htmlFor="property-country" className="text-xs font-bold text-brand-gray-600">País <span className="text-brand-rose">*</span></label>
+                            <input id="property-country" type="text" required autoComplete="country-name" value={country}
+                              onChange={(e) => { setCountry(e.target.value); invalidateResolvedLocation(); }} placeholder="Ej. México"
+                              className={`w-full rounded-xl border bg-brand-gray-50 p-3 text-xs font-semibold outline-none transition focus:bg-white focus:ring-2 focus:ring-brand-accent/10 ${fieldErrors.country ? 'border-brand-rose' : 'border-brand-gray-200 focus:border-brand-accent'}`} />
+                            {fieldErrors.country && <p className="text-[10px] font-bold text-brand-rose">⚠ {fieldErrors.country}</p>}
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label htmlFor="property-neighborhood" className="text-xs font-bold text-brand-gray-600">Colonia / Fraccionamiento</label>
+                            <input id="property-neighborhood" type="text" autoComplete="address-level3" value={neighborhood}
+                              onChange={(e) => { setNeighborhood(e.target.value); invalidateResolvedLocation(); }} placeholder="Ej. Tres Ríos"
+                              className="w-full rounded-xl border border-brand-gray-200 bg-brand-gray-50 p-3 text-xs font-semibold outline-none transition focus:border-brand-accent focus:bg-white focus:ring-2 focus:ring-brand-accent/10" />
+                          </div>
                         </div>
-                      </div>
+                      </section>
 
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="flex flex-col gap-1.5 col-span-2">
-                          <label className="text-xs font-bold text-brand-gray-500">Calle y Número</label>
-                          <input
-                            type="text"
-                            value={streetName}
-                            onChange={(e) => setStreetName(e.target.value)}
-                            placeholder="Calle, Número exterior/interior"
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
-                          />
+                      <section className="rounded-2xl border border-brand-gray-200 bg-brand-gray-50/70 p-4">
+                        <div className="mb-4 flex items-start justify-between gap-3">
+                          <div>
+                            <h5 className="text-xs font-black text-brand-black">Dirección exacta</h5>
+                            <p className="mt-0.5 text-[10px] font-medium text-brand-gray-500">Completa lo que tengas disponible. Puedes mantener estos datos privados.</p>
+                          </div>
+                          <span className="rounded-full border border-brand-gray-200 bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-brand-gray-500">Opcional</span>
                         </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-bold text-brand-gray-500">C.P.</label>
-                          <input
-                            type="text"
-                            value={postalCode}
-                            onChange={(e) => setPostalCode(e.target.value)}
-                            placeholder="Código Postal"
-                            className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
-                          />
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
+                          <div className="flex flex-col gap-1.5 sm:col-span-3">
+                            <label htmlFor="property-street" className="text-xs font-bold text-brand-gray-600">Calle</label>
+                            <input id="property-street" type="text" autoComplete="address-line1" value={streetName}
+                              onChange={(e) => { setStreetName(e.target.value); invalidateResolvedLocation(); }} placeholder="Ej. Av. Álvaro Obregón"
+                              className="w-full rounded-xl border border-brand-gray-200 bg-white p-3 text-xs font-semibold outline-none transition focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/10" />
+                          </div>
+                          <div className="flex flex-col gap-1.5 sm:col-span-1">
+                            <label htmlFor="property-number" className="text-xs font-bold text-brand-gray-600">Número</label>
+                            <input id="property-number" type="text" value={streetNumber}
+                              onChange={(e) => { setStreetNumber(e.target.value); invalidateResolvedLocation(); }} placeholder="123"
+                              className="w-full rounded-xl border border-brand-gray-200 bg-white p-3 text-xs font-semibold outline-none transition focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/10" />
+                          </div>
+                          <div className="flex flex-col gap-1.5 sm:col-span-2">
+                            <label htmlFor="property-postal" className="text-xs font-bold text-brand-gray-600">Código postal</label>
+                            <input id="property-postal" type="text" inputMode="numeric" autoComplete="postal-code" value={postalCode}
+                              onChange={(e) => { setPostalCode(e.target.value); invalidateResolvedLocation(); }} placeholder="80000"
+                              className="w-full rounded-xl border border-brand-gray-200 bg-white p-3 text-xs font-semibold outline-none transition focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/10" />
+                          </div>
+                          <div className="flex flex-col gap-1.5 sm:col-span-6">
+                            <label htmlFor="property-reference" className="text-xs font-bold text-brand-gray-600">Referencia para llegar</label>
+                            <input id="property-reference" type="text" value={locationReference} onChange={(e) => setLocationReference(e.target.value)}
+                              placeholder="Ej. Frente al parque municipal"
+                              className="w-full rounded-xl border border-brand-gray-200 bg-white p-3 text-xs font-semibold outline-none transition focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/10" />
+                          </div>
                         </div>
-                      </div>
+                      </section>
 
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500">Referencias de Ubicación</label>
-                        <input
-                          type="text"
-                          value={locationReference}
-                          onChange={(e) => setLocationReference(e.target.value)}
-                          placeholder="Ej. Frente a parque municipal"
-                          className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-2">
-                        <input
-                          type="checkbox"
-                          id="showPublicAddress"
-                          checked={showPublicAddress}
-                          onChange={(e) => setShowPublicAddress(e.target.checked)}
-                          className="w-4 h-4 accent-brand-accent cursor-pointer"
-                        />
-                        <label htmlFor="showPublicAddress" className="text-xs font-semibold text-brand-gray-600 cursor-pointer">
-                          Mostrar dirección completa públicamente (sino se mostrará aproximada).
-                        </label>
-                      </div>
-
-                      {/* Map Container */}
-                      <div className="flex flex-col gap-1.5 mt-3">
-                        <label className="text-xs font-bold text-brand-gray-500">Ubicación en el mapa</label>
-                        <div 
-                          id="wizard-preview-map" 
-                          className="w-full h-48 rounded-2xl overflow-hidden border border-brand-gray-200 z-10"
-                        />
-                        <span className="text-[10px] text-brand-gray-400 font-bold leading-normal">
-                          💡 Si la geocodificación no encuentra tu dirección exacta, haz click directamente en el mapa para colocar el marcador manualmente.
+                      <label htmlFor="showPublicAddress" className="flex cursor-pointer items-start gap-3 rounded-2xl border border-brand-accent/20 bg-brand-accent/[0.04] p-4 transition hover:border-brand-accent/40">
+                        <input type="checkbox" id="showPublicAddress" checked={showPublicAddress} onChange={(e) => setShowPublicAddress(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-brand-accent" />
+                        <span>
+                          <span className="block text-xs font-black text-brand-black">Mostrar la dirección completa en el anuncio</span>
+                          <span className="mt-1 block text-[10px] font-medium leading-relaxed text-brand-gray-500">Si lo desactivas, los visitantes solo verán la zona aproximada: colonia y ciudad.</span>
                         </span>
-                      </div>
+                      </label>
                     </div>
                   </motion.div>
                 )}

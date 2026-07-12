@@ -196,6 +196,9 @@ export class PropertyValidator {
       }
     } else if (step === 2) {
       // Ubicación
+      if (!data.city || !data.city.trim()) {
+        errors.push({ field: 'city', message: 'La ciudad es requerida.' });
+      }
       if (!data.location || !data.location.trim()) {
         errors.push({ field: 'location', message: 'La ubicación de la propiedad es requerida.' });
       }
