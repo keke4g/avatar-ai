@@ -14,8 +14,8 @@ export const ETERNA_VOICE_ENGINES: Array<{
   {
     id: 'elevenlabs',
     name: 'ElevenLabs',
-    voice: 'Sarah · Flash v2.5',
-    description: 'Voz femenina cálida y expresiva con el modelo de baja latencia optimizado para conversaciones en tiempo real.',
+    voice: 'Sarah · Turbo v2.5',
+    description: 'Voz femenina cálida y expresiva con equilibrio entre naturalidad, definición y velocidad conversacional.',
     badge: 'Recomendada',
   },
   {
