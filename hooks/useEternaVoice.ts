@@ -94,7 +94,13 @@ const selectPremiumVoiceWithReason = (): { voice: SpeechSynthesisVoice | null, r
     return { voice: null, reason: "SpeechSynthesis.getVoices() devolvió una lista vacía. Posible retraso en la carga del navegador." };
   }
 
-  // 1. Prioridad absoluta: voces femeninas nativas de México.
+  // 1. Prioridad absoluta solicitada: Google español de Estados Unidos.
+  const esUS = voices.find(v => v.name === "Google español de Estados Unidos" || v.lang === "es-US" || v.lang === "es_US");
+  if (esUS) {
+    return { voice: esUS, reason: "Forzada: Google español de Estados Unidos (es-US)" };
+  }
+
+  // 2. Respaldo regional: voces femeninas nativas de México.
   const mexicanFemale = voices.find(v => {
     const name = v.name.toLowerCase();
     const isMexican = v.lang.toLowerCase().replace('_', '-').startsWith('es-mx');
@@ -102,12 +108,6 @@ const selectPremiumVoiceWithReason = (): { voice: SpeechSynthesisVoice | null, r
   });
   if (mexicanFemale) {
     return { voice: mexicanFemale, reason: `Voz femenina nativa de México: ${mexicanFemale.name}` };
-  }
-
-  // 2. Prioridad secundaria: Google español de Estados Unidos (es-US)
-  const esUS = voices.find(v => v.name === "Google español de Estados Unidos" || v.lang === "es-US" || v.lang === "es_US");
-  if (esUS) {
-    return { voice: esUS, reason: "Forzada: Google español de Estados Unidos (es-US)" };
   }
 
   // 3. Google español (es-ES)

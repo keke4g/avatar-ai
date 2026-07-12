@@ -14,8 +14,8 @@ export const ETERNA_VOICE_ENGINES: Array<{
   {
     id: 'elevenlabs',
     name: 'ElevenLabs',
-    voice: 'Sarah · Multilingual v2',
-    description: 'La opción más realista para Eterna. Voz femenina cálida y expresiva, optimizada para conversación en español.',
+    voice: 'Sarah · Flash v2.5',
+    description: 'Voz femenina cálida y expresiva con el modelo de baja latencia optimizado para conversaciones en tiempo real.',
     badge: 'Recomendada',
   },
   {

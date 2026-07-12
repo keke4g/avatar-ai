@@ -33,7 +33,7 @@ async function synthesizeWithElevenLabs(text: string) {
 
   const voiceId = process.env.ELEVENLABS_VOICE_ID || ELEVENLABS_DEFAULT_VOICE_ID;
   const response = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`,
+    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_22050_32`,
     {
       method: 'POST',
       headers: {
@@ -43,7 +43,7 @@ async function synthesizeWithElevenLabs(text: string) {
       },
       body: JSON.stringify({
         text,
-        model_id: 'eleven_multilingual_v2',
+        model_id: 'eleven_flash_v2_5',
         language_code: 'es',
         voice_settings: {
           stability: 0.42,
