@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction } from 'react';
 import { StreamStatus } from './useWebSocketStream';
+import {
+  ETERNA_VOICE_ENGINE_EVENT,
+  EternaVoiceEngine,
+  getEternaVoiceEngine,
+} from '../lib/eterna/voiceConfig';
 
 export type VoiceModeState = 'disabled' | 'LISTENING' | 'PROCESSING' | 'SPEAKING' | 'COOLDOWN';
 
@@ -89,32 +94,32 @@ const selectPremiumVoiceWithReason = (): { voice: SpeechSynthesisVoice | null, r
     return { voice: null, reason: "SpeechSynthesis.getVoices() devolvió una lista vacía. Posible retraso en la carga del navegador." };
   }
 
-  // 1. Prioridad absoluta: Google español de Estados Unidos (es-US)
+  // 1. Prioridad absoluta: voces femeninas nativas de México.
+  const mexicanFemale = voices.find(v => {
+    const name = v.name.toLowerCase();
+    const isMexican = v.lang.toLowerCase().replace('_', '-').startsWith('es-mx');
+    return isMexican && (name.includes('dalia') || name.includes('sabina') || name.includes('renata') || name.includes('larissa'));
+  });
+  if (mexicanFemale) {
+    return { voice: mexicanFemale, reason: `Voz femenina nativa de México: ${mexicanFemale.name}` };
+  }
+
+  // 2. Prioridad secundaria: Google español de Estados Unidos (es-US)
   const esUS = voices.find(v => v.name === "Google español de Estados Unidos" || v.lang === "es-US" || v.lang === "es_US");
   if (esUS) {
     return { voice: esUS, reason: "Forzada: Google español de Estados Unidos (es-US)" };
   }
 
-  // 2. Prioridad secundaria: Google español (es-ES)
+  // 3. Google español (es-ES)
   const esES = voices.find(v => v.name === "Google español" || v.lang === "es-ES" || v.lang === "es-ES");
   if (esES) {
     return { voice: esES, reason: "Coincidencia secundaria: Google español (es-ES)" };
   }
 
-  // 3. Último recurso: Microsoft Sabina
-  const sabina = voices.find(v => v.name === "Microsoft Sabina - Spanish (Mexico)" || v.name.toLowerCase().includes("sabina"));
-  if (sabina) {
-    return { voice: sabina, reason: "Último recurso: Microsoft Sabina" };
-  }
-
   // Filter voices that have a Spanish language prefix
   const spanishVoices = voices.filter(v => v.lang.toLowerCase().startsWith('es'));
 
-  // 4. Microsoft Dalia
-  const dalia = spanishVoices.find(v => v.name.toLowerCase().includes('dalia'));
-  if (dalia) return { voice: dalia, reason: "Microsoft Dalia (es-MX)" };
-
-  // 5. Microsoft Elena
+  // 4. Microsoft Elena
   const elena = spanishVoices.find(v => v.name.toLowerCase().includes('elena'));
   if (elena) return { voice: elena, reason: "Microsoft Elena (es-ES)" };
 
@@ -224,7 +229,11 @@ export function useEternaVoice({
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const isStoppingForSpeechRef = useRef<boolean>(false);
   const recognitionActiveRef = useRef<boolean>(false);
-  const pendingUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const pendingSpeechStartRef = useRef<(() => void) | null>(null);
+  const voiceEngineRef = useRef<EternaVoiceEngine>(getEternaVoiceEngine());
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioObjectUrlRef = useRef<string | null>(null);
+  const speechRequestRef = useRef<AbortController | null>(null);
   const lastSpokenTextRef = useRef<string>('');
   const lastSpokenTimestampRef = useRef<number>(0);
   const speechSessionActiveRef = useRef<boolean>(false);
@@ -329,16 +338,38 @@ export function useEternaVoice({
     }
   }, []);
 
+  useEffect(() => {
+    const syncVoiceEngine = (event?: Event) => {
+      const selected = (event as CustomEvent<{ engine?: EternaVoiceEngine }>)?.detail?.engine;
+      voiceEngineRef.current = selected || getEternaVoiceEngine();
+      addVoiceDebugLog(`[VOICE ENGINE] ${voiceEngineRef.current}`);
+    };
+
+    syncVoiceEngine();
+    window.addEventListener(ETERNA_VOICE_ENGINE_EVENT, syncVoiceEngine);
+    return () => window.removeEventListener(ETERNA_VOICE_ENGINE_EVENT, syncVoiceEngine);
+  }, []);
+
   // Centralized, optimized SpeechSynthesis controller
   const speak = useCallback((text: string, onEnd?: () => void) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) {
+    if (typeof window === 'undefined') {
       onEnd?.();
       return;
     }
 
     // Cancel any ongoing speech synthesis first
-    window.speechSynthesis.cancel();
-    pendingUtteranceRef.current = null;
+    window.speechSynthesis?.cancel();
+    pendingSpeechStartRef.current = null;
+    speechRequestRef.current?.abort();
+    speechRequestRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (audioObjectUrlRef.current) {
+      URL.revokeObjectURL(audioObjectUrlRef.current);
+      audioObjectUrlRef.current = null;
+    }
 
     // Check if recognition is running
     const wasRecognitionActive = recognitionRef.current && recognitionActiveRef.current;
@@ -378,19 +409,6 @@ export function useEternaVoice({
     console.log('[AUDIT] speechSessionActiveRef -> true');
     speechSessionActiveRef.current = true; // Mark speech session as active
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    if (selectedVoiceRef.current) {
-      utterance.voice = selectedVoiceRef.current;
-      utterance.lang = selectedVoiceRef.current.lang;
-    } else {
-      utterance.lang = languageRef.current === 'es' ? 'es-MX' : 'en-US';
-    }
-
-    utterance.rate = 0.95;
-    utterance.pitch = 1.10;
-    utterance.volume = 1.0;
-
     let isFinished = false;
 
     const handleEnd = () => {
@@ -407,6 +425,14 @@ export function useEternaVoice({
         return;
       }
       isFinished = true;
+
+      speechRequestRef.current?.abort();
+      speechRequestRef.current = null;
+      audioRef.current = null;
+      if (audioObjectUrlRef.current) {
+        URL.revokeObjectURL(audioObjectUrlRef.current);
+        audioObjectUrlRef.current = null;
+      }
 
       // If we are no longer speaking (e.g. because we were interrupted), we should not transition back to idle
       // or restart recognition from here, because the interruption already handled it.
@@ -438,27 +464,83 @@ export function useEternaVoice({
       console.log('[HANDLE END EXIT C]');
     };
 
-    utterance.onend = handleEnd;
-    utterance.onerror = handleEnd;
+    const playWithBrowser = () => {
+      if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
+        handleEnd();
+        return;
+      }
 
-    // If recognition was running, we must wait for its onend event before starting synthesis
-    if (wasRecognitionActive) {
-      pendingUtteranceRef.current = utterance;
-    } else {
       try {
-        console.log(`[VOICE STATE] speech start`);
+        const utterance = new SpeechSynthesisUtterance(text);
+        if (selectedVoiceRef.current) {
+          utterance.voice = selectedVoiceRef.current;
+          utterance.lang = selectedVoiceRef.current.lang;
+        } else {
+          utterance.lang = languageRef.current === 'es' ? 'es-MX' : 'en-US';
+        }
+        utterance.rate = 0.95;
+        utterance.pitch = 1.1;
+        utterance.volume = 1;
+        utterance.onend = handleEnd;
+        utterance.onerror = handleEnd;
+        console.log('[VOICE STATE] browser speech start');
         window.speechSynthesis.speak(utterance);
       } catch (e) {
-        console.warn('[Eterna Voice] speak failed:', e);
-        setSimulatedStatusRef.current?.('idle');
-        setIsSpeaking(false);
-        isSpeakingRef.current = false;
-        console.trace('[AUDIT] speechSessionActiveRef -> false (speak catch)');
-        speechSessionActiveRef.current = false; // Clear session ref on error
-        isStoppingForSpeechRef.current = false; // Reset the flag on failure
-        enterListeningState();
-        onEnd?.();
+        console.warn('[Eterna Voice] browser speech failed:', e);
+        handleEnd();
       }
+    };
+
+    const playWithRemoteEngine = async (engine: Exclude<EternaVoiceEngine, 'browser'>) => {
+      const controller = new AbortController();
+      speechRequestRef.current = controller;
+
+      try {
+        const response = await fetch('/api/voz', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ texto: text, engine }),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`Voice engine ${engine} returned ${response.status}`);
+
+        const audioBlob = await response.blob();
+        if (!speechSessionActiveRef.current || controller.signal.aborted) return;
+
+        const objectUrl = URL.createObjectURL(audioBlob);
+        audioObjectUrlRef.current = objectUrl;
+        const audio = new Audio(objectUrl);
+        audioRef.current = audio;
+        audio.onended = handleEnd;
+        audio.onerror = () => {
+          audioRef.current = null;
+          if (audioObjectUrlRef.current) {
+            URL.revokeObjectURL(audioObjectUrlRef.current);
+            audioObjectUrlRef.current = null;
+          }
+          if (speechSessionActiveRef.current) playWithBrowser();
+        };
+        console.log(`[VOICE STATE] ${engine} speech start`);
+        await audio.play();
+      } catch (error) {
+        if (controller.signal.aborted || !speechSessionActiveRef.current) return;
+        console.warn(`[Eterna Voice] ${engine} unavailable, using browser fallback:`, error);
+        addVoiceDebugLog(`[VOICE FALLBACK] ${engine} -> browser`);
+        playWithBrowser();
+      }
+    };
+
+    const startSelectedEngine = () => {
+      const engine = voiceEngineRef.current;
+      if (engine === 'browser') playWithBrowser();
+      else void playWithRemoteEngine(engine);
+    };
+
+    // Si el micrófono estaba escuchando, esperamos su evento onend antes de reproducir.
+    if (wasRecognitionActive) {
+      pendingSpeechStartRef.current = startSelectedEngine;
+    } else {
+      startSelectedEngine();
     }
   }, [language]);
 
@@ -477,7 +559,17 @@ export function useEternaVoice({
     lastSpokenTimestampRef.current = 0; // Prevent recent speech window blocking
     setSimulatedStatusRef.current?.('listening');
     isStoppingForSpeechRef.current = false; // Reset flag
-    pendingUtteranceRef.current = null; // Clear any pending speech
+    pendingSpeechStartRef.current = null; // Clear any pending speech
+    speechRequestRef.current?.abort();
+    speechRequestRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (audioObjectUrlRef.current) {
+      URL.revokeObjectURL(audioObjectUrlRef.current);
+      audioObjectUrlRef.current = null;
+    }
 
     // Bypasses COOLDOWN when user interrupts, goes straight to LISTENING
     enterListeningState();
@@ -509,7 +601,17 @@ export function useEternaVoice({
     speechSessionActiveRef.current = false; // Clear session ref
     lastSpokenTimestampRef.current = 0; // Prevent recent speech window blocking
     isStoppingForSpeechRef.current = false; // Reset flag
-    pendingUtteranceRef.current = null;
+    pendingSpeechStartRef.current = null;
+    speechRequestRef.current?.abort();
+    speechRequestRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (audioObjectUrlRef.current) {
+      URL.revokeObjectURL(audioObjectUrlRef.current);
+      audioObjectUrlRef.current = null;
+    }
 
     enterListeningState();
     addVoiceDebugLog(`startConversationMode completed. voiceMode after: ${voiceModeRef.current}`);
@@ -526,7 +628,17 @@ export function useEternaVoice({
     setIsListening(false);
     isListeningRef.current = false;
     isStoppingForSpeechRef.current = false; // Reset flag
-    pendingUtteranceRef.current = null;
+    pendingSpeechStartRef.current = null;
+    speechRequestRef.current?.abort();
+    speechRequestRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (audioObjectUrlRef.current) {
+      URL.revokeObjectURL(audioObjectUrlRef.current);
+      audioObjectUrlRef.current = null;
+    }
     if (recognitionRef.current) {
       try {
         if (recognitionActiveRef.current) {
@@ -656,14 +768,13 @@ export function useEternaVoice({
           if (!active) return;
 
           // If we aborted recognition specifically to speak, and now it has ended, start synthesis
-          if (pendingUtteranceRef.current) {
-            const utterance = pendingUtteranceRef.current;
-            pendingUtteranceRef.current = null;
+          if (pendingSpeechStartRef.current) {
+            const startSpeech = pendingSpeechStartRef.current;
+            pendingSpeechStartRef.current = null;
             try {
-              console.log(`[VOICE STATE] speech start`);
-              window.speechSynthesis.speak(utterance);
+              startSpeech();
             } catch (e) {
-              console.warn('[Eterna Voice] speak pending utterance failed:', e);
+              console.warn('[Eterna Voice] pending speech failed:', e);
               setSimulatedStatusRef.current?.('idle');
               setIsSpeaking(false);
               isSpeakingRef.current = false;
@@ -801,6 +912,9 @@ export function useEternaVoice({
       if (typeof window !== 'undefined' && window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
+      speechRequestRef.current?.abort();
+      audioRef.current?.pause();
+      if (audioObjectUrlRef.current) URL.revokeObjectURL(audioObjectUrlRef.current);
     };
   }, []);
 
