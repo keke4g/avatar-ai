@@ -1420,19 +1420,29 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
         resolve(null);
         return;
       }
+
+      let settled = false;
+      const finish = (result: { lat: number; lng: number } | null) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeoutId);
+        resolve(result);
+      };
+      const timeoutId = window.setTimeout(() => finish(null), 3000);
+
       try {
         const geocoder = new (window as any).google.maps.Geocoder();
         geocoder.geocode({ address: queryStr }, (results: any, status: any) => {
           if (status === 'OK' && results && results.length > 0) {
             const loc = results[0].geometry.location;
-            resolve({ lat: loc.lat(), lng: loc.lng() });
+            finish({ lat: loc.lat(), lng: loc.lng() });
           } else {
-            resolve(null);
+            finish(null);
           }
         });
       } catch (e) {
         console.error('[Geocoding Error]:', e);
-        resolve(null);
+        finish(null);
       }
     });
   };
@@ -1471,47 +1481,6 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setAddress(fullAddress);
     }
 
-    // Paso 2: Geolocalización asíncrona de fallback si faltan coordenadas
-    if (step === 2 && (currentLat === null || currentLng === null)) {
-      // setValidationError("Geocodificando ubicación...");
-      
-      // Intento 1: Dirección completa
-      const query1 = fullAddress;
-      if (query1.trim()) {
-        const res1 = await geocodeManualAddress(query1);
-        console.log('[GeoTrace] [Fase A] Geocoder Intento 1 devuelto:', res1);
-        if (res1) {
-          currentLat = res1.lat;
-          currentLng = res1.lng;
-          setLatitude(res1.lat);
-          setLongitude(res1.lng);
-          setGeometrySource('google_geocoding');
-        }
-      }
-
-      // Intento 2: Fallback jerárquico
-      if (currentLat === null || currentLng === null) {
-        const query2 = [cleanCity, stateName, country].filter(Boolean).join(', ');
-        if (query2.trim()) {
-          const res2 = await geocodeManualAddress(query2);
-          console.log('[GeoTrace] [Fase A] Geocoder Intento 2 devuelto:', res2);
-          if (res2) {
-            currentLat = res2.lat;
-            currentLng = res2.lng;
-            setLatitude(res2.lat);
-            setLongitude(res2.lng);
-            setGeometrySource('google_geocoding');
-          }
-        }
-      }
-      
-      setValidationError(null);
-    }
-
-    if (step === 2) {
-      console.log('[GeoTrace] [Fase B] Salida de Step 2. Coordenadas:', { latitude: currentLat, longitude: currentLng, geometrySource });
-    }
-
     // Compilar datos del paso actual para validación estructurada
     const stepData: Record<string, any> = {
       title,
@@ -1543,6 +1512,30 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setValidationError("Por favor corrige los errores del formulario para avanzar.");
       setTimeout(scrollToError, 80);
       return;
+    }
+
+    // La geocodificación es una mejora de datos, nunca un requisito para navegar.
+    // Se ejecuta después de validar y en segundo plano para que una API externa
+    // lenta, restringida o caída no pueda congelar el botón "Siguiente".
+    if (step === 2 && (currentLat === null || currentLng === null)) {
+      void (async () => {
+        let resolvedLocation = fullAddress.trim()
+          ? await geocodeManualAddress(fullAddress)
+          : null;
+
+        if (!resolvedLocation) {
+          const fallbackQuery = [cleanCity, stateName, country].filter(Boolean).join(', ');
+          resolvedLocation = fallbackQuery.trim()
+            ? await geocodeManualAddress(fallbackQuery)
+            : null;
+        }
+
+        if (resolvedLocation) {
+          setLatitude(resolvedLocation.lat);
+          setLongitude(resolvedLocation.lng);
+          setGeometrySource('google_geocoding');
+        }
+      })();
     }
 
     const nextStep = activeSteps[currentActiveIndex + 1];
