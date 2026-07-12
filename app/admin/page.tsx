@@ -75,6 +75,7 @@ export default function AdminPage() {
   const [voiceEngine, setVoiceEngine] = useState<EternaVoiceEngine>(DEFAULT_ETERNA_VOICE_ENGINE);
   const [voiceEngineStatus, setVoiceEngineStatus] = useState<Record<EternaVoiceEngine, boolean>>({
     elevenlabs: false,
+    deepgram: false,
     azure: false,
     browser: true,
   });
@@ -102,6 +103,7 @@ export default function AdminPage() {
         if (!active || !data?.engines) return;
         setVoiceEngineStatus({
           elevenlabs: Boolean(data.engines.elevenlabs?.configured),
+          deepgram: Boolean(data.engines.deepgram?.configured),
           azure: Boolean(data.engines.azure?.configured),
           browser: true,
         });
@@ -1806,7 +1808,7 @@ export default function AdminPage() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                       {ETERNA_VOICE_ENGINES.map((engine) => {
                         const selected = voiceEngine === engine.id;
                         const configured = voiceEngineStatus[engine.id];

@@ -1,8 +1,8 @@
-export type EternaVoiceEngine = 'elevenlabs' | 'browser' | 'azure';
+export type EternaVoiceEngine = 'elevenlabs' | 'deepgram' | 'browser' | 'azure';
 
 export const ETERNA_VOICE_ENGINE_STORAGE_KEY = 'auraswap_eterna_voice_engine';
 export const ETERNA_VOICE_ENGINE_EVENT = 'auraswap:eterna-voice-engine-changed';
-export const DEFAULT_ETERNA_VOICE_ENGINE: EternaVoiceEngine = 'elevenlabs';
+export const DEFAULT_ETERNA_VOICE_ENGINE: EternaVoiceEngine = 'deepgram';
 
 export const ETERNA_VOICE_ENGINES: Array<{
   id: EternaVoiceEngine;
@@ -12,11 +12,18 @@ export const ETERNA_VOICE_ENGINES: Array<{
   badge: string;
 }> = [
   {
+    id: 'deepgram',
+    name: 'Deepgram Aura-2',
+    voice: 'Estrella · Español (México)',
+    description: 'Voz femenina mexicana, natural y expresiva, optimizada para respuestas conversacionales de muy baja latencia.',
+    badge: 'Recomendada',
+  },
+  {
     id: 'elevenlabs',
     name: 'ElevenLabs',
     voice: 'Sarah · Turbo v2.5',
     description: 'Voz femenina cálida y expresiva con equilibrio entre naturalidad, definición y velocidad conversacional.',
-    badge: 'Recomendada',
+    badge: 'Alta fidelidad',
   },
   {
     id: 'azure',
@@ -37,7 +44,7 @@ export const ETERNA_VOICE_ENGINES: Array<{
 export function getEternaVoiceEngine(): EternaVoiceEngine {
   if (typeof window === 'undefined') return DEFAULT_ETERNA_VOICE_ENGINE;
   const stored = window.localStorage.getItem(ETERNA_VOICE_ENGINE_STORAGE_KEY);
-  return stored === 'browser' || stored === 'azure' || stored === 'elevenlabs'
+  return stored === 'browser' || stored === 'azure' || stored === 'elevenlabs' || stored === 'deepgram'
     ? stored
     : DEFAULT_ETERNA_VOICE_ENGINE;
 }

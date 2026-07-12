@@ -104,11 +104,48 @@ async function synthesizeWithAzure(text: string) {
   return audioResponse(await response.arrayBuffer(), 'audio/mpeg');
 }
 
+async function synthesizeWithDeepgram(text: string) {
+  const apiKey = process.env.DEEPGRAM_API_KEY;
+  if (!apiKey) {
+    return Response.json({ error: 'Deepgram no está configurado.' }, { status: 503 });
+  }
+
+  const response = await fetch(
+    'https://api.deepgram.com/v1/speak?model=aura-2-estrella-es&encoding=mp3',
+    {
+      method: 'POST',
+      headers: {
+        Accept: 'audio/mpeg',
+        Authorization: `Token ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+
+  if (!response.ok || !response.body) {
+    console.error('[Voice API] Deepgram respondió con estado', response.status);
+    return Response.json({ error: 'Deepgram no pudo generar la voz.' }, { status: 502 });
+  }
+
+  // Conservamos el stream para que el navegador pueda reproducir desde el primer fragmento.
+  return new Response(response.body, {
+    headers: {
+      'Content-Type': response.headers.get('content-type') || 'audio/mpeg',
+      'Cache-Control': 'private, no-store, max-age=0',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Voice-Engine': 'deepgram',
+    },
+  });
+}
+
 export async function GET() {
   return Response.json(
     {
       engines: {
         elevenlabs: { configured: Boolean(process.env.ELEVENLABS_API_KEY) },
+        deepgram: { configured: Boolean(process.env.DEEPGRAM_API_KEY) },
         azure: { configured: Boolean(process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION) },
         browser: { configured: true },
       },
@@ -141,14 +178,14 @@ export async function POST(req: Request) {
       );
     }
 
-    if (engine !== 'elevenlabs' && engine !== 'azure') {
+    if (engine !== 'elevenlabs' && engine !== 'azure' && engine !== 'deepgram') {
       return Response.json({ error: 'Motor de voz no compatible con esta ruta.' }, { status: 400 });
     }
 
     const text = rawText.trim();
-    return engine === 'azure'
-      ? await synthesizeWithAzure(text)
-      : await synthesizeWithElevenLabs(text);
+    if (engine === 'azure') return await synthesizeWithAzure(text);
+    if (engine === 'deepgram') return await synthesizeWithDeepgram(text);
+    return await synthesizeWithElevenLabs(text);
   } catch (error) {
     const isTimeout = error instanceof Error && error.name === 'TimeoutError';
     console.error('[Voice API] Error generando audio:', isTimeout ? 'timeout' : error);
