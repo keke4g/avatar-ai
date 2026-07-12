@@ -494,6 +494,8 @@ export function useEternaVoice({
     const playWithRemoteEngine = async (engine: Exclude<EternaVoiceEngine, 'browser'>) => {
       const controller = new AbortController();
       speechRequestRef.current = controller;
+      let playbackGuard: number | null = null;
+      let fallbackStarted = false;
 
       try {
         const response = await fetch('/api/voz', {
@@ -504,72 +506,59 @@ export function useEternaVoice({
         });
         if (!response.ok) throw new Error(`Voice engine ${engine} returned ${response.status}`);
 
-        if (
-          engine === 'deepgram' &&
-          response.body &&
-          typeof MediaSource !== 'undefined' &&
-          MediaSource.isTypeSupported('audio/mpeg')
-        ) {
-          const mediaSource = new MediaSource();
-          const objectUrl = URL.createObjectURL(mediaSource);
-          audioObjectUrlRef.current = objectUrl;
-          const audio = new Audio(objectUrl);
-          audioRef.current = audio;
-          audio.onended = handleEnd;
-
-          await new Promise<void>((resolve, reject) => {
-            mediaSource.addEventListener('sourceopen', () => resolve(), { once: true });
-            mediaSource.addEventListener('error', () => reject(new Error('MediaSource unavailable')), { once: true });
-          });
-
-          const sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
-          const reader = response.body.getReader();
-          let playbackStarted = false;
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            if (!value?.byteLength) continue;
-
-            await new Promise<void>((resolve, reject) => {
-              sourceBuffer.addEventListener('updateend', () => resolve(), { once: true });
-              sourceBuffer.addEventListener('error', () => reject(new Error('Audio stream append failed')), { once: true });
-              sourceBuffer.appendBuffer(value);
-            });
-
-            if (!playbackStarted) {
-              playbackStarted = true;
-              await audio.play();
-              console.log('[VOICE STATE] deepgram streaming playback start');
-            }
-          }
-
-          if (mediaSource.readyState === 'open' && !sourceBuffer.updating) {
-            mediaSource.endOfStream();
-          }
-          return;
-        }
-
         const audioBlob = await response.blob();
         if (!speechSessionActiveRef.current || controller.signal.aborted) return;
 
         const objectUrl = URL.createObjectURL(audioBlob);
         audioObjectUrlRef.current = objectUrl;
         const audio = new Audio(objectUrl);
+        audio.preload = 'auto';
+        audio.volume = 1;
         audioRef.current = audio;
-        audio.onended = handleEnd;
-        audio.onerror = () => {
+        let playbackConfirmed = false;
+        const fallbackToBrowser = () => {
+          if (fallbackStarted || !speechSessionActiveRef.current) return;
+          fallbackStarted = true;
+          audio.pause();
           audioRef.current = null;
           if (audioObjectUrlRef.current) {
             URL.revokeObjectURL(audioObjectUrlRef.current);
             audioObjectUrlRef.current = null;
           }
-          if (speechSessionActiveRef.current) playWithBrowser();
+          addVoiceDebugLog(`[VOICE FALLBACK] ${engine} audio playback -> browser`);
+          playWithBrowser();
+        };
+        playbackGuard = window.setTimeout(() => {
+          if (!playbackConfirmed) fallbackToBrowser();
+        }, 1500);
+        audio.onplaying = () => {
+          playbackConfirmed = true;
+          if (playbackGuard !== null) window.clearTimeout(playbackGuard);
+          console.log(`[VOICE STATE] ${engine} audible playback confirmed`);
+        };
+        audio.onended = () => {
+          if (playbackGuard !== null) window.clearTimeout(playbackGuard);
+          handleEnd();
+        };
+        audio.onerror = () => {
+          if (playbackGuard !== null) window.clearTimeout(playbackGuard);
+          fallbackToBrowser();
         };
         console.log(`[VOICE STATE] ${engine} speech start`);
         await audio.play();
       } catch (error) {
         if (controller.signal.aborted || !speechSessionActiveRef.current) return;
+        if (playbackGuard !== null) window.clearTimeout(playbackGuard);
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
+        if (audioObjectUrlRef.current) {
+          URL.revokeObjectURL(audioObjectUrlRef.current);
+          audioObjectUrlRef.current = null;
+        }
+        if (fallbackStarted) return;
+        fallbackStarted = true;
         console.warn(`[Eterna Voice] ${engine} unavailable, using browser fallback:`, error);
         addVoiceDebugLog(`[VOICE FALLBACK] ${engine} -> browser`);
         playWithBrowser();
