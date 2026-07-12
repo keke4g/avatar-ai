@@ -1461,16 +1461,6 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     setValidationError(null);
     setFieldErrors({});
 
-    // ── Smart scroll gate: if user hasn't reached the bottom yet, scroll them there
-    if (scrollInfo.hasOverflow && !hasReviewedAll) {
-      scrollAreaRef.current?.scrollTo({
-        top: scrollAreaRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
-      setValidationError('Revisa los campos restantes antes de continuar ↓');
-      return;
-    }
-
     let currentLat = latitude;
     let currentLng = longitude;
 
