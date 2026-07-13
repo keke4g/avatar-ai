@@ -10,7 +10,7 @@ import ImageUploadDropzone from '../../components/ImageUploadDropzone';
 import { 
   Grid, Calendar, Heart, ShieldCheck, Plus, Check, X, 
   MessageSquare, Star, Settings, FileText, ArrowRight, Building, Compass, Sparkles, AlertTriangle,
-  Edit, Trash2, Eye, EyeOff, Image, MapPin, Copy, Wifi, Key, Clock, Phone
+  Edit, Trash2, Eye, EyeOff, Image, MapPin, Copy, Wifi, Key, Clock, Phone, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MOCK_USERS } from '../../lib/mockData';
@@ -18,7 +18,10 @@ import confetti from 'canvas-confetti';
 
 import AuthGuard from '../../components/AuthGuard';
 import PropertyWizardModal from '../../components/PropertyWizardModal';
+import PropertyEditorModal from '../../components/PropertyEditorModal';
 import { useLiveContext } from '../../lib/context/LiveContext';
+import { ServiceFactory } from '../../lib/services/ServiceFactory';
+import { Property } from '../../lib/types';
 
 type TabType = 'swaps' | 'properties' | 'leads' | 'favorites' | 'trips' | 'reviews';
 
@@ -160,7 +163,8 @@ function DashboardPageContent() {
   const [listFormOpen, setListFormOpen] = useState(false);
 
   // Property Management states
-  const [editingProperty, setEditingProperty] = useState<any | null>(null);
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [editingPropertyLoadingId, setEditingPropertyLoadingId] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
@@ -195,11 +199,21 @@ function DashboardPageContent() {
     }
   }, [activeTab, liveContext.eterna.activeGuidedFlow]);
 
-  const handleOpenEdit = (prop: any) => {
-    setEditingProperty(prop);
+  const handleOpenEdit = async (prop: Property) => {
+    setEditingPropertyLoadingId(prop.id);
+    try {
+      // Fetch the complete, current record instead of editing the dashboard card snapshot.
+      const completeProperty = await ServiceFactory.getPropertyService().getById(prop.id);
+      setEditingProperty(completeProperty || prop);
+    } catch (error) {
+      console.error('[Dashboard] No fue posible recargar la propiedad antes de editar:', error);
+      setEditingProperty(prop);
+    } finally {
+      setEditingPropertyLoadingId(null);
+    }
   };
 
-  // Note: Saved changes are now handled by PropertyWizardModal onSubmit
+  // Saved changes are handled by the dedicated single-page editor.
 
   // Favorite properties
   const favoritedProperties = properties.filter((p) => favorites.includes(p.id));
@@ -684,11 +698,12 @@ function DashboardPageContent() {
 
                     {/* Comprehensive Edit / Manage button */}
                     <button 
-                      onClick={() => handleOpenEdit(myProp)}
+                      onClick={() => void handleOpenEdit(myProp)}
+                      disabled={editingPropertyLoadingId === myProp.id}
                       className="p-2 bg-brand-black hover:bg-brand-black/90 text-white rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 flex-1 min-w-[65px]"
                     >
-                      <Edit className="w-3.5 h-3.5" />
-                      <span>{language === 'es' ? 'Gestionar' : 'Manage'}</span>
+                      {editingPropertyLoadingId === myProp.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Edit className="w-3.5 h-3.5" />}
+                      <span>{editingPropertyLoadingId === myProp.id ? (language === 'es' ? 'Cargando' : 'Loading') : (language === 'es' ? 'Gestionar' : 'Manage')}</span>
                     </button>
                   </div>
                 </div>
@@ -1605,11 +1620,12 @@ function DashboardPageContent() {
         )}
       </AnimatePresence>
 
-      {/* 5. Comprehensive Host Property Management & Edit Modal */}
+      {/* 5. Single-page property editor (kept separate from the publishing wizard) */}
       <AnimatePresence>
         {editingProperty && (
-          <PropertyWizardModal
+          <PropertyEditorModal
             isOpen={!!editingProperty}
+            property={editingProperty}
             onClose={() => {
               if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('eterna-cancel-speech'));
@@ -1619,7 +1635,6 @@ function DashboardPageContent() {
                 setActiveGuidedFlow(null);
               }
             }}
-            initialData={editingProperty}
             onDelete={async (id) => {
               try {
                 await deleteProperty(id);
@@ -1636,9 +1651,10 @@ function DashboardPageContent() {
             onSubmit={async (propertyData) => {
               try {
                 await updateProperty(editingProperty.id, propertyData);
-                setEditingProperty(null);
+                setEditingProperty((current) => current ? { ...current, ...propertyData } as Property : current);
               } catch (err) {
                 console.error('Error updating property:', err);
+                throw err;
               }
             }}
           />
