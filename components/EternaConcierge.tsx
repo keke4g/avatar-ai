@@ -35,6 +35,11 @@ import {
 import { IntentClassifier } from '../lib/eterna/IntentClassifier';
 import { generatePropertySummary } from '../lib/eterna/actions/PropertyActions';
 import { EternaChatMessage } from '../lib/eterna/propertySales';
+import {
+  mergeSearchAnalysisIntoMemory,
+  parseSearchConciergeResponse,
+  SearchConciergeResponse,
+} from '../lib/eterna/searchConcierge';
 import { useSearchActions } from '../lib/eterna/actions/SearchActions';
 import { useNavigationActions } from '../lib/eterna/actions/NavigationActions';
 import { useGeneralActions } from '../lib/eterna/actions/GeneralActions';
@@ -160,6 +165,7 @@ export default function EternaConcierge() {
 
   // Gemini API REST Abort Controller Ref
   const geminiAbortControllerRef = useRef<AbortController | null>(null);
+  const homeSearchAbortControllerRef = useRef<AbortController | null>(null);
   const lastPropertySummaryRef = useRef<string | null>(null);
   
   // Realtime hook
@@ -606,6 +612,54 @@ Do not invent any other routes. If the user asks you to go to a section, politel
     return pureResolveIntent(prompt, intentContext, language);
   }, [intentContext, language]);
 
+  const analyzeHomeConversationWithGemini = useCallback(async (
+    prompt: string,
+    memory: ConversationMemory,
+  ): Promise<SearchConciergeResponse> => {
+    homeSearchAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    homeSearchAbortControllerRef.current = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), 16_000);
+
+    try {
+      const conversationHistory = chatHistoryRef.current
+        .slice(-20)
+        .map((message) => ({
+          role: message.role,
+          content: message.content,
+        }));
+
+      const response = await fetch('/api/avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: prompt,
+          userId: currentUser?.id,
+          conversationHistory,
+          systemPrompt: systemPrompt.content,
+          responseMode: 'search_concierge',
+          currentSearchState: memory,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gemini search concierge HTTP ${response.status}`);
+      }
+
+      const parsed = parseSearchConciergeResponse(await response.json());
+      if (!parsed) {
+        throw new Error('Gemini devolvió un análisis de búsqueda inválido.');
+      }
+      return parsed;
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (homeSearchAbortControllerRef.current === controller) {
+        homeSearchAbortControllerRef.current = null;
+      }
+    }
+  }, [currentUser?.id, systemPrompt.content]);
+
 
 
   // ── ETERNA SEARCH CONCIERGE HELPERS (useSearchActions Hook) ──
@@ -977,6 +1031,9 @@ Do not invent any other routes. If the user asks you to go to a section, politel
   */
 
   const determineOperation = (memory: ConversationMemory, promptHistory: string): 'sale' | 'rent' | undefined => {
+    if (memory.operation?.value === 'sale' || memory.operation?.value === 'rent') {
+      return memory.operation.value;
+    }
     const clean = promptHistory.toLowerCase();
     if (/\b(intercambiar|intercambio|hacer swap|swap|swaps|permutar|permuta|acepto intercambio|trueque|exchange)\b/i.test(clean)) {
       return undefined;
@@ -998,6 +1055,9 @@ Do not invent any other routes. If the user asks you to go to a section, politel
   };
 
   const determineOfferingMode = (memory: ConversationMemory, promptHistory: string): 'SALE' | 'RENT' | 'SWAP' => {
+    if (memory.operation?.value === 'sale') return 'SALE';
+    if (memory.operation?.value === 'rent') return 'RENT';
+    if (memory.operation?.value === 'swap') return 'SWAP';
     const clean = promptHistory.toLowerCase();
     if (/\b(intercambiar|intercambio|hacer swap|swap|swaps|permutar|permuta|acepto intercambio|trueque|exchange)\b/i.test(clean)) {
       return 'SWAP';
@@ -1013,6 +1073,8 @@ Do not invent any other routes. If the user asks you to go to a section, politel
   };
 
   const determinePropertyType = (memory: ConversationMemory, promptHistory: string): 'Casas' | 'Departamentos' | undefined => {
+    if (memory.propertyType?.value === 'departamento') return 'Departamentos';
+    if (memory.propertyType?.value === 'casa') return 'Casas';
     const clean = promptHistory.toLowerCase();
     if (/\b(departamento|departamentos|depa|depas|depto|deptos|condo|condominio|apartment|apartments|flat|apartamento|apartamentos)\b/i.test(clean)) {
       return 'Departamentos';
@@ -1603,6 +1665,71 @@ Explore actualizado: Redirecting to /explore`);
         setConversationalSession(resetSession);
         if (typeof window !== 'undefined') {
           localStorage.removeItem('eterna_conversation_session');
+        }
+      }
+    }
+
+    // On the home page Gemini interprets the whole conversation before the
+    // deterministic flow. The local classifier remains available as a safe
+    // fallback when Gemini is disabled or temporarily unavailable.
+    const homeNavigationIntent = isHome ? resolveIntent(prompt) : null;
+    const isExplicitHomeNavigation = Boolean(
+      homeNavigationIntent?.matched
+      && homeNavigationIntent.action === 'navigate'
+      && homeNavigationIntent.route,
+    );
+
+    if (isHome && geminiActive && !isInterruption && !isExplicitHomeNavigation) {
+      try {
+        setThinkingContext('property_search');
+        const analysis = await analyzeHomeConversationWithGemini(prompt, memory);
+
+        if (analysis.intent === 'property_search') {
+          const updatedMemory = mergeSearchAnalysisIntoMemory(memory, analysis);
+          const operation = updatedMemory.operation?.value;
+          const hasSearchRequirements = Boolean(
+            updatedMemory.city
+            && operation
+            && (operation === 'swap' || updatedMemory.budget),
+          );
+
+          if (hasSearchRequirements) {
+            await runSearchAndRedirect(updatedMemory, prompt);
+            return;
+          }
+
+          const nextStep: ConversationStep = analysis.missingField === 'city'
+            ? 'city'
+            : analysis.missingField === 'budget'
+              ? 'budget'
+              : 'purpose';
+          const updatedSession: ConversationSession = {
+            activeIntent: ConversationIntent.PROPERTY_SEARCH,
+            status: ConversationStatus.COLLECTING,
+            step: nextStep,
+            memory: updatedMemory,
+            createdAt: conversationalSession.createdAt || Date.now(),
+            updatedAt: Date.now(),
+          };
+
+          setConversationalSession(updatedSession);
+          localStorage.setItem('eterna_conversation_session', JSON.stringify(updatedSession));
+          setChatHistory(prev => [...prev, { role: 'assistant', content: analysis.reply }]);
+          setSimulatedStatus('talking');
+          speak(analysis.reply, () => setSimulatedStatus('idle'));
+          return;
+        }
+
+        if (analysis.intent === 'general') {
+          setThinkingContext('general');
+          setChatHistory(prev => [...prev, { role: 'assistant', content: analysis.reply }]);
+          setSimulatedStatus('talking');
+          speak(analysis.reply, () => setSimulatedStatus('idle'));
+          return;
+        }
+      } catch (error) {
+        if ((error as { name?: string }).name !== 'AbortError') {
+          console.warn('[Eterna-Gemini] Home analysis failed; using local fallback.', error);
         }
       }
     }

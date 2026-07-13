@@ -7,6 +7,7 @@ import { navigationDictionary } from './dictionaries/navigation';
 import { supportDictionary } from './dictionaries/support';
 import { generalDictionary } from './dictionaries/general';
 import { ConversationMemory, ConversationSession } from './ConversationEngine';
+import { parseBudgetToNumber } from '../search/SearchEngine';
 
 export type IntentType = 
   | 'SEARCH_PROPERTY'
@@ -225,6 +226,18 @@ export class IntentClassifier {
         const isExplicitUnit = rawMatch.includes('mil') || rawMatch.includes('millon') || rawMatch.includes('million') || rawMatch.includes('k') || rawMatch.includes('mdp') || rawMatch.includes('$');
         if (num > 100 || isExplicitUnit) {
           slots.presupuesto = num.toString();
+        }
+      }
+    }
+
+    if (!slots.presupuesto) {
+      const writtenBudgetMatch = cleanForBudget.match(
+        /\b(?:un|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|medio)\s+(?:millones?|mil)\b/i,
+      );
+      if (writtenBudgetMatch) {
+        const parsedBudget = parseBudgetToNumber(writtenBudgetMatch[0]);
+        if (parsedBudget > 0) {
+          slots.presupuesto = String(parsedBudget);
         }
       }
     }

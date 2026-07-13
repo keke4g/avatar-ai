@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { message, userId, conversationHistory, systemPrompt, responseMode } = body as Record<string, unknown>;
+    const { message, userId, conversationHistory, systemPrompt, responseMode, currentSearchState } = body as Record<string, unknown>;
 
     // Validación del mensaje
     if (typeof message !== "string" || message.trim() === "" || message.length > 4_000) {
@@ -54,7 +54,12 @@ export async function POST(request: Request) {
       );
     }
 
-    if (responseMode !== undefined && responseMode !== "standard" && responseMode !== "property_sales") {
+    if (
+      responseMode !== undefined
+      && responseMode !== "standard"
+      && responseMode !== "property_sales"
+      && responseMode !== "search_concierge"
+    ) {
       return NextResponse.json(
         { error: "El campo 'responseMode' no es válido." },
         { status: 400 },
@@ -70,6 +75,31 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         ...salesResponse,
+        provider: "gemini",
+        model: "gemini-2.5-flash",
+      });
+    }
+
+    if (responseMode === "search_concierge") {
+      if (
+        currentSearchState !== undefined
+        && (!currentSearchState || typeof currentSearchState !== "object" || JSON.stringify(currentSearchState).length > 10_000)
+      ) {
+        return NextResponse.json(
+          { error: "El estado actual de búsqueda no es válido." },
+          { status: 400 },
+        );
+      }
+
+      const searchResponse = await GeminiService.analyzeSearchConversation({
+        message: message.trim(),
+        conversationHistory: typedHistory,
+        systemPrompt: typeof systemPrompt === "string" ? systemPrompt : undefined,
+        currentSearchState,
+      });
+
+      return NextResponse.json({
+        ...searchResponse,
         provider: "gemini",
         model: "gemini-2.5-flash",
       });

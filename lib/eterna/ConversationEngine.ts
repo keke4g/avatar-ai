@@ -1,4 +1,5 @@
 import { extractEntities } from './IntentRouter';
+import { parseBudgetToNumber } from '../search/SearchEngine';
 
 export enum ConversationIntent {
   PROPERTY_SEARCH = "PROPERTY_SEARCH",
@@ -34,6 +35,7 @@ export interface MemoryField<T> {
 }
 
 export interface ConversationMemory {
+  operation?: MemoryField<'sale' | 'rent' | 'swap'>;
   purpose?: MemoryField<'vivir' | 'inversion' | string>;
   city?: MemoryField<string>;
   zone?: MemoryField<string>;
@@ -128,6 +130,16 @@ export class ConversationEngine {
       const moneyMatch = clean.match(/\b(?:\$|usd|mxn)?\s*(\d+[\d\s.,]*\s*(?:millones|mil|usd|dolares|dólares|pesos|mxn|m))\b/i);
       if (moneyMatch) {
         setField('budget', moneyMatch[0].trim(), 0.95);
+      }
+    }
+
+    const writtenBudgetMatch = clean.match(
+      /\b(?:un|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|medio)\s+(?:millones?|mil)\b/i,
+    );
+    if (writtenBudgetMatch) {
+      const parsedBudget = parseBudgetToNumber(writtenBudgetMatch[0]);
+      if (parsedBudget > 0) {
+        setField('budget', String(parsedBudget), 0.97);
       }
     }
 
