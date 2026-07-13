@@ -403,20 +403,34 @@ export function useEternaVoice({
       return;
     }
 
-    // Rule #2 & #6: Transition to SPEAKING state
-    transitionToState('SPEAKING');
+    const selectedEngine = voiceEngineRef.current;
+    setIsSpeaking(false);
+    isSpeakingRef.current = false;
+    if (selectedEngine !== 'browser') {
+      // Durante la generación remota el avatar permanece procesando. El modo
+      // hablando se activa más abajo con la confirmación de audio audible.
+      transitionToState('PROCESSING');
+      setSimulatedStatusRef.current?.('thinking');
+    }
 
-    // Rule #3 & #4: Update speech timestamps and text
+    // La sesión empieza ahora para poder cancelarla durante la petición, pero
+    // el avatar no entra en modo hablando hasta que el audio sea audible.
     lastSpokenTextRef.current = text;
-    lastSpokenTimestampRef.current = Date.now();
-
-    setSimulatedStatusRef.current?.('talking');
-    setIsSpeaking(true);
-    isSpeakingRef.current = true;
     console.log('[AUDIT] speechSessionActiveRef -> true');
-    speechSessionActiveRef.current = true; // Mark speech session as active
+    speechSessionActiveRef.current = true;
 
     let isFinished = false;
+
+    const markAudibleSpeechStarted = () => {
+      if (isFinished || !speechSessionActiveRef.current || isSpeakingRef.current) return;
+
+      transitionToState('SPEAKING');
+      lastSpokenTimestampRef.current = Date.now();
+      setSimulatedStatusRef.current?.('talking');
+      setIsSpeaking(true);
+      isSpeakingRef.current = true;
+      console.log('[VOICE STATE] audible speech start');
+    };
 
     const handleEnd = () => {
       console.log(`[VOICE STATE] speech end`);
@@ -454,6 +468,7 @@ export function useEternaVoice({
       setSimulatedStatusRef.current?.('idle');
       setSimulatedTextRef.current?.('');
       setIsSpeaking(false);
+      isSpeakingRef.current = false;
       if (onEnd) {
         setTimeout(onEnd, 0);
       }
@@ -491,6 +506,8 @@ export function useEternaVoice({
         utterance.onend = handleEnd;
         utterance.onerror = handleEnd;
         console.log('[VOICE STATE] browser speech start');
+        // Conserva el comportamiento inmediato de la voz del navegador.
+        markAudibleSpeechStarted();
         window.speechSynthesis.speak(utterance);
       } catch (e) {
         console.warn('[Eterna Voice] browser speech failed:', e);
@@ -570,6 +587,7 @@ export function useEternaVoice({
             nextStartTime = Math.max(nextStartTime, context.currentTime + 0.02) + audioBuffer.duration;
 
             if (scheduledSources === 1) {
+              markAudibleSpeechStarted();
               console.log('[VOICE STATE] deepgram PCM playback start');
             }
           }
@@ -607,6 +625,7 @@ export function useEternaVoice({
         audio.onplaying = () => {
           playbackConfirmed = true;
           if (playbackGuard !== null) window.clearTimeout(playbackGuard);
+          markAudibleSpeechStarted();
           console.log(`[VOICE STATE] ${engine} audible playback confirmed`);
         };
         audio.onended = () => {
@@ -639,9 +658,8 @@ export function useEternaVoice({
     };
 
     const startSelectedEngine = () => {
-      const engine = voiceEngineRef.current;
-      if (engine === 'browser') playWithBrowser();
-      else void playWithRemoteEngine(engine);
+      if (selectedEngine === 'browser') playWithBrowser();
+      else void playWithRemoteEngine(selectedEngine);
     };
 
     // Si el micrófono estaba escuchando, esperamos su evento onend antes de reproducir.

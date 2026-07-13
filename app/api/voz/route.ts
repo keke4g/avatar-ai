@@ -35,7 +35,7 @@ async function synthesizeWithElevenLabs(text: string) {
 
   const voiceId = process.env.ELEVENLABS_VOICE_ID || ELEVENLABS_DEFAULT_VOICE_ID;
   const response = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_64`,
+    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream?output_format=mp3_44100_64`,
     {
       method: 'POST',
       headers: {
@@ -61,12 +61,21 @@ async function synthesizeWithElevenLabs(text: string) {
     },
   );
 
-  if (!response.ok) {
+  if (!response.ok || !response.body) {
     console.error('[Voice API] ElevenLabs respondió con estado', response.status);
     return Response.json({ error: 'ElevenLabs no pudo generar la voz.' }, { status: 502 });
   }
 
-  return audioResponse(await response.arrayBuffer(), 'audio/mpeg');
+  // Reenvía cada fragmento apenas llega. La calidad no cambia, pero se evita
+  // esperar y copiar el MP3 completo dentro de la función de Vercel.
+  return new Response(response.body, {
+    headers: {
+      'Content-Type': 'audio/mpeg',
+      'Cache-Control': 'private, no-store, max-age=0',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Voice-Engine': 'elevenlabs',
+    },
+  });
 }
 
 async function synthesizeWithAzure(text: string) {
