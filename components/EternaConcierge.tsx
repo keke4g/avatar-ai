@@ -9,7 +9,7 @@ import { VideoAvatar } from './VideoAvatar';
 import { useSwap } from '../lib/context/SwapContext';
 import { useLiveContext } from '../lib/context/LiveContext';
 import { GUIDED_FLOWS } from '../lib/concierge/guidedFlows';
-import { formatCount, formatSentencePart } from '../lib/textHelpers';
+import { formatCount, formatPropertyLocation, formatSentencePart } from '../lib/textHelpers';
 import { 
   Sparkles, X, Send, Mic, MicOff, 
   HelpCircle, Volume2, VolumeX, Minimize2,
@@ -458,7 +458,7 @@ export default function EternaConcierge() {
     return JSON.stringify({
       user: currentUser?.name || 'Usuario',
       userId: currentUser?.id || '',
-      properties: myProps.map(p => `${p.title} (${p.location}, ${p.country})`),
+      properties: myProps.map(p => `${p.title} (${formatPropertyLocation(p.location, p.country)})`),
       propertiesCount: myProps.length,
       pendingSwaps: intentContext.pendingSwaps,
       activeTrips: activeTrips.map(s => ({

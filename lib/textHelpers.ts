@@ -97,3 +97,26 @@ export function formatBathrooms(bathrooms: number, halfBathrooms: number = 0, la
   
   return fullText;
 }
+
+/**
+ * Builds a public-facing property location without repeating the country when
+ * `location` already includes it (for example, "Guadalajara, Jalisco, México").
+ */
+export function formatPropertyLocation(location?: string | null, country?: string | null): string {
+  const parts = [
+    ...(location || '').split(','),
+    country || '',
+  ]
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const normalizePart = (part: string) => part
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase()
+    .replace(/\s+/g, ' ');
+
+  return parts
+    .filter((part, index) => index === 0 || normalizePart(part) !== normalizePart(parts[index - 1]))
+    .join(', ');
+}

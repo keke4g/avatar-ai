@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSwap } from '../../lib/context/SwapContext';
 import { useTranslation } from '../../lib/context/LanguageContext';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { formatCount, formatBathrooms } from '../../lib/textHelpers';
+import { formatCount, formatBathrooms, formatPropertyLocation } from '../../lib/textHelpers';
 import PropertyCard from '../../components/PropertyCard';
 import ImageUploadDropzone from '../../components/ImageUploadDropzone';
 import { 
@@ -624,7 +624,7 @@ function DashboardPageContent() {
                   >
                     <div className="flex items-center justify-between">
                       <h3 className="font-bold text-sm text-brand-black tracking-tight truncate max-w-[80%] group-hover:text-brand-accent transition-colors">
-                        {myProp.location}, <span className="text-brand-gray-500 font-medium">{myProp.country}</span>
+                        {formatPropertyLocation(myProp.location, myProp.country)}
                       </h3>
                       {(() => {
                         const hostReviews = reviews.filter(r => r.reviewedUserId === myProp.hostId);
@@ -773,7 +773,7 @@ function DashboardPageContent() {
                               </span>
                             </div>
                             <p className="text-xs text-brand-gray-500 font-semibold mt-1">
-                              {leadProperty ? `${leadProperty.location}, ${leadProperty.country}` : lead.propertyId}
+                              {leadProperty ? formatPropertyLocation(leadProperty.location, leadProperty.country) : lead.propertyId}
                             </p>
                           </div>
                         </div>
@@ -964,7 +964,7 @@ function DashboardPageContent() {
                           <p className="text-xs text-brand-gray-500 font-medium flex items-center gap-1 mb-1">
                             <MapPin className="w-3.5 h-3.5 text-brand-gray-400 shrink-0" />
                             <span className="truncate">
-                              {partnerProp ? `${partnerProp.location}, ${partnerProp.country}` : (language === 'es' ? 'Ubicación exclusiva' : 'Exclusive Location')}
+                              {partnerProp ? formatPropertyLocation(partnerProp.location, partnerProp.country) : (language === 'es' ? 'Ubicación exclusiva' : 'Exclusive Location')}
                             </span>
                           </p>
 

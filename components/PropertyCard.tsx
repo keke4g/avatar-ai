@@ -8,7 +8,7 @@ import { Heart, ChevronLeft, ChevronRight, Star, ShieldCheck } from 'lucide-reac
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '../lib/context/LanguageContext';
 import { getActiveOfferings } from '../lib/propertyOfferings';
-import { formatCount, formatBathrooms } from '../lib/textHelpers';
+import { formatCount, formatBathrooms, formatPropertyLocation } from '../lib/textHelpers';
 
 interface PropertyCardProps {
   property: Property;
@@ -237,7 +237,7 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
           {/* Location & Rating */}
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-base tracking-tight text-brand-black group-hover:text-brand-accent transition-colors duration-200">
-              {property.location}, <span className="text-brand-gray-500 font-normal">{property.country}</span>
+              {formatPropertyLocation(property.location, property.country)}
             </h3>
             <div className="flex items-center gap-1 text-sm font-medium">
               <Star className="w-3.5 h-3.5 fill-brand-black" />

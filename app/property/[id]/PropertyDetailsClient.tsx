@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import { formatCount, formatBathrooms } from '../../../lib/textHelpers';
+import { formatCount, formatBathrooms, formatPropertyLocation } from '../../../lib/textHelpers';
 import { useSwap } from '../../../lib/context/SwapContext';
 import { useTranslation } from '../../../lib/context/LanguageContext';
 import { useRouter } from 'next/navigation';
@@ -950,7 +950,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           <span className="hidden sm:inline text-brand-gray-300">•</span>
           <div className="flex items-center gap-1.5">
             <MapPin className="w-3.5 h-3.5 text-brand-gray-400" />
-            <span>{property.location}, {property.country}</span>
+            <span>{formatPropertyLocation(property.location, property.country)}</span>
           </div>
         </div>
 

@@ -170,8 +170,12 @@ function getMediaUrl(property: Property, types: PropertyMedia['mediaType'][]): s
 
 function formFromProperty(property: Property): EditorForm {
   const locationParts = (property.location || '').split(',').map((part) => part.trim()).filter(Boolean);
+  const trailingPart = locationParts.at(-1);
+  if (trailingPart && property.country && trailingPart.localeCompare(property.country, undefined, { sensitivity: 'base' }) === 0) {
+    locationParts.pop();
+  }
   const inferredCity = property.city || locationParts[0] || '';
-  const inferredState = property.state || (locationParts.length > 2 ? locationParts[1] : '');
+  const inferredState = property.state || locationParts.slice(1).join(', ');
 
   return {
     title: property.title || '',
@@ -473,7 +477,9 @@ export default function PropertyEditorModal({ isOpen, property, onClose, onSubmi
       return;
     }
 
-    const location = [form.city.trim(), form.state.trim(), form.country.trim()].filter(Boolean).join(', ');
+    // `country` has its own database field. Keeping it out of `location`
+    // prevents views from rendering values such as "México, México".
+    const location = [form.city.trim(), form.state.trim()].filter(Boolean).join(', ');
     const address = [form.streetName.trim(), form.streetNumber.trim()].filter(Boolean).join(' ');
     const offerings = form.offerings.map((offering) => ({
       ...offering,

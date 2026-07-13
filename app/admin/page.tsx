@@ -5,6 +5,7 @@ import { useSwap } from '../../lib/context/SwapContext';
 import { useTranslation } from '../../lib/context/LanguageContext';
 import { useRouter } from 'next/navigation';
 import AuthGuard from '../../components/AuthGuard';
+import { formatPropertyLocation } from '../../lib/textHelpers';
 import { 
   Shield, Activity, Building, Users, RefreshCw, FileText, 
   CheckCircle, AlertTriangle, Settings, Search, Filter, 
@@ -1013,7 +1014,7 @@ export default function AdminPage() {
                             <td className="p-4">
                               <span className="flex items-center gap-1 text-brand-gray-600">
                                 <MapPin className="w-3.5 h-3.5 text-brand-accent/50" />
-                                {p.location}, {p.country}
+                                {formatPropertyLocation(p.location, p.country)}
                               </span>
                             </td>
                             <td className="p-4 text-center">
@@ -2250,7 +2251,7 @@ export default function AdminPage() {
                             <img src={p.images[0]} className="w-10 h-7 rounded object-cover" />
                             <div>
                               <p className="font-bold text-brand-black line-clamp-1">{p.title}</p>
-                              <p className="text-[9px] text-brand-gray-400 font-bold mt-0.5">{p.location}, {p.country}</p>
+                              <p className="text-[9px] text-brand-gray-400 font-bold mt-0.5">{formatPropertyLocation(p.location, p.country)}</p>
                             </div>
                           </div>
                           <span className={`px-2 py-0.5 text-[8px] font-black uppercase rounded ${
