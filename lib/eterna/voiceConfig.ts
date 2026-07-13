@@ -44,9 +44,9 @@ export const ETERNA_VOICE_ENGINES: Array<{
   {
     id: 'elevenlabs',
     name: 'ElevenLabs',
-    voice: 'Sarah · Turbo v2.5',
-    description: 'Voz femenina cálida y expresiva con equilibrio entre naturalidad, definición y velocidad conversacional.',
-    badge: 'Alta fidelidad',
+    voice: 'Eterna México Ejecutiva · Turbo v2.5',
+    description: 'Voz femenina diseñada con acento mexicano nativo, tono profesional inmobiliario y respuesta de baja latencia.',
+    badge: 'México profesional',
   },
   {
     id: 'azure',

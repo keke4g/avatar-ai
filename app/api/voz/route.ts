@@ -3,7 +3,9 @@ import type { EternaVoiceEngine } from '../../../lib/eterna/voiceConfig';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const ELEVENLABS_DEFAULT_VOICE_ID = 'EXAVITQu4vr4xnSDxMaL'; // Sarah
+// Voz creada con Voice Design a partir de una hablante nativa mexicana.
+// Se mantiene configurable por entorno para poder sustituirla sin desplegar código.
+const ELEVENLABS_DEFAULT_VOICE_ID = 'kgQd0MAjT5cJrslRkNYB'; // Eterna México Ejecutiva
 const MAX_TEXT_LENGTH = 1_200;
 
 function escapeXml(value: string) {
@@ -46,11 +48,13 @@ async function synthesizeWithElevenLabs(text: string) {
         model_id: 'eleven_turbo_v2_5',
         language_code: 'es',
         voice_settings: {
-          stability: 0.42,
-          similarity_boost: 0.82,
-          style: 0.35,
-          speed: 1.0,
-          use_speaker_boost: true,
+          stability: 0.48,
+          similarity_boost: 0.84,
+          // Style y speaker boost agregan procesamiento y latencia. La voz ya
+          // fue diseñada con el tono profesional que necesita Eterna.
+          style: 0,
+          speed: 1.03,
+          use_speaker_boost: false,
         },
       }),
       signal: AbortSignal.timeout(15_000),
