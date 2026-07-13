@@ -1,5 +1,6 @@
 import { PropertyMedia, PropertyMediaType } from '../types';
 import { toCamelCase, toSnakeCase } from './PropertyMapper';
+import { getYouTubeThumbnailUrl } from '../mediaEmbeds';
 
 export class PropertyMediaMapper {
   /**
@@ -98,17 +99,7 @@ export class PropertyMediaMapper {
 
     try {
       if (type === 'YOUTUBE') {
-        let videoId = '';
-        if (url.includes('youtube.com')) {
-          const parts = url.split('v=');
-          if (parts.length > 1) videoId = parts[1].split('&')[0];
-        } else if (url.includes('youtu.be')) {
-          const parts = url.split('/');
-          videoId = parts[parts.length - 1].split('?')[0];
-        }
-        if (videoId) {
-          return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-        }
+        return getYouTubeThumbnailUrl(url);
       }
 
       if (type === 'VIMEO') {
@@ -121,7 +112,9 @@ export class PropertyMediaMapper {
         }
       }
 
-      if (type === 'MATTERPORT') {
+      if (type === 'MATTERPORT' || type === 'VIRTUAL_TOUR') {
+        const youtubeThumbnail = getYouTubeThumbnailUrl(url);
+        if (youtubeThumbnail) return youtubeThumbnail;
         // Matterport generic preview placeholder
         return 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80';
       }

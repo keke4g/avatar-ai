@@ -9,6 +9,7 @@ import { Property, PropertyOffering, PropertyOfferingMode, PropertyOfferingStatu
 import { useTranslation } from '../lib/context/LanguageContext';
 import ImageUploadDropzone from './ImageUploadDropzone';
 import VideoUploadDropzone from './VideoUploadDropzone';
+import { getVirtualTourProvider } from '../lib/mediaEmbeds';
 import { PropertyValidator } from '../lib/services/PropertyValidator';
 import { useSwap } from '../lib/context/SwapContext';
 import { formatCount } from '../lib/textHelpers';
@@ -1767,7 +1768,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
             url: virtualTourPlaceholder,
             displayOrder: order++,
             isPrimary: false,
-            metadata: {}
+            metadata: { provider: getVirtualTourProvider(virtualTourPlaceholder) }
           });
         }
 
@@ -3496,14 +3497,15 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                       </div>
 
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-brand-gray-500">Recorrido Virtual 3D (Matterport)</label>
+                        <label className="text-xs font-bold text-brand-gray-500">Recorrido Virtual 3D (Matterport o YouTube)</label>
                         <input
-                          type="text"
+                          type="url"
                           value={virtualTourPlaceholder}
                           onChange={(e) => setVirtualTourPlaceholder(e.target.value)}
-                          placeholder="Ej. https://my.matterport.com/show/?m=..."
+                          placeholder="https://my.matterport.com/show/?m=... o https://youtu.be/..."
                           className="w-full p-3 rounded-xl bg-brand-gray-50 border border-brand-gray-200 text-xs font-semibold outline-none"
                         />
+                        <p className="text-[10px] leading-relaxed text-brand-gray-400">Acepta Matterport y videos 360° o recorridos publicados en YouTube.</p>
                       </div>
                     </div>
                   </motion.div>

@@ -22,6 +22,7 @@ import { PropertyEligibilityEngine } from '../../../lib/services/PropertyEligibi
 import { LegalDossierSection } from '../../../components/property/sections/LegalDossierSection';
 import { FinancingCompatibility } from '../../../components/property/sections/FinancingCompatibility';
 import { EternaMarketAnalysis } from '../../../components/property/sections/EternaMarketAnalysis';
+import { getEmbeddableMediaUrl, getVimeoEmbedUrl, getYouTubeEmbedUrl } from '../../../lib/mediaEmbeds';
 
 interface PropertyDetailsClientProps {
   id: string;
@@ -194,15 +195,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
   const renderMediaItem = (item: { type: 'image' | 'video' | 'youtube'; url: string }, className?: string) => {
     if (item.type === 'youtube') {
-      let videoId = '';
-      if (item.url.includes('youtube.com')) {
-        const parts = item.url.split('v=');
-        if (parts.length > 1) videoId = parts[1].split('&')[0];
-      } else if (item.url.includes('youtu.be')) {
-        const parts = item.url.split('/');
-        videoId = parts[parts.length - 1].split('?')[0];
-      }
-      const embedUrl = videoId ? `https://www.youtube.com/embed/${videoId}` : item.url;
+      const embedUrl = getYouTubeEmbedUrl(item.url);
+      if (!embedUrl) return null;
 
       return (
         <iframe
@@ -1362,24 +1356,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
             const currentTab = availableTabs.includes(activeMediaTab) ? activeMediaTab : (availableTabs[0] || '');
 
-            const getYoutubeEmbedUrl = (url: string) => {
-              let videoId = '';
-              if (url.includes('youtube.com')) {
-                const parts = url.split('v=');
-                if (parts.length > 1) videoId = parts[1].split('&')[0];
-              } else if (url.includes('youtu.be')) {
-                const parts = url.split('/');
-                videoId = parts[parts.length - 1].split('?')[0];
-              }
-              return videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0` : url;
-            };
-
-            const getVimeoEmbedUrl = (url: string) => {
-              const parts = url.split('/');
-              const videoId = parts[parts.length - 1].split('?')[0];
-              return videoId ? `https://player.vimeo.com/video/${videoId}` : url;
-            };
-
             return (
               <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
                 <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
@@ -1447,7 +1423,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                             />
                           ) : activeVideo.mediaType === 'VIMEO' ? (
                             <iframe 
-                              src={getVimeoEmbedUrl(activeVideo.url)}
+                              src={getVimeoEmbedUrl(activeVideo.url) || activeVideo.url}
                               className="w-full h-full border-0"
                               allow="autoplay; fullscreen; picture-in-picture"
                               allowFullScreen
@@ -1455,7 +1431,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                             />
                           ) : (
                             <iframe 
-                              src={getYoutubeEmbedUrl(activeVideo.url)}
+                              src={getYouTubeEmbedUrl(activeVideo.url) || activeVideo.url}
                               className="w-full h-full border-0"
                               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                               allowFullScreen
@@ -1493,15 +1469,24 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
                   {currentTab === 'virtual' && virtualTours.length > 0 && (() => {
                     const activeTour = virtualTours[0];
+                    const embedUrl = getEmbeddableMediaUrl(activeTour.url);
                     return (
                       <div className="w-full h-full relative">
-                        <iframe 
-                          src={activeTour.url}
-                          className="w-full h-full border-0"
-                          allow="xr-spatial-tracking; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          loading="lazy"
-                        />
+                        {embedUrl ? (
+                          <iframe
+                            src={embedUrl}
+                            title={activeTour.title || (language === 'es' ? 'Recorrido virtual de la propiedad' : 'Property virtual tour')}
+                            className="w-full h-full border-0"
+                            allow="accelerometer; autoplay; xr-spatial-tracking; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                            allowFullScreen
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center px-6 text-center text-sm font-semibold text-brand-gray-500">
+                            {language === 'es' ? 'El enlace de este recorrido no es válido.' : 'This tour link is not valid.'}
+                          </div>
+                        )}
                       </div>
                     );
                   })()}

@@ -23,6 +23,7 @@ import {
 import { Property, PropertyMedia, PropertyOffering, PropertyOfferingMode } from '../lib/types';
 import ImageUploadDropzone, { ImageMetadata } from './ImageUploadDropzone';
 import VideoUploadDropzone from './VideoUploadDropzone';
+import { getVirtualTourProvider } from '../lib/mediaEmbeds';
 
 interface PropertyEditorModalProps {
   isOpen: boolean;
@@ -449,7 +450,7 @@ export default function PropertyEditorModal({ isOpen, property, onClose, onSubmi
     let order = media.length;
     if (form.videoUrl.trim()) media.push({ mediaType: 'VIDEO', url: form.videoUrl.trim(), displayOrder: order++, isPrimary: false, metadata: {} });
     if (form.youtubeUrl.trim()) media.push({ mediaType: form.youtubeUrl.includes('vimeo') ? 'VIMEO' : 'YOUTUBE', url: form.youtubeUrl.trim(), displayOrder: order++, isPrimary: false, metadata: {} });
-    if (form.virtualTourUrl.trim()) media.push({ mediaType: 'MATTERPORT', url: form.virtualTourUrl.trim(), displayOrder: order++, isPrimary: false, metadata: {} });
+    if (form.virtualTourUrl.trim()) media.push({ mediaType: 'MATTERPORT', url: form.virtualTourUrl.trim(), displayOrder: order++, isPrimary: false, metadata: { provider: getVirtualTourProvider(form.virtualTourUrl) } });
     preserved.forEach((item) => media.push({ ...item, displayOrder: order++ }));
     return media;
   };
@@ -782,7 +783,7 @@ export default function PropertyEditorModal({ isOpen, property, onClose, onSubmi
                   <div><p className="mb-2 text-[11px] font-extrabold text-slate-700">Video de la propiedad</p><VideoUploadDropzone videoUrl={form.videoUrl} onChange={(url) => update('videoUrl', url)} /></div>
                   <div className="flex flex-col gap-4">
                     <Field label="YouTube o Vimeo"><input type="url" value={form.youtubeUrl} onChange={(event) => update('youtubeUrl', event.target.value)} className={inputClass} placeholder="https://youtube.com/watch?v=…" /></Field>
-                    <Field label="Recorrido 3D / Matterport"><input type="url" value={form.virtualTourUrl} onChange={(event) => update('virtualTourUrl', event.target.value)} className={inputClass} placeholder="https://my.matterport.com/show/…" /></Field>
+                    <Field label="Recorrido 3D / Matterport o YouTube"><input type="url" value={form.virtualTourUrl} onChange={(event) => update('virtualTourUrl', event.target.value)} className={inputClass} placeholder="https://my.matterport.com/show/… o https://youtu.be/…" /></Field>
                   </div>
                 </div>
               </Section>
