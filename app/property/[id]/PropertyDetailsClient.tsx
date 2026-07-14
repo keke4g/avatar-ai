@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import { formatCount, formatBathrooms, formatPropertyLocation } from '../../../lib/textHelpers';
+import { formatCount, formatPropertyLocation } from '../../../lib/textHelpers';
 import { useSwap } from '../../../lib/context/SwapContext';
 import { useTranslation } from '../../../lib/context/LanguageContext';
 import { useRouter } from 'next/navigation';
@@ -99,6 +99,16 @@ interface SpecFieldConfig {
   labelEn: string;
   format?: (value: any, lang: 'es' | 'en') => string;
 }
+
+const hasMeaningfulSpecValue = (value: unknown): boolean => {
+  if (value === undefined || value === null || value === false) return false;
+  if (typeof value === 'number') return Number.isFinite(value) && value > 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    return normalized.length > 0 && !/^0(?:\.0+)?$/.test(normalized);
+  }
+  return true;
+};
 
 const SPEC_FIELDS: SpecFieldConfig[] = [
   { key: 'developmentName', labelEs: 'Desarrollo', labelEn: 'Development' },
@@ -1064,59 +1074,78 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           })()}
 
           {/* Core specs highlights */}
-          <div className="flex flex-wrap gap-x-8 gap-y-4 border-b border-brand-gray-200/80 pb-6">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-5 border-b border-brand-gray-200/80 pb-6 sm:grid-cols-4">
             {/* Guests: Hide for SALE */}
             {selectedMode !== 'SALE' && property.maxGuests !== undefined && property.maxGuests !== null && property.maxGuests > 0 && (
-              <div className="flex flex-col gap-1 items-start min-w-[100px]">
+              <div className="flex min-w-0 items-start gap-2.5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-gray-100 text-brand-gray-500">
+                  <Users className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
                 <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
-                  <Users className="w-4 h-4 text-brand-gray-500" />
                   <span>{t('details.guests')}</span>
                 </div>
                 <span className="text-xs text-brand-gray-500">
                   {language === 'es' ? `Capacidad para ${formatCount(property.maxGuests, 'persona', 'personas', 'feminine')}` : `${property.maxGuests} guest${property.maxGuests !== 1 ? 's' : ''}`}
                 </span>
+                </div>
               </div>
             )}
 
-            {/* Bedrooms (Always show if > 0) */}
-            {property.bedrooms !== undefined && property.bedrooms !== null && property.bedrooms > 0 && (
-              <div className="flex flex-col gap-1 items-start min-w-[100px]">
-                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
-                  <BedDouble className="w-4 h-4 text-brand-gray-500" />
-                  <span>{language === 'es' ? 'Habitaciones' : 'Bedrooms'}</span>
-                </div>
-                <span className="text-xs text-brand-gray-500">
-                  {language === 'es' ? formatCount(property.bedrooms, 'habitación', 'habitaciones', 'feminine') : `${property.bedrooms} bedroom${property.bedrooms !== 1 ? 's' : ''}`}
+            {/* Essential real-estate specs: always visible, including zero values. */}
+            {[
+              {
+                key: 'bedrooms',
+                Icon: BedDouble,
+                badge: null,
+                label: language === 'es' ? 'Recámaras' : 'Bedrooms',
+                value: language === 'es'
+                  ? formatCount(Number(property.bedrooms) || 0, 'recámara', 'recámaras', 'feminine')
+                  : `${Number(property.bedrooms) || 0} bedroom${Number(property.bedrooms) === 1 ? '' : 's'}`,
+              },
+              {
+                key: 'bathrooms',
+                Icon: Bath,
+                badge: null,
+                label: language === 'es' ? 'Baños completos' : 'Full bathrooms',
+                value: language === 'es'
+                  ? formatCount(Number(property.bathrooms) || 0, 'baño completo', 'baños completos', 'masculine')
+                  : `${Number(property.bathrooms) || 0} full bathroom${Number(property.bathrooms) === 1 ? '' : 's'}`,
+              },
+              {
+                key: 'halfBathrooms',
+                Icon: Bath,
+                badge: '½',
+                label: language === 'es' ? 'Medios baños' : 'Half bathrooms',
+                value: language === 'es'
+                  ? formatCount(Number(property.halfBathrooms) || 0, 'medio baño', 'medios baños', 'masculine')
+                  : `${Number(property.halfBathrooms) || 0} half bathroom${Number(property.halfBathrooms) === 1 ? '' : 's'}`,
+              },
+              {
+                key: 'parkingSpaces',
+                Icon: Car,
+                badge: null,
+                label: language === 'es' ? 'Estacionamientos' : 'Parking',
+                value: language === 'es'
+                  ? formatCount(Number(property.parkingSpaces) || 0, 'estacionamiento', 'estacionamientos', 'masculine')
+                  : `${Number(property.parkingSpaces) || 0} parking space${Number(property.parkingSpaces) === 1 ? '' : 's'}`,
+              },
+            ].map(({ key, Icon, badge, label, value }) => (
+              <div key={key} className="flex min-w-0 items-start gap-2.5">
+                <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-gray-100 text-brand-gray-500">
+                  <Icon className="h-4 w-4" />
+                  {badge && (
+                    <span className="absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-white bg-brand-black px-0.5 text-[8px] font-black text-white">
+                      {badge}
+                    </span>
+                  )}
                 </span>
-              </div>
-            )}
-
-            {/* Bathrooms / Half Bathrooms (Always show if full > 0 or half > 0) */}
-            {((property.bathrooms !== undefined && property.bathrooms !== null && property.bathrooms > 0) || 
-              (property.halfBathrooms !== undefined && property.halfBathrooms !== null && property.halfBathrooms > 0)) && (
-              <div className="flex flex-col gap-1 items-start min-w-[100px]">
-                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
-                  <Bath className="w-4 h-4 text-brand-gray-500" />
-                  <span>{t('details.bathrooms')}</span>
+                <div className="min-w-0">
+                  <span className="block text-sm font-semibold leading-tight text-brand-black">{label}</span>
+                  <span className="mt-1 block text-xs leading-tight text-brand-gray-500">{value}</span>
                 </div>
-                <span className="text-xs text-brand-gray-500">
-                  {formatBathrooms(property.bathrooms || 0, property.halfBathrooms || 0, language === 'es' ? 'es' : 'en')}
-                </span>
               </div>
-            )}
-
-            {/* Estacionamientos (Always show if > 0) */}
-            {property.parkingSpaces !== undefined && property.parkingSpaces !== null && property.parkingSpaces > 0 && (
-              <div className="flex flex-col gap-1 items-start min-w-[100px]">
-                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
-                  <Car className="w-4 h-4 text-brand-gray-500" />
-                  <span>{language === 'es' ? 'Estacionamiento' : 'Parking'}</span>
-                </div>
-                <span className="text-xs text-brand-gray-500">
-                  {language === 'es' ? formatCount(property.parkingSpaces, 'cajón', 'cajones', 'masculine') : `${property.parkingSpaces} space${property.parkingSpaces !== 1 ? 's' : ''}`}
-                </span>
-              </div>
-            )}
+            ))}
 
             {/* levelsCount (Show for SALE if > 0) */}
             {selectedMode === 'SALE' && property.levelsCount !== undefined && property.levelsCount !== null && property.levelsCount > 0 && (
@@ -1252,7 +1281,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           {(() => {
             const visibleSpecs = SPEC_FIELDS.map(cfg => {
               const value = property[cfg.key];
-              if (value === undefined || value === null || value === '' || value === false) return null;
+              if (!hasMeaningfulSpecValue(value)) return null;
               const label = language === 'es' ? cfg.labelEs : cfg.labelEn;
               const displayVal = cfg.format ? cfg.format(value, language === 'es' ? 'es' : 'en') : String(value);
               return { key: cfg.key, label, value: displayVal };
@@ -1281,7 +1310,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           {(() => {
             const visibleServices = SERVICES_FIELDS.map(cfg => {
               const value = property[cfg.key];
-              if (value === undefined || value === null || value === '' || value === false) return null;
+              if (!hasMeaningfulSpecValue(value)) return null;
               const label = language === 'es' ? cfg.labelEs : cfg.labelEn;
               const displayVal = cfg.format ? cfg.format(value, language === 'es' ? 'es' : 'en') : String(value);
               return { key: cfg.key, label, value: displayVal };
@@ -1310,7 +1339,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           {(() => {
             const visibleSecurity = SECURITY_FIELDS.map(cfg => {
               const value = property[cfg.key];
-              if (value === undefined || value === null || value === '' || value === false) return null;
+              if (!hasMeaningfulSpecValue(value)) return null;
               const label = language === 'es' ? cfg.labelEs : cfg.labelEn;
               const displayVal = cfg.format ? cfg.format(value, language === 'es' ? 'es' : 'en') : String(value);
               return { key: cfg.key, label, value: displayVal };

@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   KeyRound, UserPlus, HelpCircle, ArrowRight, CheckCircle2, 
-  AlertTriangle, Mail, Lock, User, Terminal, LogOut
+  AlertTriangle, Mail, Lock, User, ShieldCheck
 } from 'lucide-react';
 
 import { useSupabase } from '../../lib/services/ServiceFactory';
@@ -20,8 +20,7 @@ function LoginForm() {
   const isVerifiedParam = searchParams.get('verified') === 'true';
   const { t, language } = useTranslation();
   const { 
-    loginMock, registerMock, resetPasswordMock, logoutMock, 
-    currentUser, resendVerificationEmail 
+    loginMock, registerMock, resetPasswordMock, resendVerificationEmail
   } = useSwap();
 
   // Tab State
@@ -84,13 +83,6 @@ function LoginForm() {
       }
     }
   }, [isVerifiedParam, redirectCountdown, router]);
-
-  // Pre-configured developer quick roles
-  const presetUsers = [
-    { name: 'Mateo Valenzuela', email: 'admin@auraswap.com', role: 'ADMIN', badge: 'Global Admin', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80' },
-    { name: 'Sofia Alvarez', email: 'host@auraswap.com', role: 'HOST', badge: 'Verified Host', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80' },
-    { name: 'Carlos Mendoza', email: 'member@auraswap.com', role: 'MEMBER', badge: 'Active Member', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80' }
-  ];
 
   // Form submission handlers
   const handleLogin = async (e: React.FormEvent) => {
@@ -194,69 +186,53 @@ function LoginForm() {
     }
   };
 
-  const handleQuickSwitch = async (emailAddr: string) => {
-    setLoading(true);
-    setErrorMsg(null);
-    setForgotSuccess(false);
-    
-    setTimeout(async () => {
-      try {
-        await loginMock(emailAddr, 'password');
-        setLoading(false);
-        router.push('/explore');
-      } catch (err) {
-        // Fallback for mock switches if offline
-        setLoading(false);
-        router.push('/explore');
-      }
-    }, 300);
-  };
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch w-full max-w-5xl">
-      
-      {/* LEFT COLUMN: Premium Auth Console Card */}
-      <div className="lg:col-span-7 bg-white border border-brand-gray-200/80 rounded-3xl p-6 sm:p-8 shadow-floating flex flex-col justify-between relative overflow-hidden">
-        <div className="absolute -top-10 -left-10 w-24 h-24 rounded-full bg-brand-accent/5 filter blur-lg pointer-events-none" />
+    <div className="w-full max-w-[620px]">
+      <div className="relative flex flex-col justify-between overflow-hidden rounded-[28px] border border-brand-gray-200/80 bg-white/95 p-5 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:rounded-[34px] sm:p-8 md:p-10">
+        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-brand-accent/70 to-transparent" />
+        <div className="pointer-events-none absolute -left-16 -top-16 h-40 w-40 rounded-full bg-brand-accent/8 blur-3xl" />
         
         <div>
           {/* Header Tabs (Hidden in verified success view and verify email view) */}
           {!isVerifiedParam && activeTab !== 'verify' && (
-            <div className="flex items-center gap-1.5 p-1 bg-brand-gray-50 border border-brand-gray-200/50 rounded-2xl mb-8 select-none">
+            <div className="mb-7 grid grid-cols-3 gap-1 rounded-2xl border border-brand-gray-200/60 bg-brand-gray-50/80 p-1 select-none sm:mb-9 sm:gap-1.5">
               <button
+                type="button"
                 onClick={() => { setActiveTab('login'); setErrorMsg(null); setForgotSuccess(false); }}
-                className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                className={`flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-xl px-1 text-[9px] font-black uppercase tracking-[0.08em] transition-all cursor-pointer sm:gap-1.5 sm:text-[10px] sm:tracking-wider ${
                   activeTab === 'login'
                     ? 'bg-brand-black text-white shadow-premium'
                     : 'text-brand-gray-500 hover:text-brand-black'
                 }`}
               >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>{language === 'es' ? 'Ingresar' : 'Log In'}</span>
+                <KeyRound className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{language === 'es' ? 'Ingresar' : 'Log In'}</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => { setActiveTab('register'); setErrorMsg(null); setForgotSuccess(false); }}
-                className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                className={`flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-xl px-1 text-[9px] font-black uppercase tracking-[0.08em] transition-all cursor-pointer sm:gap-1.5 sm:text-[10px] sm:tracking-wider ${
                   activeTab === 'register'
                     ? 'bg-brand-black text-white shadow-premium'
                     : 'text-brand-gray-500 hover:text-brand-black'
                 }`}
               >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>{language === 'es' ? 'Registrarse' : 'Sign Up'}</span>
+                <UserPlus className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{language === 'es' ? 'Registrarse' : 'Sign Up'}</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => { setActiveTab('forgot'); setErrorMsg(null); setForgotSuccess(false); }}
-                className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                className={`flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-xl px-1 text-[9px] font-black uppercase tracking-[0.08em] transition-all cursor-pointer sm:gap-1.5 sm:text-[10px] sm:tracking-wider ${
                   activeTab === 'forgot'
                     ? 'bg-brand-black text-white shadow-premium'
                     : 'text-brand-gray-500 hover:text-brand-black'
                 }`}
               >
-                <HelpCircle className="w-3.5 h-3.5" />
-                <span>{language === 'es' ? 'Recuperar' : 'Recovery'}</span>
+                <HelpCircle className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{language === 'es' ? 'Recuperar' : 'Recovery'}</span>
               </button>
             </div>
           )}
@@ -377,13 +353,17 @@ function LoginForm() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
                 transition={{ duration: 0.2 }}
-                className="flex flex-col gap-5"
+                className="flex flex-col gap-6"
               >
                 <div>
-                  <h2 className="text-xl font-black text-brand-black tracking-tight leading-none mb-2">
+                  <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                    <ShieldCheck className="h-3 w-3" />
+                    <span>{language === 'es' ? 'Acceso protegido' : 'Protected access'}</span>
+                  </div>
+                  <h2 className="mb-2 text-2xl font-black leading-tight tracking-tight text-brand-black sm:text-[28px]">
                     {t('auth.loginTitle')}
                   </h2>
-                  <p className="text-xs text-brand-gray-400 font-semibold">
+                  <p className="max-w-md text-xs font-semibold leading-relaxed text-brand-gray-500 sm:text-[13px]">
                     {t('auth.loginSubtitle')}
                   </p>
                 </div>
@@ -406,27 +386,29 @@ function LoginForm() {
                   </div>
                 )}
 
-                <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                <form onSubmit={handleLogin} className="flex flex-col gap-5">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-brand-black uppercase tracking-wider">
+                    <label htmlFor="login-email" className="text-[10px] font-black text-brand-black uppercase tracking-wider">
                       {t('auth.emailLabel')}
                     </label>
                     <div className="relative">
                       <Mail className="w-4 h-4 text-brand-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
+                        id="login-email"
                         type="email"
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder={t('auth.emailPlaceholder')}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-brand-gray-200/80 focus:outline-none focus:border-brand-black text-xs font-semibold bg-brand-gray-50/30"
+                        autoComplete="email"
+                        className="h-[52px] w-full rounded-2xl border border-brand-gray-200/90 bg-brand-gray-50/40 pl-11 pr-4 text-sm font-semibold transition-all placeholder:text-brand-gray-400 focus:border-brand-accent focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-accent/10"
                       />
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-1.5">
                     <div className="flex justify-between items-center">
-                      <label className="text-[10px] font-black text-brand-black uppercase tracking-wider">
+                      <label htmlFor="login-password" className="text-[10px] font-black text-brand-black uppercase tracking-wider">
                         {t('auth.passwordLabel')}
                       </label>
                       <button
@@ -440,12 +422,14 @@ function LoginForm() {
                     <div className="relative">
                       <Lock className="w-4 h-4 text-brand-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
+                        id="login-password"
                         type="password"
                         required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder={t('auth.passwordPlaceholder')}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-brand-gray-200/80 focus:outline-none focus:border-brand-black text-xs font-semibold bg-brand-gray-50/30"
+                        autoComplete="current-password"
+                        className="h-[52px] w-full rounded-2xl border border-brand-gray-200/90 bg-brand-gray-50/40 pl-11 pr-4 text-sm font-semibold transition-all placeholder:text-brand-gray-400 focus:border-brand-accent focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-accent/10"
                       />
                     </div>
                   </div>
@@ -453,7 +437,7 @@ function LoginForm() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3.5 px-6 rounded-full bg-brand-black hover:bg-brand-black/90 text-white font-bold text-xs tracking-wider uppercase transition-all shadow-premium mt-2 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40"
+                    className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-brand-black px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_14px_30px_rgba(9,9,11,0.18)] transition-all hover:-translate-y-0.5 hover:bg-brand-black/90 hover:shadow-[0_18px_34px_rgba(9,9,11,0.24)] active:translate-y-0 cursor-pointer disabled:opacity-40"
                   >
                     {loading ? (
                       <div className="w-3.5 h-3.5 rounded-full border-2 border-brand-gray-200 border-t-white animate-spin" />
@@ -494,69 +478,77 @@ function LoginForm() {
 
                 <form onSubmit={handleRegister} className="flex flex-col gap-4">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-brand-black uppercase tracking-wider">
+                    <label htmlFor="register-name" className="text-[10px] font-black text-brand-black uppercase tracking-wider">
                       {t('auth.nameLabel')}
                     </label>
                     <div className="relative">
                       <User className="w-4 h-4 text-brand-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
+                        id="register-name"
                         type="text"
                         required
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder={t('auth.namePlaceholder')}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-brand-gray-200/80 focus:outline-none focus:border-brand-black text-xs font-semibold bg-brand-gray-50/30"
+                        autoComplete="name"
+                        className="h-[52px] w-full rounded-2xl border border-brand-gray-200/90 bg-brand-gray-50/40 pl-11 pr-4 text-sm font-semibold transition-all placeholder:text-brand-gray-400 focus:border-brand-accent focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-accent/10"
                       />
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-brand-black uppercase tracking-wider">
+                    <label htmlFor="register-email" className="text-[10px] font-black text-brand-black uppercase tracking-wider">
                       {t('auth.emailLabel')}
                     </label>
                     <div className="relative">
                       <Mail className="w-4 h-4 text-brand-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
+                        id="register-email"
                         type="email"
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder={t('auth.emailPlaceholder')}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-brand-gray-200/80 focus:outline-none focus:border-brand-black text-xs font-semibold bg-brand-gray-50/30"
+                        autoComplete="email"
+                        className="h-[52px] w-full rounded-2xl border border-brand-gray-200/90 bg-brand-gray-50/40 pl-11 pr-4 text-sm font-semibold transition-all placeholder:text-brand-gray-400 focus:border-brand-accent focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-accent/10"
                       />
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-brand-black uppercase tracking-wider">
+                    <label htmlFor="register-password" className="text-[10px] font-black text-brand-black uppercase tracking-wider">
                       {t('auth.passwordLabel')}
                     </label>
                     <div className="relative">
                       <Lock className="w-4 h-4 text-brand-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
+                        id="register-password"
                         type="password"
                         required
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
                         placeholder={t('auth.passwordPlaceholder')}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-brand-gray-200/80 focus:outline-none focus:border-brand-black text-xs font-semibold bg-brand-gray-50/30"
+                        autoComplete="new-password"
+                        className="h-[52px] w-full rounded-2xl border border-brand-gray-200/90 bg-brand-gray-50/40 pl-11 pr-4 text-sm font-semibold transition-all placeholder:text-brand-gray-400 focus:border-brand-accent focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-accent/10"
                       />
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-brand-black uppercase tracking-wider">
+                    <label htmlFor="register-password-confirmation" className="text-[10px] font-black text-brand-black uppercase tracking-wider">
                       {language === 'es' ? 'Confirmar Contraseña' : 'Confirm Password'}
                     </label>
                     <div className="relative">
                       <Lock className="w-4 h-4 text-brand-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
+                        id="register-password-confirmation"
                         type="password"
                         required
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder={language === 'es' ? 'Repite tu contraseña' : 'Repeat your password'}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-brand-gray-200/80 focus:outline-none focus:border-brand-black text-xs font-semibold bg-brand-gray-50/30"
+                        autoComplete="new-password"
+                        className="h-[52px] w-full rounded-2xl border border-brand-gray-200/90 bg-brand-gray-50/40 pl-11 pr-4 text-sm font-semibold transition-all placeholder:text-brand-gray-400 focus:border-brand-accent focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-accent/10"
                       />
                     </div>
                   </div>
@@ -564,7 +556,7 @@ function LoginForm() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3.5 px-6 rounded-full bg-brand-black hover:bg-brand-black/90 text-white font-bold text-xs tracking-wider uppercase transition-all shadow-premium mt-2 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40"
+                    className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-brand-black px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_14px_30px_rgba(9,9,11,0.18)] transition-all hover:-translate-y-0.5 hover:bg-brand-black/90 active:translate-y-0 cursor-pointer disabled:opacity-40"
                   >
                     {loading ? (
                       <div className="w-3.5 h-3.5 rounded-full border-2 border-brand-gray-200 border-t-white animate-spin" />
@@ -615,18 +607,20 @@ function LoginForm() {
                 ) : (
                   <form onSubmit={handleForgot} className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-black text-brand-black uppercase tracking-wider">
+                      <label htmlFor="recovery-email" className="text-[10px] font-black text-brand-black uppercase tracking-wider">
                         {t('auth.emailLabel')}
                       </label>
                       <div className="relative">
                         <Mail className="w-4 h-4 text-brand-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                         <input
+                          id="recovery-email"
                           type="email"
                           required
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder={t('auth.emailPlaceholder')}
-                          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-brand-gray-200/80 focus:outline-none focus:border-brand-black text-xs font-semibold bg-brand-gray-50/30"
+                          autoComplete="email"
+                          className="h-[52px] w-full rounded-2xl border border-brand-gray-200/90 bg-brand-gray-50/40 pl-11 pr-4 text-sm font-semibold transition-all placeholder:text-brand-gray-400 focus:border-brand-accent focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-accent/10"
                         />
                       </div>
                     </div>
@@ -634,7 +628,7 @@ function LoginForm() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full py-3.5 px-6 rounded-full bg-brand-black hover:bg-brand-black/90 text-white font-bold text-xs tracking-wider uppercase transition-all shadow-premium mt-2 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40"
+                      className="mt-1 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-brand-black px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_14px_30px_rgba(9,9,11,0.18)] transition-all hover:-translate-y-0.5 hover:bg-brand-black/90 active:translate-y-0 cursor-pointer disabled:opacity-40"
                     >
                       {loading ? (
                         <div className="w-3.5 h-3.5 rounded-full border-2 border-brand-gray-200 border-t-white animate-spin" />
@@ -652,104 +646,30 @@ function LoginForm() {
           </AnimatePresence>
         </div>
 
-        <div className="border-t border-brand-gray-100 pt-5 mt-8 flex justify-between items-center text-[10px] font-bold text-brand-gray-400 select-none">
+        <div className="mt-8 flex flex-col items-center justify-between gap-2 border-t border-brand-gray-100 pt-5 text-center text-[9px] font-bold uppercase tracking-[0.12em] text-brand-gray-400 select-none min-[420px]:flex-row min-[420px]:text-left">
           <span>AuraSwap Network</span>
-          <span>Secured Live Session</span>
+          <span className="inline-flex items-center gap-1.5 normal-case tracking-normal">
+            <Lock className="h-3 w-3" />
+            {language === 'es' ? 'Sesión cifrada y protegida' : 'Encrypted and protected session'}
+          </span>
         </div>
       </div>
-
-      {/* RIGHT COLUMN: Interactive Developer Testing Dashboard */}
-      <div className="lg:col-span-5 flex flex-col gap-6">
-        <div className="bg-brand-black border border-brand-gray-800 rounded-3xl p-6 shadow-floating text-white relative overflow-hidden flex-1 flex flex-col justify-between">
-          <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-brand-accent/5 filter blur-lg pointer-events-none" />
-          
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-xl bg-brand-accent/10 border border-brand-accent/20 flex items-center justify-center text-brand-accent">
-                <Terminal className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-[8px] font-black uppercase tracking-wider text-brand-accent leading-none">Developer Console</span>
-                <h3 className="text-xs font-black tracking-tight leading-none mt-0.5">
-                  {t('auth.quickSwapTitle')}
-                </h3>
-              </div>
-            </div>
-
-            <p className="text-[10px] text-brand-gray-400 font-semibold leading-relaxed mb-6">
-              {t('auth.quickSwapDesc')}
-            </p>
-
-            {/* Roles swappers grid */}
-            <div className="flex flex-col gap-3">
-              {presetUsers.map((preset) => (
-                <button
-                  key={preset.email}
-                  onClick={() => handleQuickSwitch(preset.email)}
-                  className="w-full p-3 rounded-2xl bg-brand-gray-900/60 hover:bg-brand-gray-900 border border-brand-gray-800 hover:border-brand-gray-700 text-left transition-all flex items-center justify-between gap-3 cursor-pointer text-xs group"
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={preset.avatar}
-                      alt={preset.name}
-                      className="w-8 h-8 rounded-full object-cover border border-brand-gray-800 group-hover:border-brand-accent/50 shrink-0"
-                    />
-                    <div>
-                      <p className="font-extrabold text-white group-hover:text-brand-accent transition-colors">{preset.name}</p>
-                      <p className="text-[9px] text-brand-gray-500 font-bold uppercase mt-0.5 tracking-wider">{preset.email}</p>
-                    </div>
-                  </div>
-
-                  <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase shrink-0 ${
-                    preset.role === 'ADMIN' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                    preset.role === 'HOST' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 
-                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                  }`}>
-                    {preset.badge}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {currentUser && (
-            <div className="mt-8 pt-5 border-t border-brand-gray-800 flex items-center justify-between gap-4 animate-in fade-in select-none">
-              <div className="flex items-center gap-2">
-                <img src={currentUser.avatar} className="w-7 h-7 rounded-full object-cover border border-brand-gray-800" />
-                <div className="text-[10px]">
-                  <p className="font-extrabold text-white leading-none">{currentUser.name}</p>
-                  <p className="text-[8px] text-brand-gray-500 uppercase font-black tracking-wider mt-0.5 leading-none">{currentUser.role}</p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => logoutMock()}
-                className="px-3 py-1.5 rounded-lg border border-brand-rose/25 bg-brand-rose/5 hover:bg-brand-rose/10 text-[9px] font-black uppercase tracking-wider text-brand-rose transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-              >
-                <LogOut className="w-3 h-3" />
-                <span>{language === 'es' ? 'Salir' : 'Logout'}</span>
-              </button>
-            </div>
-          )}
-
-        </div>
-      </div>
-
     </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <div className="max-w-7xl mx-auto px-6 sm:px-12 md:px-24 py-12 relative min-h-[85vh] flex items-center justify-center">
+    <main className="relative mx-auto flex min-h-[calc(100dvh-112px)] max-w-7xl items-center justify-center overflow-hidden px-4 py-8 pb-28 sm:px-8 sm:py-12 sm:pb-24 lg:px-12">
       
       {/* Ambient background glows */}
-      <div className="absolute top-1/4 right-10 w-96 h-96 rounded-full bg-brand-accent/5 filter blur-3xl pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '6s' }} />
-      <div className="absolute bottom-1/4 left-10 w-96 h-96 rounded-full bg-brand-rose/5 filter blur-3xl pointer-events-none -z-10 animate-pulse" style={{ animationDuration: '8s' }} />
+      <div className="pointer-events-none absolute -right-24 top-10 -z-10 h-80 w-80 rounded-full bg-brand-accent/6 blur-3xl sm:h-[420px] sm:w-[420px]" />
+      <div className="pointer-events-none absolute -bottom-24 -left-24 -z-10 h-80 w-80 rounded-full bg-emerald-100/40 blur-3xl sm:h-[420px] sm:w-[420px]" />
+      <div className="pointer-events-none absolute inset-x-6 top-1/2 -z-10 h-px bg-gradient-to-r from-transparent via-brand-gray-200/70 to-transparent" />
 
       <React.Suspense fallback={<div className="w-8 h-8 rounded-full border-4 border-brand-gray-205 border-t-brand-accent animate-spin mx-auto" />}>
         <LoginForm />
       </React.Suspense>
-    </div>
+    </main>
   );
 }

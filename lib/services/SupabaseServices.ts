@@ -16,6 +16,86 @@ import { SupabasePropertyMediaService } from './SupabasePropertyMediaService';
 const HYBRID_PROPERTY_SELECT = '*, property_media(*), profiles:public_profiles_view!host_id(name, avatar_url, is_verified), property_offerings(*, property_offering_availability(*), property_offering_pricing_rules(*))';
 const LEGACY_PROPERTY_SELECT = '*, property_media(*), profiles:public_profiles_view!host_id(name, avatar_url, is_verified)';
 
+// Compatibility bridge while older Supabase projects still expose the original,
+// reduced public_properties_view. Only public, non-contact property details are
+// selected from the base table and merged into the sanitized view response.
+const PUBLIC_PROPERTY_DETAILS_SELECT = [
+  'id',
+  'primary_operation',
+  'development_name',
+  'subdivision_name',
+  'private_neighborhood',
+  'phase_stage',
+  'lot_number',
+  'block_number',
+  'condominium_regime',
+  'maintenance_fee_amount',
+  'neighborhood',
+  'postal_code',
+  'street_name',
+  'street_number',
+  'location_reference',
+  'show_public_address',
+  'half_bathrooms',
+  'parking_spaces',
+  'levels_count',
+  'construction_age',
+  'conservation_state_id',
+  'construction_type_id',
+  'surface_total',
+  'surface_built',
+  'surface_front',
+  'surface_depth',
+  'surface_garden',
+  'surface_terrace',
+  'surface_roof_garden',
+  'surface_patio',
+  'services_water',
+  'services_electricity',
+  'services_sewerage',
+  'services_nat_gas',
+  'services_lp_gas',
+  'services_internet',
+  'services_garbage',
+  'security_cctv',
+  'security_guardhouse',
+  'security_24_7',
+  'security_biometric',
+  'view_type_id',
+  'orientation_id',
+].join(',');
+
+type PublicPropertyRow = Record<string, unknown> & { id?: string };
+
+const enrichPublicPropertyRows = async <T extends PublicPropertyRow>(rows: T[]): Promise<T[]> => {
+  const propertyIds = rows
+    .map((row) => row.id)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+  if (propertyIds.length === 0) return rows;
+
+  const { data: details, error } = await supabase
+    .from('properties')
+    .select(PUBLIC_PROPERTY_DETAILS_SELECT)
+    .in('id', propertyIds)
+    .eq('is_published', true);
+
+  if (error) {
+    console.warn('[SupabasePropertyService] Public property details enrichment unavailable:', error.message);
+    return rows;
+  }
+
+  const detailRows = (details || []) as unknown as PublicPropertyRow[];
+  const detailsById = new Map(
+    detailRows.map((detail) => [detail.id, detail]),
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    ...(row.id ? detailsById.get(row.id) : undefined),
+  } as T));
+};
+
 
 const isMissingOfferingsRelationError = (error: any): boolean => {
   return error?.code === 'PGRST200' || error?.code === '42P01';
@@ -164,7 +244,8 @@ export class SupabasePropertyService implements IPropertyService {
         return { results: [], total: 0, filters, provider: 'supabase', executionTime: 0 };
       }
 
-      const candidates = (data || []).map(mapPostgresProperty);
+      const enrichedData = await enrichPublicPropertyRows((data || []) as PublicPropertyRow[]);
+      const candidates = enrichedData.map(mapPostgresProperty);
       const results = searchProperties(candidates, filters);
       return { results, total: results.length, filters, provider: 'supabase', executionTime: 0 };
     });
@@ -216,7 +297,8 @@ export class SupabasePropertyService implements IPropertyService {
       return [];
     }
 
-    return (data || []).map(mapPostgresProperty);
+    const enrichedData = await enrichPublicPropertyRows((data || []) as PublicPropertyRow[]);
+    return enrichedData.map(mapPostgresProperty);
   }
 
   async getById(id: string): Promise<Property | null> {
@@ -242,7 +324,10 @@ export class SupabasePropertyService implements IPropertyService {
       return null;
     }
 
-    return data ? mapPostgresProperty(data) : null;
+    if (!data) return null;
+
+    const [enrichedProperty] = await enrichPublicPropertyRows([data as PublicPropertyRow]);
+    return enrichedProperty ? mapPostgresProperty(enrichedProperty) : null;
   }
 
   async create(property: Partial<Property> & { title: string; hostId: string }): Promise<Property> {
