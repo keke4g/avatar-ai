@@ -13,7 +13,7 @@ import { formatCount, formatPropertyLocation, formatSentencePart } from '../lib/
 import { 
   Sparkles, X, Send, Mic, MicOff, 
   HelpCircle, Volume2, VolumeX, Minimize2,
-  Navigation, ArrowUpRight, User, MessageSquare, PhoneCall
+  Navigation, ArrowUpRight, User, MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -49,6 +49,7 @@ import { parseBudgetToNumber, parseBudgetRange } from '../lib/search/SearchEngin
 import { PropertySearchFilters } from '../lib/search/types';
 import { searchLogger } from '../lib/search/searchLogger';
 import { DoubleBufferVideoPlayer } from './DoubleBufferVideoPlayer';
+import { EternaPropertyActions } from './eterna/EternaPropertyActions';
 import { AvatarStateName } from '../lib/eternaAssets';
 // ────────────────────────────────────────────────
 // MAIN COMPONENT
@@ -414,6 +415,43 @@ export default function EternaConcierge() {
   const activeStatus = (isConnected && !geminiActive) ? wsStatus : simulatedStatus;
 
   const [conciergeMode, setConciergeMode] = useState<'avatar' | 'chat'>('avatar');
+
+  const latestPropertySales = useMemo(() => {
+    for (let index = chatHistory.length - 1; index >= 0; index -= 1) {
+      const message = chatHistory[index];
+      if (message.role === 'assistant' && message.propertySales) {
+        return message.propertySales;
+      }
+    }
+    return null;
+  }, [chatHistory]);
+
+  const closeEternaCompletely = useCallback(() => {
+    if (greetingTimerRef.current) {
+      clearTimeout(greetingTimerRef.current);
+      greetingTimerRef.current = null;
+    }
+
+    geminiAbortControllerRef.current?.abort();
+    geminiAbortControllerRef.current = null;
+    homeSearchAbortControllerRef.current?.abort();
+    homeSearchAbortControllerRef.current = null;
+
+    if (isConnected) {
+      interrupt();
+    }
+    interruptVoice();
+    stopVoiceMode();
+
+    if (typeof window !== 'undefined') {
+      window.speechSynthesis?.cancel();
+      window.dispatchEvent(new CustomEvent('eterna-highlight-actions', { detail: false }));
+    }
+
+    setSimulatedStatus('idle');
+    setSimulatedText('');
+    setIsOpen(false);
+  }, [interrupt, interruptVoice, isConnected, stopVoiceMode]);
 
   // ────────────────────────────────────────────────
   // CONTEXT BRIDGE — Real user data for LLM
@@ -2391,7 +2429,7 @@ Explore actualizado: Redirecting to /explore`);
         handleSend(payload);
       }
     } else if (type === 'close') {
-      setIsOpen(false);
+      closeEternaCompletely();
     } else if (type === 'startVoice') {
       setIsOpen(true);
       if (typeof window !== 'undefined' && window.innerWidth < 768 && shouldBeCompactOnMobile) {
@@ -2420,7 +2458,7 @@ Explore actualizado: Redirecting to /explore`);
     }
 
     clearEternaCommand();
-  }, [eternaCommand, voiceMode, handleVoiceButtonClick, handleSend, clearEternaCommand, shouldBeCompactOnMobile]);
+  }, [eternaCommand, voiceMode, handleVoiceButtonClick, handleSend, clearEternaCommand, shouldBeCompactOnMobile, closeEternaCompletely, isHome, conciergeMode, stopVoiceMode]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
@@ -2639,8 +2677,9 @@ Explore actualizado: Redirecting to /explore`);
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setIsOpen(false);
+                          closeEternaCompletely();
                         }}
+                        aria-label={language === 'es' ? 'Cerrar Eterna y apagar el micrófono' : 'Close Eterna and turn off the microphone'}
                         className={`text-white/70 hover:text-white hover:bg-white/10 rounded-full cursor-pointer transition-colors ${isCompact ? 'p-1' : 'p-1.5'}`}
                       >
                         <X className={isCompact ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
@@ -2648,8 +2687,25 @@ Explore actualizado: Redirecting to /explore`);
                     </div>
                   </div>
 
+                  {/* Contextual property actions remain available in avatar mode */}
+                  {latestPropertySales && liveContext.property && !isCompact && activeStatus !== 'thinking' && (
+                    <div
+                      className="absolute inset-x-3 bottom-[76px] z-40 pointer-events-auto"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <EternaPropertyActions
+                        propertySales={latestPropertySales}
+                        language={language}
+                        propertyTitle={liveContext.property.title}
+                        variant="avatar"
+                        onQuestion={handleSend}
+                        onContact={openPropertyContact}
+                      />
+                    </div>
+                  )}
+
                   {/* Centered Glassmorphic Helper Tooltip */}
-                  {!isListening && activeStatus === 'idle' && !isCompact && (
+                  {!latestPropertySales && !isListening && activeStatus === 'idle' && !isCompact && (
                     <div className="absolute bottom-[35%] left-1/2 z-30 pointer-events-none select-none flex flex-col items-center animate-bounce-gentle w-full max-w-[90%]">
                       <div className="p-[1.2px] rounded-full animate-rainbow-border shadow-floating">
                         <div className="bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3 py-1.5 md:px-4 md:py-2 rounded-full flex items-center gap-1.5 md:gap-2 transition-all duration-300">
@@ -2735,7 +2791,8 @@ Explore actualizado: Redirecting to /explore`);
 
                       {/* Close button */}
                       <button
-                        onClick={() => setIsOpen(false)}
+                        onClick={closeEternaCompletely}
+                        aria-label={language === 'es' ? 'Cerrar Eterna y apagar el micrófono' : 'Close Eterna and turn off the microphone'}
                         className="p-1.5 text-brand-gray-500 hover:text-brand-black hover:bg-brand-gray-100 rounded-full cursor-pointer transition-colors"
                       >
                         <X className="w-4 h-4" />
@@ -2861,78 +2918,13 @@ Explore actualizado: Redirecting to /explore`);
                                   </div>
                                 )}
                                 {msg.propertySales && liveContext.property && (
-                                  <div className="mt-3 pt-3 border-t border-brand-gray-200/70 animate-in fade-in slide-in-from-bottom-1 duration-300">
-                                    {msg.propertySales.suggestedQuestions.length > 0 && (
-                                      <div className="flex flex-wrap gap-1.5 mb-3">
-                                        {msg.propertySales.suggestedQuestions.map((question) => (
-                                          <button
-                                            key={question}
-                                            type="button"
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              handleSend(question);
-                                            }}
-                                            className="max-w-full px-2.5 py-1.5 rounded-full bg-white border border-brand-gray-200 text-[9px] leading-tight font-bold text-brand-gray-600 hover:border-brand-accent/50 hover:text-brand-accent transition-colors cursor-pointer text-left"
-                                          >
-                                            {question}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    <div className="rounded-2xl bg-white border border-brand-gray-200 p-2.5 shadow-xs">
-                                      <div className="flex items-center justify-between gap-3 mb-2">
-                                        <div>
-                                          <span className="block text-[8px] uppercase tracking-[0.16em] text-brand-gray-400 font-black">
-                                            {language === 'es' ? 'Siguiente paso' : 'Next step'}
-                                          </span>
-                                          <span className="block text-[10px] text-brand-black font-extrabold mt-0.5">
-                                            {msg.propertySales.contactIntent || msg.propertySales.stage === 'ready_to_contact'
-                                              ? (language === 'es' ? 'Conecta con el responsable' : 'Connect with the advisor')
-                                              : (language === 'es' ? '¿Te interesa avanzar?' : 'Interested in moving forward?')}
-                                          </span>
-                                        </div>
-                                        <span className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                                          <ArrowUpRight className="w-3.5 h-3.5" />
-                                        </span>
-                                      </div>
-
-                                      <div className="grid grid-cols-2 gap-1.5">
-                                        <button
-                                          type="button"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            openPropertyContact(
-                                              'message',
-                                              msg.propertySales?.leadSummary || (language === 'es'
-                                                ? 'Hola, me interesa esta propiedad y quisiera recibir más información.'
-                                                : 'Hello, I am interested in this property and would like more information.'),
-                                            );
-                                          }}
-                                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-black px-2 py-2 text-[9px] font-extrabold text-white hover:bg-brand-gray-800 transition-colors cursor-pointer"
-                                        >
-                                          <MessageSquare className="w-3 h-3" />
-                                          <span>{language === 'es' ? 'Enviar mensaje' : 'Send message'}</span>
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                             openPropertyContact(
-                                               'call',
-                                              msg.propertySales?.leadSummary || (language === 'es'
-                                                ? `Hola, me interesa "${liveContext.property?.title || 'esta propiedad'}" y quisiera solicitar una llamada con el responsable comercial.`
-                                                : `Hello, I am interested in "${liveContext.property?.title || 'this property'}" and would like to request a call with the advisor.`),
-                                             );
-                                          }}
-                                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-2 py-2 text-[9px] font-extrabold text-white hover:bg-emerald-600 transition-colors cursor-pointer"
-                                        >
-                                          <PhoneCall className="w-3 h-3" />
-                                          <span>{language === 'es' ? 'Solicitar llamada' : 'Request call'}</span>
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </div>
+                                  <EternaPropertyActions
+                                    propertySales={msg.propertySales}
+                                    language={language}
+                                    propertyTitle={liveContext.property.title}
+                                    onQuestion={handleSend}
+                                    onContact={openPropertyContact}
+                                  />
                                 )}
                               </div>
                             </div>
