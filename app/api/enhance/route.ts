@@ -81,12 +81,12 @@ ${text}
       systemPrompt = `Actúa como un asistente de redacción para listados inmobiliarios. Tu tarea es generar exactamente 3 versiones mejoradas de la descripción del listado, basadas en el texto original proporcionado. Formatea tu respuesta estrictamente como un arreglo JSON de strings, sin bloques de código Markdown ni explicaciones adicionales, por ejemplo: ["Versión 1", "Versión 2", "Versión 3"].`;
     }
 
-    const reply = await GeminiService.generateAvatarResponse({
+    const { result: reply, model } = await GeminiService.generateAvatarResponse({
       message: prompt,
       systemPrompt
     });
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({ reply, provider: 'gemini', model });
   } catch (error: unknown) {
     console.error('[Enhance API] Error:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });

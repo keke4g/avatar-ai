@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { GeminiService, ConversationMessage } from "../../../lib/services/GeminiService";
+import {
+  ConversationMessage,
+  GeminiService,
+  getGeminiErrorStatus,
+  isRetryableGeminiError,
+} from "../../../lib/services/GeminiService";
 
 export async function POST(request: Request) {
   try {
@@ -67,7 +72,7 @@ export async function POST(request: Request) {
     }
 
     if (responseMode === "property_sales") {
-      const salesResponse = await GeminiService.generatePropertySalesResponse({
+      const { result: salesResponse, model } = await GeminiService.generatePropertySalesResponse({
         message: message.trim(),
         conversationHistory: typedHistory,
         systemPrompt: typeof systemPrompt === "string" ? systemPrompt : undefined,
@@ -76,7 +81,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         ...salesResponse,
         provider: "gemini",
-        model: "gemini-2.5-flash",
+        model,
       });
     }
 
@@ -91,7 +96,7 @@ export async function POST(request: Request) {
         );
       }
 
-      const searchResponse = await GeminiService.analyzeSearchConversation({
+      const { result: searchResponse, model } = await GeminiService.analyzeSearchConversation({
         message: message.trim(),
         conversationHistory: typedHistory,
         systemPrompt: typeof systemPrompt === "string" ? systemPrompt : undefined,
@@ -101,12 +106,12 @@ export async function POST(request: Request) {
       return NextResponse.json({
         ...searchResponse,
         provider: "gemini",
-        model: "gemini-2.5-flash",
+        model,
       });
     }
 
     // Ejecutar llamada a GeminiService
-    const reply = await GeminiService.generateAvatarResponse({
+    const { result: reply, model } = await GeminiService.generateAvatarResponse({
       message: message.trim(),
       userId: typeof userId === "string" ? userId.slice(0, 128) : undefined,
       conversationHistory: typedHistory,
@@ -116,16 +121,24 @@ export async function POST(request: Request) {
     return NextResponse.json({
       reply,
       provider: "gemini",
-      model: "gemini-2.5-flash",
+      model,
     });
   } catch (error: unknown) {
     console.error("[AvatarRoute] Error en el endpoint de Avatar:", error);
-    
+
+    const retryable = isRetryableGeminiError(error);
+    const upstreamStatus = getGeminiErrorStatus(error);
+
     return NextResponse.json(
-      { 
-        error: "Ocurrió un error interno en el servidor."
+      {
+        error: retryable
+          ? "Eterna está recibiendo una alta demanda temporal. Intenta nuevamente en unos segundos."
+          : "Eterna no pudo procesar la solicitud en este momento.",
+        code: retryable ? "AI_TEMPORARILY_UNAVAILABLE" : "AI_REQUEST_FAILED",
+        retryable,
+        upstreamStatus,
       },
-      { status: 500 }
+      { status: retryable ? 503 : 500 }
     );
   }
 }

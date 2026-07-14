@@ -1,4 +1,10 @@
-import { Content, GoogleGenAI } from '@google/genai';
+import {
+  ApiError,
+  Content,
+  GenerateContentParameters,
+  GenerateContentResponse,
+  GoogleGenAI,
+} from '@google/genai';
 import {
   parsePropertySalesResponse,
   PROPERTY_SALES_RESPONSE_SCHEMA,
@@ -11,6 +17,15 @@ import {
 } from '../eterna/searchConcierge';
 
 let geminiClient: GoogleGenAI | null = null;
+
+export const GEMINI_PRIMARY_MODEL = 'gemini-2.5-flash';
+export const GEMINI_FALLBACK_MODEL = 'gemini-2.5-flash-lite';
+const GEMINI_MODELS = [GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL] as const;
+
+export interface GeminiModelResult<T> {
+  result: T;
+  model: string;
+}
 
 function getGeminiClient(): GoogleGenAI {
   const apiKey = process.env.GOOGLE_API_KEY;
@@ -57,6 +72,108 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs = 20_000): Promise<
   } finally {
     if (timeout) clearTimeout(timeout);
   }
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export function getGeminiErrorStatus(error: unknown): number | null {
+  if (error instanceof ApiError) return error.status;
+  if (error && typeof error === 'object' && 'status' in error) {
+    const status = Number((error as { status?: unknown }).status);
+    if (Number.isInteger(status)) return status;
+  }
+
+  const statusMatch = getErrorMessage(error).match(/\b(408|429|500|502|503|504)\b/);
+  return statusMatch ? Number(statusMatch[1]) : null;
+}
+
+export function isRetryableGeminiError(error: unknown): boolean {
+  const status = getGeminiErrorStatus(error);
+  if (status === 408 || status === 429 || (status !== null && status >= 500)) return true;
+
+  return /timed? out|timeout|unavailable|high demand|overload|temporarily/i.test(getErrorMessage(error));
+}
+
+function wait(delayMs: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+interface GeminiFailoverOptions {
+  models?: readonly string[];
+  timeoutMs?: number;
+  retryDelayMs?: number;
+}
+
+/**
+ * Keeps interactive requests fast: one attempt with Flash, then switches to
+ * Flash-Lite and retries it once only when Google reports a transient error.
+ */
+export async function executeGeminiWithFailover<T>(
+  operation: (model: string) => Promise<T>,
+  options: GeminiFailoverOptions = {},
+): Promise<GeminiModelResult<T>> {
+  const models = options.models?.length ? options.models : GEMINI_MODELS;
+  const retryDelayMs = options.retryDelayMs ?? 300;
+
+  return withTimeout((async () => {
+    let lastError: unknown;
+
+    for (let modelIndex = 0; modelIndex < models.length; modelIndex += 1) {
+      const model = models[modelIndex];
+      const maxAttempts = modelIndex === models.length - 1 ? 2 : 1;
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+          const result = await operation(model);
+          if (modelIndex > 0 || attempt > 1) {
+            console.info('[GeminiService] Request recovered with resilience plan.', {
+              model,
+              attempt,
+            });
+          }
+          return { result, model };
+        } catch (error: unknown) {
+          lastError = error;
+          const retryable = isRetryableGeminiError(error);
+          const hasAnotherAttempt = attempt < maxAttempts || modelIndex < models.length - 1;
+
+          console.warn('[GeminiService] Generation attempt failed.', {
+            model,
+            attempt,
+            status: getGeminiErrorStatus(error),
+            retryable,
+            hasAnotherAttempt,
+          });
+
+          if (!retryable || !hasAnotherAttempt) throw error;
+
+          if (attempt < maxAttempts) {
+            const jitterMs = Math.floor(Math.random() * 120);
+            await wait(retryDelayMs * (2 ** (attempt - 1)) + jitterMs);
+          }
+        }
+      }
+    }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('Gemini no pudo completar la solicitud.');
+  })(), options.timeoutMs ?? 20_000);
+}
+
+async function generateContentWithResilience(
+  parameters: Omit<GenerateContentParameters, 'model'>,
+  timeoutMs?: number,
+): Promise<GeminiModelResult<GenerateContentResponse>> {
+  return executeGeminiWithFailover(
+    (model) => getGeminiClient().models.generateContent({
+      ...parameters,
+      model,
+    }),
+    { timeoutMs },
+  );
 }
 
 const DEFAULT_SYSTEM_PROMPT =
@@ -106,34 +223,29 @@ export class GeminiService {
     userId?: string;
     conversationHistory?: ConversationMessage[];
     systemPrompt?: string;
-  }): Promise<string> {
-    const response = await withTimeout(
-      getGeminiClient().models.generateContent({
-        model: 'gemini-2.5-flash',
+  }): Promise<GeminiModelResult<string>> {
+    const generation = await generateContentWithResilience({
         contents: buildContents(params.message, params.conversationHistory),
         config: {
           systemInstruction: params.systemPrompt || DEFAULT_SYSTEM_PROMPT,
           temperature: 0.55,
           maxOutputTokens: 700,
         },
-      }),
-    );
+      });
 
-    const responseText = response.text?.trim();
+    const responseText = generation.result.text?.trim();
     if (!responseText) {
       throw new Error('Gemini devolvió una respuesta vacía.');
     }
-    return responseText;
+    return { result: responseText, model: generation.model };
   }
 
   static async generatePropertySalesResponse(params: {
     message: string;
     conversationHistory?: ConversationMessage[];
     systemPrompt?: string;
-  }): Promise<PropertySalesResponse> {
-    const response = await withTimeout(
-      getGeminiClient().models.generateContent({
-        model: 'gemini-2.5-flash',
+  }): Promise<GeminiModelResult<PropertySalesResponse>> {
+    const generation = await generateContentWithResilience({
         contents: buildContents(params.message, params.conversationHistory),
         config: {
           systemInstruction: `${params.systemPrompt || DEFAULT_SYSTEM_PROMPT}\n\n${PROPERTY_SALES_INSTRUCTION}`,
@@ -142,10 +254,9 @@ export class GeminiService {
           responseMimeType: 'application/json',
           responseJsonSchema: PROPERTY_SALES_RESPONSE_SCHEMA,
         },
-      }),
-    );
+      });
 
-    const responseText = response.text?.trim();
+    const responseText = generation.result.text?.trim();
     if (!responseText) {
       throw new Error('Gemini devolvió una respuesta comercial vacía.');
     }
@@ -161,7 +272,7 @@ export class GeminiService {
     if (!validated) {
       throw new Error('La respuesta comercial de Gemini no cumple el contrato esperado.');
     }
-    return validated;
+    return { result: validated, model: generation.model };
   }
 
   static async analyzeSearchConversation(params: {
@@ -169,11 +280,9 @@ export class GeminiService {
     conversationHistory?: ConversationMessage[];
     systemPrompt?: string;
     currentSearchState?: unknown;
-  }): Promise<SearchConciergeResponse> {
+  }): Promise<GeminiModelResult<SearchConciergeResponse>> {
     const searchState = JSON.stringify(params.currentSearchState || {});
-    const response = await withTimeout(
-      getGeminiClient().models.generateContent({
-        model: 'gemini-2.5-flash',
+    const generation = await generateContentWithResilience({
         contents: buildContents(
           `${params.message}\n\n[MEMORIA ACTUAL DE BÚSQUEDA]\n${searchState}`,
           params.conversationHistory,
@@ -185,11 +294,9 @@ export class GeminiService {
           responseMimeType: 'application/json',
           responseJsonSchema: SEARCH_CONCIERGE_RESPONSE_SCHEMA,
         },
-      }),
-      15_000,
-    );
+      }, 15_000);
 
-    const responseText = response.text?.trim();
+    const responseText = generation.result.text?.trim();
     if (!responseText) {
       throw new Error('Gemini devolvió un análisis de búsqueda vacío.');
     }
@@ -205,6 +312,6 @@ export class GeminiService {
     if (!validated) {
       throw new Error('El análisis de búsqueda de Gemini no cumple el contrato esperado.');
     }
-    return validated;
+    return { result: validated, model: generation.model };
   }
 }

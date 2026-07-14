@@ -262,7 +262,21 @@ export function useGeneralActions({
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const responseError = await response.json().catch(() => null) as {
+          error?: string;
+          code?: string;
+          retryable?: boolean;
+        } | null;
+        const apiError = new Error(
+          responseError?.error
+          || (language === 'es'
+            ? 'Eterna no pudo responder en este momento.'
+            : 'Eterna could not respond right now.'),
+        ) as Error & { status?: number; code?: string; retryable?: boolean };
+        apiError.status = response.status;
+        apiError.code = responseError?.code;
+        apiError.retryable = responseError?.retryable;
+        throw apiError;
       }
 
       const data = await response.json();
@@ -297,7 +311,13 @@ export function useGeneralActions({
       });
 
     } catch (error: unknown) {
-      const err = error as { name?: string; message?: string };
+      const err = error as {
+        name?: string;
+        message?: string;
+        status?: number;
+        code?: string;
+        retryable?: boolean;
+      };
       clearTimeout(timeoutId);
       setSimulatedStatus('idle');
 
@@ -314,10 +334,24 @@ export function useGeneralActions({
         }
       } else {
         console.error("[Eterna-Gemini] Error al consultar Gemini REST API:", error);
-        const errorMsg = language === 'es'
-          ? `Ocurrió un error al comunicarse con Eterna: ${err.message || 'Error de conexión'}`
-          : `An error occurred while communicating with Eterna: ${err.message || 'Connection error'}`;
-        setChatHistory(prev => [...prev, { role: 'assistant', content: errorMsg }]);
+        if (currentPropertyId) {
+          const errorMsg = language === 'es'
+            ? (err.retryable || err.status === 503
+              ? 'Estoy recibiendo una alta demanda temporal al consultar el expediente. Inténtalo nuevamente en unos segundos; conservaré el contexto de esta propiedad.'
+              : 'No pude consultar el expediente en este momento. No quiero darte información legal sin verificar; inténtalo nuevamente en unos segundos.')
+            : (err.retryable || err.status === 503
+              ? 'I am experiencing temporarily high demand while reviewing the dossier. Please try again in a few seconds; I will keep this property context.'
+              : 'I could not review the dossier right now. I do not want to provide unverified legal information; please try again in a few seconds.');
+          setChatHistory(prev => [...prev, { role: 'assistant', content: errorMsg }]);
+          setSimulatedText('');
+          speak(errorMsg, () => setSimulatedStatus('idle'));
+          return;
+        }
+
+        console.warn('[Eterna-Gemini] Activando asistencia local.', {
+          status: err.status,
+          code: err.code,
+        });
         runIntelligentFallback(prompt);
       }
     } finally {
