@@ -10,7 +10,7 @@ import {
   BedDouble, Bath, Users, ArrowRight, ChevronLeft, ChevronRight,
   Wifi, Waves, Coffee, Monitor, Wind, Key, Flame, Compass, MessageSquareCode,
   ZoomIn, ZoomOut, Maximize, Download, ExternalLink, Play, FileText, Info, ShieldAlert, Award, TrendingUp, BarChart2, FileCheck, RefreshCw,
-  Car, Building, Home, PhoneCall, Mail, UserRound, MessageCircle, Clock3
+  Car, Building, Home, PhoneCall, Mail, UserRound, MessageCircle, Clock3, Scale, CalendarCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -23,6 +23,8 @@ import { LegalDossierSection } from '../../../components/property/sections/Legal
 import { FinancingCompatibility } from '../../../components/property/sections/FinancingCompatibility';
 import { EternaMarketAnalysis } from '../../../components/property/sections/EternaMarketAnalysis';
 import { getEmbeddableMediaUrl, getVimeoEmbedUrl, getYouTubeEmbedUrl } from '../../../lib/mediaEmbeds';
+import PropertyDecisionSummary from '../../../components/v2/PropertyDecisionSummary';
+import { useAuraV2 } from '../../../lib/context/AuraV2Context';
 
 interface PropertyDetailsClientProps {
   id: string;
@@ -163,6 +165,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   const { properties, myProperties, requestSwap, favorites, toggleFavorite, currentUser, swaps, reviews, users, createLead, loading } = useSwap();
   const { t, language } = useTranslation();
   const { setActiveProperty, clearActiveProperty } = useLiveContext();
+  const { recordContact, comparisonIds, toggleComparison } = useAuraV2();
   const hasMounted = useSyncExternalStore(
     () => () => undefined,
     () => true,
@@ -552,8 +555,10 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   }, [activeOfferingModes]);
   const [leadSuccessOpen, setLeadSuccessOpen] = useState(false);
   const [selectedLeadOffering, setSelectedLeadOffering] = useState<PropertyOffering | null>(null);
-  const [leadContactPreference, setLeadContactPreference] = useState<'message' | 'call'>('message');
+  const [leadContactPreference, setLeadContactPreference] = useState<'message' | 'call' | 'visit'>('message');
   const [leadMessage, setLeadMessage] = useState('');
+  const [visitDate, setVisitDate] = useState('');
+  const [visitTime, setVisitTime] = useState('');
   const [isSubmittingLead, setIsSubmittingLead] = useState(false);
   const [leadError, setLeadError] = useState('');
   const [selectedMyPropId, setSelectedMyPropId] = useState('');
@@ -587,18 +592,22 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
     const handleEternaContact = (event: Event) => {
       const detail = (event as CustomEvent<{
         propertyId?: string;
-        channel?: 'message' | 'call';
+        channel?: 'message' | 'call' | 'visit';
         message?: string;
       }>).detail;
 
       if (!property || detail?.propertyId !== property.id) return;
 
       const offering = activeSaleOffering || activeRentOffering;
-      const channel = detail.channel === 'call' ? 'call' : 'message';
+      const channel = detail.channel === 'call' ? 'call' : detail.channel === 'visit' ? 'visit' : 'message';
       const fallbackMessage = channel === 'call'
         ? (language === 'es'
             ? `Hola, me interesa "${property.title}" y quisiera solicitar una llamada con el responsable comercial.`
             : `Hello, I am interested in "${property.title}" and would like to request a call with the advisor.`)
+        : channel === 'visit'
+        ? (language === 'es'
+            ? `Hola, me interesa "${property.title}" y quisiera proponer una fecha para visitarla.`
+            : `Hello, I am interested in "${property.title}" and would like to propose a date to visit it.`)
         : (language === 'es'
             ? `Hola, me interesa "${property.title}" y quisiera recibir más información.`
             : `Hello, I am interested in "${property.title}" and would like more information.`);
@@ -866,33 +875,47 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
     }, 1000);
   };
 
-  const openLeadModal = (offering: PropertyOffering | null) => {
+  const openLeadModal = (offering: PropertyOffering | null, preference: 'message' | 'call' | 'visit' = 'message', draft = '') => {
     if (!offering) return;
     setSelectedLeadOffering(offering);
-    setLeadContactPreference('message');
-    setLeadMessage('');
+    setLeadContactPreference(preference);
+    setLeadMessage(draft);
+    setVisitDate('');
+    setVisitTime('');
     setLeadError('');
     setLeadModalOpen(true);
   };
 
   const handleLeadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!property || !selectedLeadOffering || !leadMessage.trim()) return;
+    if (!property || !selectedLeadOffering || !leadMessage.trim() || (leadContactPreference === 'visit' && !visitDate)) return;
 
     setIsSubmittingLead(true);
     setLeadError('');
 
     try {
+      const schedulingDetails = leadContactPreference === 'visit'
+        ? `\n\nFecha propuesta: ${new Date(`${visitDate}T12:00:00`).toLocaleDateString(language === 'es' ? 'es-MX' : 'en-US')}${visitTime ? ` a las ${visitTime}` : ''}. Sujeta a confirmación del responsable.`
+        : '';
       await createLead({
         propertyId: property.id,
         offeringId: selectedLeadOffering.id,
         leadType: selectedLeadOffering.mode as LeadType,
-        message: leadMessage.trim(),
+        message: `${leadMessage.trim()}${schedulingDetails}`,
+      });
+
+      recordContact({
+        propertyId: property.id,
+        propertyTitle: property.title,
+        channel: leadContactPreference,
+        status: leadContactPreference === 'visit' ? 'visit_proposed' : 'sent',
       });
 
       setLeadModalOpen(false);
       setLeadSuccessOpen(true);
       setLeadMessage('');
+      setVisitDate('');
+      setVisitTime('');
       setSelectedLeadOffering(null);
     } catch (err) {
       console.error('[PropertyDetails] Lead submission failed:', err);
@@ -907,7 +930,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 sm:px-12 md:px-24">
+    <div className="max-w-7xl mx-auto px-6 pb-24 sm:px-12 md:px-24 lg:pb-0">
       
       {/* 1. Sub-Header: Title & Sharing Controls */}
       <div className="flex flex-col gap-2 mb-6">
@@ -915,8 +938,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           <span className="bg-brand-accent/10 text-brand-accent text-[10px] font-extrabold tracking-widest uppercase px-2.5 py-1 rounded-md">
             {t('details.swapTier', { tier: t(`valueRatings.${property.valueRating}`).startsWith('valueRatings.') ? property.valueRating : t(`valueRatings.${property.valueRating}`) })}
           </span>
-          <span className="bg-brand-black text-white text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-md">
-            {t('details.matchScore', { score: property.auraScore })}
+          <span className="bg-brand-black text-white text-xs font-bold tracking-wide px-3 py-1.5 rounded-md">
+            {language === 'es' ? 'Decisión asistida' : 'Decision assistance'}
           </span>
         </div>
 
@@ -977,6 +1000,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           </div>
         )}
       </div>
+
+      <PropertyDecisionSummary property={property} />
 
       {/* 2. Premium Image Grid (Apple/Airbnb Inspired) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 rounded-2xl overflow-hidden shadow-premium mb-10 cursor-pointer">
@@ -1731,6 +1756,22 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   </div>
 
                   <div className="rounded-[22px] border border-brand-gray-200/80 bg-white/90 p-3 shadow-[0_12px_30px_rgba(15,23,42,0.07)] backdrop-blur-sm">
+                  {(activeSaleOffering || activeRentOffering) && !isSelfProperty && (
+                    <button
+                      type="button"
+                      onClick={() => openLeadModal(
+                        activeSaleOffering || activeRentOffering,
+                        'visit',
+                        language === 'es'
+                          ? `Hola, me interesa "${property.title}" y quisiera conocerla en persona.`
+                          : `Hello, I am interested in "${property.title}" and would like to visit it in person.`,
+                      )}
+                      className="mb-2 flex min-h-12 w-full items-center justify-between rounded-2xl bg-indigo-600 px-4 text-xs font-extrabold text-white transition hover:bg-indigo-700"
+                    >
+                      <span className="flex items-center gap-2.5"><CalendarCheck className="h-5 w-5" /> {language === 'es' ? 'Proponer una visita' : 'Propose a visit'}</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  )}
                   {broker.whatsapp && (
                     <a
                       href={`https://wa.me/${broker.whatsapp}?text=${encodeURIComponent(whatsappMessage)}`}
@@ -2924,6 +2965,37 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
         )}
       </AnimatePresence>
 
+      {!isSelfProperty && (activeSaleOffering || activeRentOffering) && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white/95 p-3 pr-24 shadow-[0_-12px_35px_rgba(24,24,27,0.10)] backdrop-blur-xl lg:hidden" aria-label="Acciones principales de la propiedad">
+          <div className="mx-auto grid max-w-lg grid-cols-[52px_1fr] gap-2">
+            <button
+              type="button"
+              onClick={() => toggleComparison(property.id)}
+              className={`flex min-h-13 items-center justify-center rounded-xl border ${comparisonIds.includes(property.id) ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-zinc-300 bg-white text-zinc-700'}`}
+              aria-label={comparisonIds.includes(property.id) ? 'Quitar de comparación' : 'Añadir a comparación'}
+              aria-pressed={comparisonIds.includes(property.id)}
+            >
+              <Scale className="h-5 w-5" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const offering = activeSaleOffering || activeRentOffering;
+                openLeadModal(
+                  offering,
+                  'message',
+                  language === 'es' ? `Hola, me interesa "${property.title}". ¿Podrían confirmarme si continúa disponible?` : `Hello, I am interested in "${property.title}". Could you confirm whether it is still available?`,
+                );
+              }}
+              className="flex min-h-13 items-center justify-center gap-2 rounded-xl bg-zinc-950 px-4 text-sm font-black text-white"
+            >
+              <MessageCircle className="h-5 w-5" aria-hidden="true" />
+              {language === 'es' ? 'Confirmar disponibilidad' : 'Confirm availability'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 5. Lead capture modal for rent and sale offerings */}
       <AnimatePresence>
         {leadModalOpen && (
@@ -2948,12 +3020,16 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   <div className="w-12 h-12 rounded-full bg-brand-accent/10 text-brand-accent flex items-center justify-center shrink-0">
                     {leadContactPreference === 'call'
                       ? <PhoneCall className="w-6 h-6" />
+                      : leadContactPreference === 'visit'
+                      ? <CalendarCheck className="w-6 h-6" />
                       : <MessageSquareCode className="w-6 h-6" />}
                   </div>
                   <div>
                     <h3 className="text-lg font-extrabold text-brand-black leading-tight">
                       {leadContactPreference === 'call'
                         ? (language === 'es' ? 'Solicitar una llamada' : 'Request a call')
+                        : leadContactPreference === 'visit'
+                        ? (language === 'es' ? 'Proponer una visita' : 'Propose a visit')
                         : selectedLeadOffering?.mode === 'SALE'
                         ? (language === 'es' ? 'Solicitar información' : 'Request information')
                         : (language === 'es' ? 'Consultar disponibilidad' : 'Check availability')}
@@ -2963,12 +3039,27 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                         ? (language === 'es'
                             ? 'Eterna preparó tu solicitud. Puedes ajustarla antes de pedir que el responsable comercial te llame.'
                             : 'Eterna prepared your request. You can edit it before asking the advisor to call you.')
+                        : leadContactPreference === 'visit'
+                        ? (language === 'es'
+                            ? 'Elige una fecha y hora preferidas. La visita quedará pendiente hasta que el responsable la confirme.'
+                            : 'Choose a preferred date and time. The visit remains pending until the advisor confirms it.')
                         : (language === 'es'
                             ? 'Eterna preparó un mensaje con tu interés. Revísalo y envíalo al responsable de la propiedad.'
                             : 'Eterna prepared a message based on your interest. Review it and send it to the property advisor.')}
                     </p>
                   </div>
                 </div>
+
+                {leadContactPreference === 'visit' && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="text-xs font-bold text-brand-gray-600">{language === 'es' ? 'Fecha preferida' : 'Preferred date'}
+                      <input type="date" min={new Date().toISOString().slice(0, 10)} value={visitDate} onChange={(event) => setVisitDate(event.target.value)} required className="mt-1.5 min-h-12 w-full rounded-xl border border-brand-gray-200 bg-brand-gray-50 px-3 text-sm font-semibold outline-none focus:border-brand-accent" />
+                    </label>
+                    <label className="text-xs font-bold text-brand-gray-600">{language === 'es' ? 'Hora aproximada' : 'Approximate time'}
+                      <input type="time" value={visitTime} onChange={(event) => setVisitTime(event.target.value)} className="mt-1.5 min-h-12 w-full rounded-xl border border-brand-gray-200 bg-brand-gray-50 px-3 text-sm font-semibold outline-none focus:border-brand-accent" />
+                    </label>
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400">
@@ -3003,9 +3094,9 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmittingLead || !leadMessage.trim()}
+                    disabled={isSubmittingLead || !leadMessage.trim() || (leadContactPreference === 'visit' && !visitDate)}
                     className={`sm:flex-1 py-3 rounded-2xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
-                      isSubmittingLead || !leadMessage.trim()
+                      isSubmittingLead || !leadMessage.trim() || (leadContactPreference === 'visit' && !visitDate)
                         ? 'bg-brand-gray-200 text-brand-gray-400 cursor-not-allowed'
                         : 'bg-brand-black hover:bg-brand-gray-800 text-white'
                     }`}
@@ -3014,6 +3105,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                       ? (language === 'es' ? 'Enviando...' : 'Sending...')
                       : leadContactPreference === 'call'
                         ? (language === 'es' ? 'Solicitar llamada' : 'Request call')
+                        : leadContactPreference === 'visit'
+                        ? (language === 'es' ? 'Proponer visita' : 'Propose visit')
                         : (language === 'es' ? 'Enviar mensaje' : 'Send message')}
                   </button>
                 </div>
@@ -3049,6 +3142,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               <h3 className="text-lg font-extrabold text-brand-black mb-2">
                 {leadContactPreference === 'call'
                   ? (language === 'es' ? 'Llamada solicitada' : 'Call requested')
+                  : leadContactPreference === 'visit'
+                  ? (language === 'es' ? 'Visita propuesta' : 'Visit proposed')
                   : (language === 'es' ? 'Mensaje enviado' : 'Message sent')}
               </h3>
               <p className="text-xs text-brand-gray-500 leading-relaxed mb-6 font-semibold">
@@ -3056,6 +3151,10 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   ? (language === 'es'
                       ? 'Tu solicitud quedó registrada. El responsable podrá revisar tu interés y ponerse en contacto contigo.'
                       : 'Your request was registered. The advisor can review your interest and contact you.')
+                  : leadContactPreference === 'visit'
+                  ? (language === 'es'
+                      ? 'Enviamos tu fecha preferida. La visita aparecerá en Mi Ruta como pendiente hasta que el responsable la confirme.'
+                      : 'We sent your preferred date. The visit will remain pending in My Route until the advisor confirms it.')
                   : (language === 'es'
                       ? 'Tu interés quedó registrado. El responsable podrá revisar el mensaje desde su panel de leads.'
                       : 'Your interest was registered. The advisor can review the message from their leads panel.')}

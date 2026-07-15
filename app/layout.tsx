@@ -7,6 +7,7 @@ import { LiveContextProvider } from "../lib/context/LiveContext";
 import { Suspense } from "react";
 import { LayoutProvider } from "../lib/context/LayoutContext";
 import LayoutContent from "../components/LayoutContent";
+import { AuraV2Provider } from "../lib/context/AuraV2Context";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -28,19 +29,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} scroll-smooth`}>
+    <html lang="es-MX" className={`${inter.variable} scroll-smooth`}>
       <body className="font-sans antialiased bg-brand-gray-50 text-brand-black min-h-screen flex flex-col justify-between selection:bg-brand-accent/20 selection:text-brand-accent">
         <LanguageProvider>
           <SwapProvider>
-            <Suspense fallback={null}>
-              <LiveContextProvider>
-                <LayoutProvider>
-                  <LayoutContent>
-                    {children}
-                  </LayoutContent>
-                </LayoutProvider>
-              </LiveContextProvider>
-            </Suspense>
+            <AuraV2Provider>
+              <Suspense fallback={null}>
+                <LiveContextProvider>
+                  <LayoutProvider>
+                    <LayoutContent>
+                      {children}
+                    </LayoutContent>
+                  </LayoutProvider>
+                </LiveContextProvider>
+              </Suspense>
+            </AuraV2Provider>
           </SwapProvider>
         </LanguageProvider>
       </body>

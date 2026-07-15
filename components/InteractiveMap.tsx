@@ -2,11 +2,22 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Property } from '../lib/types';
-import { Star, ShieldCheck, Compass, Info } from 'lucide-react';
+import { ShieldCheck, Compass, Info } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslation } from '../lib/context/LanguageContext';
 import { hasValidCoordinates } from '../lib/searchFilters';
-import { formatCount, formatBathrooms } from '../lib/textHelpers';
+import { formatCount } from '../lib/textHelpers';
+import { getActiveOfferings } from '../lib/propertyOfferings';
+
+function getMarkerLabel(property: Property, language: string) {
+  const offering = getActiveOfferings(property)[0];
+  if (!offering) return language === 'es' ? 'Ver' : 'View';
+  if (offering.mode === 'SWAP') return 'Swap';
+  const price = Number(offering.priceAmount) || 0;
+  if (price >= 1_000_000) return `$${(price / 1_000_000).toFixed(1)} M`;
+  if (price >= 1_000) return `$${Math.round(price / 1_000)} mil`;
+  return price ? `$${price.toLocaleString('es-MX')}` : (language === 'es' ? 'Ver' : 'View');
+}
 
 interface InteractiveMapProps {
   properties: Property[];
@@ -64,12 +75,12 @@ export default function InteractiveMap({
       
       const customIcon = (window as any).L.divIcon({
         className: 'custom-leaflet-marker-selected',
-        html: `<div class="bg-brand-black text-white px-2.5 py-1 rounded-full border border-brand-black font-black text-[9px] shadow-premium scale-110 ring-2 ring-indigo-500/30 transition-transform">${activeMarker.options.score || 95}%</div>`
+        html: `<div class="bg-brand-black text-white px-2.5 py-1 rounded-full border border-brand-black font-black text-[9px] shadow-premium scale-110 ring-2 ring-indigo-500/30 transition-transform">${activeMarker.options.label || (language === 'es' ? 'Ver' : 'View')}</div>`
       });
       activeMarker.setIcon(customIcon);
       activeMarker.setZIndexOffset(1000);
     }
-  }, [hoveredPropertyId, leafletLoaded]);
+  }, [hoveredPropertyId, language, leafletLoaded]);
 
   // Load Leaflet dynamically strictly on client to bypass Next.js pre-rendering crashes
   useEffect(() => {
@@ -173,6 +184,7 @@ export default function InteractiveMap({
       const isSelected = selectedId === property.id;
       const isHovered = hoveredPropertyId === property.id;
       const activeHighlight = isSelected || isHovered;
+      const markerLabel = getMarkerLabel(property, language);
 
       const customIcon = L.divIcon({
         className: activeHighlight ? 'custom-leaflet-marker-selected' : 'custom-leaflet-marker',
@@ -181,7 +193,7 @@ export default function InteractiveMap({
           activeHighlight
             ? 'bg-brand-black text-white border-brand-black font-black ring-2 ring-indigo-500/20 scale-105 shadow-md'
             : 'bg-white text-brand-accent border-brand-gray-200 font-extrabold hover:bg-brand-black hover:text-white hover:border-brand-black'
-        } px-2 py-0.5 rounded-full border text-[9px] shadow-sm font-sans transition-all duration-200 flex items-center justify-center pointer-events-auto">${property.auraScore}%</div>`
+        } px-2 py-0.5 rounded-full border text-[9px] shadow-sm font-sans transition-all duration-200 flex items-center justify-center pointer-events-auto">${markerLabel}</div>`
       });
 
       if (markersRef.current[property.id]) {
@@ -194,7 +206,7 @@ export default function InteractiveMap({
         // Create new marker
         const marker = L.marker([property.latitude, property.longitude], { 
           icon: customIcon,
-          score: property.auraScore
+          label: markerLabel
         }).addTo(map);
 
         marker.on('mouseover', () => {
@@ -230,7 +242,7 @@ export default function InteractiveMap({
         });
       }
     }
-  }, [leafletLoaded, mappableProperties, selectedId, hoveredPropertyId, onHoverProperty]);
+  }, [language, leafletLoaded, mappableProperties, selectedId, hoveredPropertyId, onHoverProperty]);
   // Trigger invalidateSize whenever mobileShowMap or leafletLoaded changes (Fixes Leaflet 0x0 size bugs on visibility toggle)
   useEffect(() => {
     if (leafletLoaded && mapRef.current) {
@@ -266,7 +278,7 @@ export default function InteractiveMap({
       {/* 2. Map Control Overlay Badge */}
       <div className="absolute top-4 left-4 glass px-3.5 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest text-brand-black flex items-center gap-1.5 shadow-sm bg-white/95 z-10 border border-brand-gray-200/30">
         <Compass className="w-3.5 h-3.5 text-brand-accent animate-spin" style={{ animationDuration: '8s' }} />
-        <span>{language === 'es' ? 'Intercambios Activos' : 'Verified Swaps Active'}</span>
+        <span>{language === 'es' ? 'Propiedades con ubicación' : 'Properties with location'}</span>
       </div>
 
       {/* 3. Loading Leaflet HUD Overlay */}
@@ -293,7 +305,11 @@ export default function InteractiveMap({
               <div>
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <span className="text-[9px] font-black text-brand-accent bg-brand-accent/5 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                    {language === 'es' ? `Compatibilidad ${selectedProperty.auraScore}%` : `${selectedProperty.auraScore}% Match`}
+                    {getActiveOfferings(selectedProperty)[0]?.mode === 'SALE'
+                      ? (language === 'es' ? 'Propiedad en venta' : 'Property for sale')
+                      : getActiveOfferings(selectedProperty)[0]?.mode === 'SWAP'
+                      ? (language === 'es' ? 'Disponible para intercambio' : 'Available for swap')
+                      : (language === 'es' ? 'Propiedad disponible' : 'Available property')}
                   </span>
                   {selectedProperty.hostVerified && (
                     <ShieldCheck className="w-3.5 h-3.5 text-brand-accent fill-brand-accent/5" />

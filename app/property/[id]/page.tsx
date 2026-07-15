@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import Link from 'next/link';
 import { MOCK_PROPERTIES, USER_PROPERTIES } from '../../../lib/mockData';
 import PropertyDetailsClient from './PropertyDetailsClient';
 
@@ -14,8 +13,8 @@ export async function generateMetadata({ params }: PropertyDetailsPageProps): Pr
 
   if (!property) {
     return {
-      title: 'Space Not Found — AuraSwap',
-      description: 'The requested home-swapping property could not be found or has been un-listed.',
+      title: 'Propiedad en AuraSwap — detalles, costos y contacto',
+      description: 'Consulta características, información declarada, costos orientativos y opciones de contacto de esta propiedad en AuraSwap.',
     };
   }
 

@@ -29,7 +29,7 @@ export default function DebugOverlay() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [copied, setCopied] = useState(false);
 
-  const showOverlay = process.env.NODE_ENV === 'development' || searchParams.has('debug');
+  const showOverlay = searchParams.has('debug');
 
   useEffect(() => {
     if (!showOverlay) return;

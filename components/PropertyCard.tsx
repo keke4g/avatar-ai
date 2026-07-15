@@ -4,11 +4,13 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Property, PropertyOfferingMode } from '../lib/types';
 import { useSwap } from '../lib/context/SwapContext';
-import { Heart, ChevronLeft, ChevronRight, Star, ShieldCheck } from 'lucide-react';
+import { Heart, ChevronLeft, ChevronRight, Star, ShieldCheck, Scale, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '../lib/context/LanguageContext';
 import { getActiveOfferings } from '../lib/propertyOfferings';
 import { formatCount, formatBathrooms, formatPropertyLocation } from '../lib/textHelpers';
+import { useAuraV2 } from '../lib/context/AuraV2Context';
+import { buildDecisionSummary } from '../lib/auraswap2/decision';
 
 interface PropertyCardProps {
   property: Property;
@@ -39,11 +41,15 @@ const OFFERING_BADGE_META: Record<PropertyOfferingMode, { label: string; classNa
 export default function PropertyCard({ property, showOfferingBadges = false }: PropertyCardProps) {
   const { favorites, toggleFavorite, reviews } = useSwap();
   const { t, language } = useTranslation();
+  const { brief, comparisonIds, toggleComparison } = useAuraV2();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
-  const [imageError, setImageError] = useState(false);
+  const [imageErrorIndex, setImageErrorIndex] = useState<number | null>(null);
+  const [compareNotice, setCompareNotice] = useState('');
 
   const isFavorited = favorites.includes(property.id);
+  const isCompared = comparisonIds.includes(property.id);
+  const decision = React.useMemo(() => buildDecisionSummary(property, brief, { comparisonCount: comparisonIds.length }), [property, brief, comparisonIds.length]);
 
   const dynamicRating = React.useMemo(() => {
     if (!reviews) return property.hostRating;
@@ -94,11 +100,6 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
     return priceTexts.join('  |  ');
   }, [property, language]);
 
-  // Reset image error state whenever slide index changes
-  React.useEffect(() => {
-    setImageError(false);
-  }, [currentImageIndex]);
-
   const handleNextImage = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -117,12 +118,19 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
     toggleFavorite(property.id);
   };
 
+  const handleCompareClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const result = toggleComparison(property.id);
+    setCompareNotice(result.reason || (result.added ? 'Añadida para comparar' : 'Retirada de comparación'));
+    window.setTimeout(() => setCompareNotice(''), 2200);
+  };
+
   const fallbackUrl = 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80';
 
   return (
-    <Link 
+    <article
       id={`property-card-${property.id}`}
-      href={`/property/${property.id}`} 
       className="group block"
     >
       <div 
@@ -132,7 +140,7 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
       >
         {/* Image Container */}
         <div className="relative aspect-[4/3] w-full rounded-2xl overflow-hidden bg-brand-gray-100 shadow-premium group-hover:shadow-floating transition-all duration-300">
-          
+          <Link href={`/property/${property.id}`} className="absolute inset-0 z-0 block" aria-label={`Ver ${property.title}`}>
           {/* Image Slide */}
           <div className="w-full h-full relative">
             {(() => {
@@ -150,9 +158,9 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
 
               return (
                 <img
-                  src={imageError ? fallbackUrl : getDisplayUrl(imageUrl)}
+                  src={imageErrorIndex === currentImageIndex ? fallbackUrl : getDisplayUrl(imageUrl)}
                   alt={property.title}
-                  onError={() => setImageError(true)}
+                  onError={() => setImageErrorIndex(currentImageIndex)}
                   className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                   loading="lazy"
                   decoding="async"
@@ -163,17 +171,18 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
 
           {/* Gradient Overlay for bottom text styling or UI elements */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent pointer-events-none" />
+          </Link>
 
           {/* Quick Info Badges */}
           <div className="absolute top-3 left-3 flex flex-col gap-1.5 pointer-events-none">
-            {/* Match Score */}
-            <div className="glass px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider text-brand-accent flex items-center gap-1 shadow-sm bg-white/95">
-              <span>{language === 'es' ? `Compatibilidad ${property.auraScore}%` : `${property.auraScore}% Match`}</span>
+            {/* Explainable match instead of an opaque percentage */}
+            <div className="glass px-3 py-1.5 rounded-full text-xs font-bold text-brand-accent flex items-center gap-1 shadow-sm bg-white/95">
+              <span>{decision.requirementCount > 0 ? decision.matchLabel : (language === 'es' ? 'Coincidencia por definir' : 'Match not defined yet')}</span>
             </div>
             
             {/* Host Verified */}
             {property.hostVerified && (
-              <div className="glass px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider text-brand-black flex items-center gap-1 shadow-sm bg-white/95 w-fit">
+              <div className="glass px-3 py-1.5 rounded-full text-xs font-bold text-brand-black flex items-center gap-1 shadow-sm bg-white/95 w-fit">
                 <ShieldCheck className="w-3.5 h-3.5 text-brand-accent fill-brand-accent/10" />
                 <span>{language === 'es' ? 'Anfitrión Verificado' : 'Verified Host'}</span>
               </div>
@@ -183,7 +192,8 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
           {/* Favorite Button */}
           <button
             onClick={handleFavoriteClick}
-            className={`absolute top-3 right-3 p-2 rounded-full border transition-all duration-300 ${
+            aria-label={isFavorited ? `Quitar ${property.title} de favoritos` : `Guardar ${property.title} en favoritos`}
+            className={`absolute top-3 right-3 z-20 flex min-h-11 min-w-11 items-center justify-center rounded-full border transition-all duration-300 ${
               isFavorited
                 ? 'bg-white border-white text-brand-rose scale-110 shadow-md'
                 : 'bg-white/80 border-white/20 text-brand-black hover:bg-white hover:scale-105 shadow-sm'
@@ -203,13 +213,15 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
               >
                 <button
                   onClick={handlePrevImage}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/90 hover:bg-white text-brand-black border border-brand-gray-200/50 hover:scale-105 active:scale-95 transition-all shadow-md"
+                  aria-label="Imagen anterior"
+                  className="absolute left-3 top-1/2 z-20 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 hover:bg-white text-brand-black border border-brand-gray-200/50 hover:scale-105 active:scale-95 transition-all shadow-md"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <button
                   onClick={handleNextImage}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/90 hover:bg-white text-brand-black border border-brand-gray-200/50 hover:scale-105 active:scale-95 transition-all shadow-md"
+                  aria-label="Imagen siguiente"
+                  className="absolute right-3 top-1/2 z-20 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 hover:bg-white text-brand-black border border-brand-gray-200/50 hover:scale-105 active:scale-95 transition-all shadow-md"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -236,9 +248,9 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
         <div className="flex flex-col gap-1 px-1">
           {/* Location & Rating */}
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-base tracking-tight text-brand-black group-hover:text-brand-accent transition-colors duration-200">
+            <Link href={`/property/${property.id}`} className="font-semibold text-base tracking-tight text-brand-black group-hover:text-brand-accent transition-colors duration-200">
               {formatPropertyLocation(property.location, property.country)}
-            </h3>
+            </Link>
             <div className="flex items-center gap-1 text-sm font-medium">
               <Star className="w-3.5 h-3.5 fill-brand-black" />
               <span>{dynamicRating.toFixed(1)}</span>
@@ -246,9 +258,9 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
           </div>
 
           {/* Property Title / Micro Details */}
-          <p className="text-sm text-brand-gray-500 truncate max-w-xs leading-normal">
+          <Link href={`/property/${property.id}`} className="text-sm text-brand-gray-500 truncate max-w-xs leading-normal">
             {t(`properties.${property.id}.title`).startsWith('properties.') ? property.title : t(`properties.${property.id}.title`)}
-          </p>
+          </Link>
 
           {/* Key Specs Row */}
           <div className="flex items-center gap-2 text-xs text-brand-gray-500 font-medium mt-0.5 font-semibold">
@@ -274,6 +286,32 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
             </div>
           )}
 
+          {decision.requirementCount > 0 && (
+            <div className="mt-2 rounded-xl border border-zinc-200 bg-white p-2.5">
+              <div className="flex items-center gap-2 text-xs font-bold text-zinc-900">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+                <span>{decision.matchLabel}</span>
+              </div>
+              {decision.tradeoffs[0] && (
+                <div className="mt-1.5 flex items-start gap-2 text-xs leading-relaxed text-zinc-500">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" aria-hidden="true" />
+                  <span>{decision.tradeoffs[0]}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleCompareClick}
+            className={`mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-3 text-xs font-bold transition ${isCompared ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-zinc-200 bg-white text-zinc-700 hover:border-indigo-400'}`}
+            aria-pressed={isCompared}
+          >
+            <Scale className="h-4 w-4" aria-hidden="true" />
+            {isCompared ? 'En comparación' : 'Añadir a comparación'}
+          </button>
+          {compareNotice && <span className="mt-1 block text-center text-xs font-medium text-indigo-700" role="status">{compareNotice}</span>}
+
           {showOfferingBadges && activeOfferingModes.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {activeOfferingModes.map((mode) => {
@@ -291,6 +329,6 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
           )}
         </div>
       </div>
-    </Link>
+    </article>
   );
 }

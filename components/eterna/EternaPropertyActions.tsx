@@ -1,10 +1,10 @@
 "use client";
 
-import { ArrowUpRight, MessageSquare, PhoneCall } from 'lucide-react';
+import { ArrowUpRight, CalendarCheck, MessageSquare, PhoneCall } from 'lucide-react';
 
 import type { PropertySalesResponse } from '../../lib/eterna/propertySales';
 
-type PropertyContactChannel = 'message' | 'call';
+type PropertyContactChannel = 'message' | 'call' | 'visit';
 
 interface EternaPropertyActionsProps {
   propertySales: PropertySalesResponse;
@@ -25,15 +25,21 @@ export function EternaPropertyActions({
 }: EternaPropertyActionsProps) {
   const isSpanish = language === 'es';
   const isAvatar = variant === 'avatar';
-  const contactTitle = propertySales.contactIntent || propertySales.stage === 'ready_to_contact'
+  const showContact = propertySales.contactIntent || propertySales.stage === 'ready_to_contact';
+  const contactTitle = showContact
     ? (isSpanish ? 'Conecta con el responsable' : 'Connect with the advisor')
-    : (isSpanish ? '¿Te interesa avanzar?' : 'Interested in moving forward?');
+    : propertySales.stage === 'consideration'
+      ? (isSpanish ? 'Resuelve lo pendiente' : 'Resolve what is pending')
+      : (isSpanish ? 'Entiende si realmente te conviene' : 'Understand whether it truly fits');
   const messageText = propertySales.leadSummary || (isSpanish
     ? 'Hola, me interesa esta propiedad y quisiera recibir más información.'
     : 'Hello, I am interested in this property and would like more information.');
   const callText = propertySales.leadSummary || (isSpanish
     ? `Hola, me interesa "${propertyTitle || 'esta propiedad'}" y quisiera solicitar una llamada con el responsable comercial.`
     : `Hello, I am interested in "${propertyTitle || 'this property'}" and would like to request a call with the advisor.`);
+  const visitText = propertySales.leadSummary || (isSpanish
+    ? `Hola, me interesa "${propertyTitle || 'esta propiedad'}" y quisiera proponer una fecha para conocerla en persona.`
+    : `Hello, I am interested in "${propertyTitle || 'this property'}" and would like to propose a date to visit it.`);
 
   return (
     <div
@@ -52,8 +58,8 @@ export function EternaPropertyActions({
                 onQuestion(question);
               }}
               className={isAvatar
-                ? 'max-w-full rounded-full border border-white/30 bg-black/55 px-3 py-1.5 text-left text-[9px] font-bold leading-tight text-white shadow-lg backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-white/60 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80'
-                : 'max-w-full rounded-full border border-brand-gray-200 bg-white px-2.5 py-1.5 text-left text-[9px] font-bold leading-tight text-brand-gray-600 transition-colors hover:border-brand-accent/50 hover:text-brand-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40'}
+                ? 'min-h-10 max-w-full rounded-full border border-white/30 bg-black/55 px-3 py-2 text-left text-xs font-bold leading-tight text-white shadow-lg backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:border-white/60 hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80'
+                : 'min-h-10 max-w-full rounded-full border border-brand-gray-200 bg-white px-3 py-2 text-left text-xs font-bold leading-tight text-brand-gray-600 transition-colors hover:border-brand-accent/50 hover:text-brand-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40'}
             >
               {question}
             </button>
@@ -68,14 +74,14 @@ export function EternaPropertyActions({
         <div className="mb-2 flex items-center justify-between gap-3">
           <div>
             <span className={isAvatar
-              ? 'block text-[8px] font-black uppercase tracking-[0.16em] text-white/60'
-              : 'block text-[8px] font-black uppercase tracking-[0.16em] text-brand-gray-400'}
+              ? 'block text-[10px] font-black uppercase tracking-[0.16em] text-white/70'
+              : 'block text-[10px] font-black uppercase tracking-[0.16em] text-brand-gray-500'}
             >
               {isSpanish ? 'Siguiente paso' : 'Next step'}
             </span>
             <span className={isAvatar
-              ? 'mt-0.5 block text-[10px] font-extrabold text-white'
-              : 'mt-0.5 block text-[10px] font-extrabold text-brand-black'}
+              ? 'mt-1 block text-sm font-extrabold text-white'
+              : 'mt-1 block text-sm font-extrabold text-brand-black'}
             >
               {contactTitle}
             </span>
@@ -88,31 +94,48 @@ export function EternaPropertyActions({
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className={`grid gap-2 ${showContact ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2'}`}>
           <button
             type="button"
             onClick={(event) => {
               event.stopPropagation();
-              onContact('message', messageText);
+              if (showContact) onContact('message', messageText);
+              else onQuestion(isSpanish ? 'Resume por qué esta propiedad coincide conmigo y cuál es su principal desventaja.' : 'Summarize why this property fits me and its main tradeoff.');
             }}
             className={isAvatar
-              ? 'inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-2 py-2 text-[9px] font-extrabold text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80'
-              : 'inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-black px-2 py-2 text-[9px] font-extrabold text-white transition-colors hover:bg-brand-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40'}
+              ? 'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-extrabold text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80'
+              : 'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-brand-black px-3 py-2 text-xs font-extrabold text-white transition-colors hover:bg-brand-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40'}
           >
             <MessageSquare className="h-3 w-3" />
-            <span>{isSpanish ? 'Enviar mensaje' : 'Send message'}</span>
+            <span>{showContact ? (isSpanish ? 'Enviar mensaje' : 'Send message') : (isSpanish ? 'Por qué encaja' : 'Why it fits')}</span>
           </button>
           <button
             type="button"
             onClick={(event) => {
               event.stopPropagation();
-              onContact('call', callText);
+              if (showContact) onContact('call', callText);
+              else onQuestion(isSpanish ? '¿Qué información importante falta confirmar antes de contactar?' : 'What important information should be confirmed before contacting?');
             }}
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-2 py-2 text-[9px] font-extrabold text-white transition-colors hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-extrabold text-white transition-colors hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
           >
             <PhoneCall className="h-3 w-3" />
-            <span>{isSpanish ? 'Solicitar llamada' : 'Request call'}</span>
+            <span>{showContact ? (isSpanish ? 'Solicitar llamada' : 'Request call') : (isSpanish ? 'Qué falta saber' : 'What is missing')}</span>
           </button>
+          {showContact && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onContact('visit', visitText);
+              }}
+              className={isAvatar
+                ? 'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-indigo-500 px-3 py-2 text-xs font-extrabold text-white transition-colors hover:bg-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-200'
+                : 'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-extrabold text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300'}
+            >
+              <CalendarCheck className="h-3.5 w-3.5" />
+              <span>{isSpanish ? 'Proponer visita' : 'Propose visit'}</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -27,6 +27,26 @@
    ======================================================== */
 
 @layer base {
+  :root {
+    --aura-font-scale: 1;
+  }
+
+  :root[data-aura-text="large"] {
+    --aura-font-scale: 1.14;
+    font-size: 18px;
+  }
+
+  :root[data-aura-contrast="high"] body {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  :root[data-aura-contrast="high"] .text-brand-gray-500,
+  :root[data-aura-contrast="high"] .text-zinc-500,
+  :root[data-aura-contrast="high"] .text-zinc-600 {
+    color: #27272a !important;
+  }
+
   body {
     background-color: #fafafa;
     color: #18181b;
@@ -39,6 +59,45 @@
   input, textarea {
     caret-color: #6366f1; /* Aura Indigo brand accent */
     color: #09090b;       /* Ensure text color is brand-black and never inherits parent text-white values */
+  }
+
+  button,
+  [role="button"],
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :focus-visible {
+    outline: 3px solid #4f46e5;
+    outline-offset: 3px;
+  }
+}
+
+:root[data-aura-motion="reduced"] *,
+:root[data-aura-motion="reduced"] *::before,
+:root[data-aura-motion="reduced"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+:root[data-aura-simple="true"] .aura-secondary-content {
+  display: none !important;
+}
+
+:root[data-aura-simple="true"] .aura-primary-action {
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.16);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

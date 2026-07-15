@@ -7,7 +7,7 @@ import { useTranslation } from '../../lib/context/LanguageContext';
 import CategorySlider from '../../components/CategorySlider';
 import PropertyCard from '../../components/PropertyCard';
 import InteractiveMap from '../../components/InteractiveMap';
-import { Map, List, RefreshCw, Compass, ArrowUpDown, Filter, Sparkles } from 'lucide-react';
+import { Map, List, RefreshCw, Compass, ArrowUpDown, Filter, Sparkles, BellRing } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { buildExploreSearchParams, filterAndSortProperties, resolveSearchDestination, PROPERTY_TYPE_MAPPING, normalizeSearchText } from '../../lib/searchFilters';
@@ -22,6 +22,8 @@ import { ServiceFactory } from '../../lib/services/ServiceFactory';
 import { PropertySearchFilters, SearchSort } from '../../lib/search/types';
 import { searchLogger } from '../../lib/search/searchLogger';
 import { getCacheKey } from '../../lib/search/SearchCache';
+import JourneyProgress from '../../components/v2/JourneyProgress';
+import { useAuraV2 } from '../../lib/context/AuraV2Context';
 
 type ExploreOfferingTab = 'ALL' | 'SWAP' | 'RENT' | 'SALE';
 
@@ -52,6 +54,7 @@ function propertyMatchesOfferingTab(property: Property, tab: ExploreOfferingTab)
 
 function ExploreContent() {
   const { properties, swaps, activeSearch, setActiveSearch } = useSwap();
+  const { createAlert } = useAuraV2();
   const { t, language } = useTranslation();
   const router = useRouter();
   const { setExploreFilters } = useLiveContext();
@@ -93,6 +96,7 @@ function ExploreContent() {
   // Progressive loading / pagination states
   const [pageSize, setPageSize] = useState(4); // Load 4 at a time
   const [isFiltering, setIsFiltering] = useState(false);
+  const [alertNotice, setAlertNotice] = useState('');
 
   // Search infrastructure refs (debouncing and race protection)
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -772,17 +776,38 @@ function ExploreContent() {
 
   return (
     <div className="max-w-7xl mx-auto px-6 sm:px-12 md:px-24 min-h-screen">
+      <JourneyProgress compact />
       
       {/* A. Dynamic Header & Search bar */}
       <div className="flex flex-col gap-6 mb-8 mt-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-brand-black tracking-tight flex items-center gap-2">
-            <span>{t('explore.title')}</span>
-            <Sparkles className="w-5 h-5 text-brand-accent animate-pulse" />
-          </h1>
-          <p className="text-xs text-brand-gray-500 font-medium mt-1">
-            {t('explore.subtitle', { count: filteredSortedProperties.length })}
-          </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-brand-black tracking-tight flex items-center gap-2">
+              <span>{t('explore.title')}</span>
+              <Sparkles className="w-5 h-5 text-brand-accent animate-pulse" />
+            </h1>
+            <p className="mt-1 text-sm font-medium text-brand-gray-500">
+              {t('explore.subtitle', { count: filteredSortedProperties.length })}
+            </p>
+          </div>
+          <div className="flex flex-col items-start gap-1 sm:items-end">
+            <button
+              type="button"
+              onClick={() => {
+                const budget = searchBudget ? Number(searchBudget) : null;
+                const result = createAlert({
+                  city: searchQuery.trim(),
+                  budget: Number.isFinite(budget) ? budget : null,
+                  goal: activeOfferingTab === 'RENT' ? 'RENT' : activeOfferingTab === 'SWAP' ? 'SWAP' : 'BUY',
+                });
+                setAlertNotice(result.created ? 'Alerta guardada en Mi Ruta.' : (result.reason || 'No se pudo guardar la alerta.'));
+              }}
+              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 text-sm font-bold text-zinc-900 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700"
+            >
+              <BellRing className="h-4 w-4" /> Avisarme de cambios
+            </button>
+            {alertNotice && <p role="status" className="text-xs font-semibold text-zinc-600">{alertNotice}</p>}
+          </div>
         </div>
 
         <AuraSearchBar
@@ -864,7 +889,7 @@ function ExploreContent() {
           }}
         />
 
-        <div className="flex flex-col gap-4 rounded-3xl border border-brand-gray-200/70 bg-white/80 p-4 shadow-sm backdrop-blur-xl">
+        <div className="aura-secondary-content flex flex-col gap-4 rounded-3xl border border-brand-gray-200/70 bg-white/80 p-4 shadow-sm backdrop-blur-xl">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-1.5 px-3.5 py-2.5 border border-brand-gray-200 rounded-2xl text-xs font-bold text-brand-gray-600 bg-white">
               <Filter className="w-3.5 h-3.5 text-brand-gray-400" />

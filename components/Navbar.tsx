@@ -6,8 +6,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSwap } from '../lib/context/SwapContext';
 import { useTranslation } from '../lib/context/LanguageContext';
-import { MessageSquare, Compass, Grid, Menu, X, Bell, Shield, User, LogOut, Check } from 'lucide-react';
+import { MessageSquare, Compass, Grid, Menu, X, Bell, Shield, User, LogOut, Check, Route } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuraV2 } from '../lib/context/AuraV2Context';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -22,6 +23,7 @@ export default function Navbar() {
     setLogoutToast
   } = useSwap();
   const { t, language, setLanguage } = useTranslation();
+  const { comparisonIds } = useAuraV2();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -183,6 +185,7 @@ export default function Navbar() {
     badge?: number;
   }> = [
     { label: t('nav.explore'), href: '/explore', icon: Compass },
+    { label: language === 'es' ? 'Mi Ruta' : 'My Journey', href: '/decision', icon: Route, badge: comparisonIds.length || undefined },
   ];
 
   if (currentUser) {
@@ -231,6 +234,16 @@ export default function Navbar() {
             </div>
             <span className={`font-bold text-lg tracking-tight select-none ${pathname === '/' && isHomeDark ? 'text-white' : 'text-brand-black'}`}>
               Aura<span className="text-brand-accent group-hover:text-brand-accent/80 transition-colors">Swap</span>
+            </span>
+            <span
+              className={`hidden sm:inline-flex rounded-full border px-2 py-0.5 text-[9px] font-black tracking-[0.14em] ${
+                pathname === '/' && isHomeDark
+                  ? 'border-white/30 bg-white/10 text-white'
+                  : 'border-brand-accent/20 bg-brand-accent/10 text-brand-accent'
+              }`}
+              aria-label="AuraSwap versión 2, vista previa"
+            >
+              2 PREVIEW
             </span>
           </Link>
 

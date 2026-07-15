@@ -83,25 +83,21 @@ export function searchProperties(properties: Property[], filters: PropertySearch
 
     // 5. Budget / Price Filter
     if (filters.budget !== undefined && filters.budget > 0) {
-      const price = activeOffering?.priceAmount ?? (prop as any).price ?? 0;
-      if (price > 0) {
-        if (price <= filters.budget) {
-          score += 5;
-          // Scale bonus: closer to budget is better
-          const ratio = price / filters.budget;
-          score += Math.round(ratio * 3);
-        } else if (price <= filters.budget * 1.25) {
-          // Within 25% margin
-          score += 1;
-        } else {
-          score -= 10; // Penalty
-          isExcluded = true; // Exclude if exceeds 25% margin
-        }
+      const price = activeOffering?.priceAmount ?? 0;
+      if (price > 0 && price <= filters.budget) {
+        score += 5;
+        // Scale bonus: closer to the declared maximum is a stronger fit.
+        const ratio = price / filters.budget;
+        score += Math.round(ratio * 3);
+      } else {
+        // A maximum budget is a hard boundary. Properties without a confirmed
+        // price cannot be presented as budget matches either.
+        isExcluded = true;
       }
     }
 
     if (filters.minBudget !== undefined && filters.minBudget > 0) {
-      const price = activeOffering?.priceAmount ?? (prop as any).price ?? 0;
+      const price = activeOffering?.priceAmount ?? 0;
       if (price > 0) {
         if (price >= filters.minBudget) {
           score += 2;

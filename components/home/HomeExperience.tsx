@@ -3,13 +3,14 @@ import React, { useState, useEffect } from "react";
 import Navbar from "../Navbar";
 import HomeHero from "./HomeHero";
 import Conversation from "./Conversation";
-import { useLayoutContext } from "../../lib/context/LayoutContext";
 import { useLiveContext } from "../../lib/context/LiveContext";
 import { Home, Search, Building2, Landmark, Globe, MessageSquare, Sun, Moon } from "lucide-react";
+import { useAuraV2 } from "../../lib/context/AuraV2Context";
+import JourneyProgress from "../v2/JourneyProgress";
 
 export default function HomeExperience() {
-  const { setHideHeader, setHideFooter } = useLayoutContext();
   const { sendPrompt } = useLiveContext();
+  const { patchBrief } = useAuraV2();
   const [searchInput, setSearchInput] = useState("");
   const [navbarHeight, setNavbarHeight] = useState(80);
   const [isDark, setIsDark] = useState(false);
@@ -55,15 +56,6 @@ export default function HomeExperience() {
       window.dispatchEvent(new CustomEvent("home-theme-change", { detail: nextDark ? "dark" : "light" }));
     }
   };
-
-  useEffect(() => {
-    setHideHeader(true);
-    setHideFooter(true);
-    return () => {
-      setHideHeader(false);
-      setHideFooter(false);
-    };
-  }, [setHideHeader, setHideFooter]);
 
   useEffect(() => {
     const updateNavbarHeight = () => {
@@ -118,6 +110,9 @@ export default function HomeExperience() {
   ];
 
   const handleCardClick = (text: string) => {
+    if (text === "Busco una propiedad") patchBrief({ goal: 'BUY' });
+    if (text === "Quiero invertir") patchBrief({ goal: 'INVEST' });
+    if (text === "Quiero vender mi casa" || text === "Valorar mi propiedad") patchBrief({ goal: 'SELL' });
     sendPrompt(text);
   };
 
@@ -229,6 +224,10 @@ export default function HomeExperience() {
           <Conversation searchInput={searchInput} setSearchInput={setSearchInput} isDark={isDark} />
         </div>
 
+      </div>
+
+      <div className="relative z-10 mx-auto mt-10 w-full max-w-[1400px] px-6 lg:px-12">
+        <JourneyProgress compact />
       </div>
 
       {/* Styles for dynamic rainbow border animation on highlight */}
