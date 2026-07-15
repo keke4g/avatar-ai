@@ -1154,28 +1154,30 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             ];
 
             return (
-              <div className="grid grid-cols-2 gap-3 border-b border-brand-gray-200/80 pb-6 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-4 border-b border-brand-gray-200/80 pb-6 sm:grid-cols-3">
                 {specs.map(({ key, Icon, badge, label, value }) => (
                   <article
                     key={key}
-                    className="flex min-h-[112px] min-w-0 flex-col justify-between rounded-2xl border border-brand-gray-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.035)]"
+                    className="group relative flex min-h-[128px] min-w-0 flex-col overflow-hidden rounded-2xl border border-neutral-100/80 bg-white/50 p-4 backdrop-blur-xs transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-0.5 hover:border-neutral-200 hover:shadow-[0_10px_20px_-5px_rgba(0,0,0,0.03)]"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-gray-100 text-brand-gray-600">
-                        <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                    <div className="flex items-start">
+                      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-neutral-50 text-neutral-500">
+                        <Icon className="h-4 w-4" aria-hidden="true" />
                         {badge && (
                           <span className="absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-white bg-brand-black px-0.5 text-[8px] font-black text-white">
                             {badge}
                           </span>
                         )}
                       </span>
-                      <span className="text-[10px] font-black uppercase leading-tight tracking-[0.08em] text-brand-gray-500">
+                    </div>
+                    <div className="mt-auto pt-3">
+                      <span className="block text-[10px] font-bold uppercase leading-tight tracking-wider text-neutral-400">
                         {label}
                       </span>
+                      <strong className="mt-1 block text-sm font-black leading-snug tracking-tight text-neutral-900 sm:text-base">
+                        {value}
+                      </strong>
                     </div>
-                    <strong className="mt-4 block text-lg font-black leading-tight tracking-tight text-brand-black sm:text-xl">
-                      {value}
-                    </strong>
                   </article>
                 ))}
               </div>
