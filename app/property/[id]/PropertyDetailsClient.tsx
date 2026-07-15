@@ -7,10 +7,10 @@ import { useTranslation } from '../../../lib/context/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { 
   Star, ShieldCheck, Heart, Share, Calendar, MapPin, Sparkles, AlertCircle,
-  BedDouble, Bath, Users, ArrowRight, ChevronLeft, ChevronRight,
+  BedDouble, Bath, Users, ArrowRight, ChevronLeft, ChevronRight, ChevronDown,
   Wifi, Waves, Coffee, Monitor, Wind, Key, Flame, Compass, MessageSquareCode,
   ZoomIn, ZoomOut, Maximize, Download, ExternalLink, Play, FileText, Info, ShieldAlert, Award, TrendingUp, BarChart2, FileCheck, RefreshCw,
-  Car, Building, Home, PhoneCall, Mail, UserRound, MessageCircle, Clock3
+  Car, Building, Home, PhoneCall, Mail, UserRound, MessageCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -1073,27 +1073,9 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             );
           })()}
 
-          {/* Core specs highlights */}
-          <div className="grid grid-cols-2 gap-x-4 gap-y-5 border-b border-brand-gray-200/80 pb-6 sm:grid-cols-4">
-            {/* Guests: Hide for SALE */}
-            {selectedMode !== 'SALE' && property.maxGuests !== undefined && property.maxGuests !== null && property.maxGuests > 0 && (
-              <div className="flex min-w-0 items-start gap-2.5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-gray-100 text-brand-gray-500">
-                  <Users className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
-                  <span>{t('details.guests')}</span>
-                </div>
-                <span className="text-xs text-brand-gray-500">
-                  {language === 'es' ? `Capacidad para ${formatCount(property.maxGuests, 'persona', 'personas', 'feminine')}` : `${property.maxGuests} guest${property.maxGuests !== 1 ? 's' : ''}`}
-                </span>
-                </div>
-              </div>
-            )}
-
-            {/* Essential real-estate specs: always visible, including zero values. */}
-            {[
+          {/* Core specs: one consistent grid so every value is easy to scan. */}
+          {(() => {
+            const specs = [
               {
                 key: 'bedrooms',
                 Icon: BedDouble,
@@ -1130,75 +1112,75 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   ? formatCount(Number(property.parkingSpaces) || 0, 'estacionamiento', 'estacionamientos', 'masculine')
                   : `${Number(property.parkingSpaces) || 0} parking space${Number(property.parkingSpaces) === 1 ? '' : 's'}`,
               },
-            ].map(({ key, Icon, badge, label, value }) => (
-              <div key={key} className="flex min-w-0 items-start gap-2.5">
-                <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-gray-100 text-brand-gray-500">
-                  <Icon className="h-4 w-4" />
-                  {badge && (
-                    <span className="absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-white bg-brand-black px-0.5 text-[8px] font-black text-white">
-                      {badge}
-                    </span>
-                  )}
-                </span>
-                <div className="min-w-0">
-                  <span className="block text-sm font-semibold leading-tight text-brand-black">{label}</span>
-                  <span className="mt-1 block text-xs leading-tight text-brand-gray-500">{value}</span>
-                </div>
-              </div>
-            ))}
+              ...(selectedMode === 'SALE' && Number(property.levelsCount) > 0 ? [{
+                key: 'levelsCount',
+                Icon: Building,
+                badge: null,
+                label: language === 'es' ? 'Niveles' : 'Levels',
+                value: language === 'es'
+                  ? formatCount(Number(property.levelsCount), 'nivel', 'niveles', 'masculine')
+                  : `${property.levelsCount} level${Number(property.levelsCount) === 1 ? '' : 's'}`,
+              }] : []),
+              ...(selectedMode === 'SALE' && Number(property.surfaceBuilt) > 0 ? [{
+                key: 'surfaceBuilt',
+                Icon: Building,
+                badge: null,
+                label: language === 'es' ? 'Construcción' : 'Built area',
+                value: `${property.surfaceBuilt} m²`,
+              }] : []),
+              ...(selectedMode === 'SALE' && Number(property.surfaceTotal) > 0 ? [{
+                key: 'surfaceTotal',
+                Icon: Home,
+                badge: null,
+                label: language === 'es' ? 'Terreno' : 'Lot size',
+                value: `${property.surfaceTotal} m²`,
+              }] : []),
+              ...(selectedMode !== 'SALE' && Number(property.maxGuests) > 0 ? [{
+                key: 'maxGuests',
+                Icon: Users,
+                badge: null,
+                label: t('details.guests'),
+                value: language === 'es'
+                  ? formatCount(Number(property.maxGuests), 'persona', 'personas', 'feminine')
+                  : `${property.maxGuests} guest${Number(property.maxGuests) === 1 ? '' : 's'}`,
+              }] : []),
+              ...(selectedMode === 'SWAP' && property.valueRating ? [{
+                key: 'valueRating',
+                Icon: RefreshCw,
+                badge: null,
+                label: language === 'es' ? 'Categoría' : 'Swap tier',
+                value: `${property.valueRating} Swap`,
+              }] : []),
+            ];
 
-            {/* levelsCount (Show for SALE if > 0) */}
-            {selectedMode === 'SALE' && property.levelsCount !== undefined && property.levelsCount !== null && property.levelsCount > 0 && (
-              <div className="flex flex-col gap-1 items-start min-w-[100px]">
-                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
-                  <Building className="w-4 h-4 text-brand-gray-500" />
-                  <span>{language === 'es' ? 'Niveles' : 'Levels'}</span>
-                </div>
-                <span className="text-xs text-brand-gray-500">
-                  {language === 'es' ? formatCount(property.levelsCount, 'nivel', 'niveles', 'masculine') : `${property.levelsCount} level${property.levelsCount !== 1 ? 's' : ''}`}
-                </span>
+            return (
+              <div className="grid grid-cols-2 gap-3 border-b border-brand-gray-200/80 pb-6 sm:grid-cols-3 lg:grid-cols-4">
+                {specs.map(({ key, Icon, badge, label, value }) => (
+                  <article
+                    key={key}
+                    className="flex min-h-[112px] min-w-0 flex-col justify-between rounded-2xl border border-brand-gray-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.035)]"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-gray-100 text-brand-gray-600">
+                        <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                        {badge && (
+                          <span className="absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-white bg-brand-black px-0.5 text-[8px] font-black text-white">
+                            {badge}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-[10px] font-black uppercase leading-tight tracking-[0.08em] text-brand-gray-500">
+                        {label}
+                      </span>
+                    </div>
+                    <strong className="mt-4 block text-lg font-black leading-tight tracking-tight text-brand-black sm:text-xl">
+                      {value}
+                    </strong>
+                  </article>
+                ))}
               </div>
-            )}
-
-            {/* Construction Area (Show for SALE if > 0) */}
-            {selectedMode === 'SALE' && property.surfaceBuilt !== undefined && property.surfaceBuilt !== null && property.surfaceBuilt > 0 && (
-              <div className="flex flex-col gap-1 items-start min-w-[100px]">
-                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
-                  <Building className="w-4 h-4 text-brand-gray-500" />
-                  <span>{language === 'es' ? 'Construcción' : 'Built Area'}</span>
-                </div>
-                <span className="text-xs text-brand-gray-500">
-                  {property.surfaceBuilt} m²
-                </span>
-              </div>
-            )}
-
-            {/* Land Area (Show for SALE if > 0) */}
-            {selectedMode === 'SALE' && property.surfaceTotal !== undefined && property.surfaceTotal !== null && property.surfaceTotal > 0 && (
-              <div className="flex flex-col gap-1 items-start min-w-[100px]">
-                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
-                  <Home className="w-4 h-4 text-brand-gray-500" />
-                  <span>{language === 'es' ? 'Terreno' : 'Lot Size'}</span>
-                </div>
-                <span className="text-xs text-brand-gray-500">
-                  {property.surfaceTotal} m²
-                </span>
-              </div>
-            )}
-
-            {/* Swap Specifics (Show for SWAP if present) */}
-            {selectedMode === 'SWAP' && property.valueRating && (
-              <div className="flex flex-col gap-1 items-start min-w-[100px]">
-                <div className="flex items-center gap-1.5 text-brand-black font-semibold text-sm">
-                  <RefreshCw className="w-4 h-4 text-brand-gray-500" />
-                  <span>{language === 'es' ? 'Categoría' : 'Swap Tier'}</span>
-                </div>
-                <span className="text-xs text-brand-gray-500 text-brand-accent font-bold">
-                  {property.valueRating} Swap
-                </span>
-              </div>
-            )}
-          </div>
+            );
+          })()}
 
           {/* 1. Descripción */}
           <div className="border-b border-brand-gray-200/80 pb-6">
@@ -1277,89 +1259,88 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             </div>
           )}
 
-          {/* 6. Ficha Técnica */}
+          {/* Technical details, services and security in one progressive disclosure. */}
           {(() => {
-            const visibleSpecs = SPEC_FIELDS.map(cfg => {
-              const value = property[cfg.key];
-              if (!hasMeaningfulSpecValue(value)) return null;
-              const label = language === 'es' ? cfg.labelEs : cfg.labelEn;
-              const displayVal = cfg.format ? cfg.format(value, language === 'es' ? 'es' : 'en') : String(value);
-              return { key: cfg.key, label, value: displayVal };
+            const buildRows = (fields: SpecFieldConfig[]) => fields.map(cfg => {
+              const rawValue = property[cfg.key];
+              if (!hasMeaningfulSpecValue(rawValue)) return null;
+              return {
+                key: cfg.key,
+                label: language === 'es' ? cfg.labelEs : cfg.labelEn,
+                value: cfg.format ? cfg.format(rawValue, language === 'es' ? 'es' : 'en') : String(rawValue),
+              };
             }).filter(Boolean) as { key: string; label: string; value: string }[];
 
-            if (visibleSpecs.length === 0) return null;
+            const groups = [
+              {
+                key: 'construction',
+                Icon: Building,
+                title: language === 'es' ? 'Construcción y superficies' : 'Construction and surfaces',
+                rows: buildRows(SPEC_FIELDS),
+              },
+              {
+                key: 'services',
+                Icon: Wifi,
+                title: language === 'es' ? 'Servicios y suministros' : 'Services and utilities',
+                rows: buildRows(SERVICES_FIELDS),
+              },
+              {
+                key: 'security',
+                Icon: ShieldCheck,
+                title: language === 'es' ? 'Seguridad y vigilancia' : 'Security and safety',
+                rows: buildRows(SECURITY_FIELDS),
+              },
+            ].filter(group => group.rows.length > 0);
+
+            if (groups.length === 0) return null;
+
+            const detailCount = groups.reduce((total, group) => total + group.rows.length, 0);
 
             return (
               <div className="border-b border-brand-gray-200/80 pb-6">
-                <h3 className="text-base font-bold text-brand-black mb-3">
-                  {language === 'es' ? 'Ficha Técnica de Construcción' : 'Construction Specifications'}
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5 text-sm text-brand-gray-500 font-semibold">
-                  {visibleSpecs.map(spec => (
-                    <div key={spec.key} className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                      <span className="text-brand-gray-400">{spec.label}</span>
-                      <span className="text-brand-black">{spec.value}</span>
+                <details className="group overflow-hidden rounded-3xl border border-brand-gray-200/80 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+                  <summary className="flex min-h-[76px] cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:content-none sm:px-6 [&::-webkit-details-marker]:hidden">
+                    <span className="flex min-w-0 items-center gap-3.5">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-gray-100 text-brand-black">
+                        <Building className="h-[18px] w-[18px]" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-black text-brand-black sm:text-base">
+                          {language === 'es' ? 'Detalles técnicos y servicios' : 'Technical details and services'}
+                        </span>
+                        <span className="mt-0.5 block text-[11px] font-semibold text-brand-gray-500">
+                          {language === 'es'
+                            ? `${detailCount} datos de construcción, suministros y seguridad`
+                            : `${detailCount} construction, utility and security details`}
+                        </span>
+                      </span>
+                    </span>
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-gray-200 bg-brand-gray-50 text-brand-gray-600 transition-transform duration-200 group-open:rotate-180">
+                      <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                  </summary>
+
+                  <div className="border-t border-brand-gray-200/80 bg-brand-gray-50/45 px-5 py-5 sm:px-6 sm:py-6">
+                    <div className="space-y-7">
+                      {groups.map(({ key, Icon, title, rows }) => (
+                        <section key={key} aria-labelledby={`property-${key}-heading`}>
+                          <h4 id={`property-${key}-heading`} className="mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.11em] text-brand-gray-600">
+                            <Icon className="h-4 w-4 text-brand-black" aria-hidden="true" />
+                            {title}
+                          </h4>
+                          <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-x-4">
+                            {rows.map(row => (
+                              <div key={row.key} className="flex min-h-11 items-center justify-between gap-4 rounded-xl border border-brand-gray-200/70 bg-white px-3.5 py-2.5">
+                                <dt className="text-xs font-semibold leading-tight text-brand-gray-500">{row.label}</dt>
+                                <dd className="text-right text-xs font-black leading-tight text-brand-black">{row.value}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </section>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Servicios y Suministros */}
-          {(() => {
-            const visibleServices = SERVICES_FIELDS.map(cfg => {
-              const value = property[cfg.key];
-              if (!hasMeaningfulSpecValue(value)) return null;
-              const label = language === 'es' ? cfg.labelEs : cfg.labelEn;
-              const displayVal = cfg.format ? cfg.format(value, language === 'es' ? 'es' : 'en') : String(value);
-              return { key: cfg.key, label, value: displayVal };
-            }).filter(Boolean) as { key: string; label: string; value: string }[];
-
-            if (visibleServices.length === 0) return null;
-
-            return (
-              <div className="border-b border-brand-gray-200/80 pb-6">
-                <h3 className="text-base font-bold text-brand-black mb-3">
-                  {language === 'es' ? 'Servicios y Suministros' : 'Services & Utilities'}
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5 text-sm text-brand-gray-500 font-semibold">
-                  {visibleServices.map(srv => (
-                    <div key={srv.key} className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                      <span className="text-brand-gray-400">{srv.label}</span>
-                      <span className="text-brand-black">{srv.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Seguridad y Vigilancia */}
-          {(() => {
-            const visibleSecurity = SECURITY_FIELDS.map(cfg => {
-              const value = property[cfg.key];
-              if (!hasMeaningfulSpecValue(value)) return null;
-              const label = language === 'es' ? cfg.labelEs : cfg.labelEn;
-              const displayVal = cfg.format ? cfg.format(value, language === 'es' ? 'es' : 'en') : String(value);
-              return { key: cfg.key, label, value: displayVal };
-            }).filter(Boolean) as { key: string; label: string; value: string }[];
-
-            if (visibleSecurity.length === 0) return null;
-
-            return (
-              <div className="border-b border-brand-gray-200/80 pb-6">
-                <h3 className="text-base font-bold text-brand-black mb-3">
-                  {language === 'es' ? 'Seguridad y Vigilancia' : 'Security & Safety'}
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5 text-sm text-brand-gray-500 font-semibold">
-                  {visibleSecurity.map(sec => (
-                    <div key={sec.key} className="flex justify-between border-b border-brand-gray-100 pb-1.5">
-                      <span className="text-brand-gray-400">{sec.label}</span>
-                      <span className="text-brand-black">{sec.value}</span>
-                    </div>
-                  ))}
-                </div>
+                  </div>
+                </details>
               </div>
             );
           })()}
@@ -1636,7 +1617,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               name: property.hostName || 'Agente Responsable',
               company: 'AuraSwap Elite Estates',
               position: 'Asesor Inmobiliario Senior',
-              responseTime: 'Menos de 15 minutos',
               phone: '+52 667 392 4829',
               whatsapp: '526673924829',
               email: 'contacto@auraswap.com'
@@ -1709,23 +1689,20 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                           {label}
                         </span>
                         <h4 className="mt-2 truncate text-2xl font-black leading-none text-brand-black">{broker.name}</h4>
-                        <p className="mt-2 text-xs font-bold leading-relaxed text-brand-gray-650">
-                          {broker.position}
-                          <span className="mx-1.5 text-brand-gray-300">·</span>
-                          <span className="text-brand-gray-500">{broker.company}</span>
-                        </p>
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-gray-200 bg-white/90 px-2.5 py-1.5 text-[9px] font-extrabold text-brand-gray-600 shadow-xs">
-                            <Clock3 className="h-3 w-3 text-brand-accent" />
-                            {language === 'es' ? 'Responde en' : 'Replies in'} {broker.responseTime.toLowerCase()}
-                          </span>
-                          {property.hostVerified && (
-                            <span className="inline-flex items-center gap-1.5 text-[9px] font-extrabold text-brand-gray-500">
-                              <ShieldCheck className="h-3 w-3 text-emerald-600" />
-                              {language === 'es' ? 'Perfil verificado' : 'Verified profile'}
-                            </span>
-                          )}
+                        <div className="mt-3 space-y-1">
+                          <p className="text-sm font-extrabold leading-tight text-brand-black">
+                            {broker.position}
+                          </p>
+                          <p className="text-xs font-semibold leading-tight text-brand-gray-500">
+                            {broker.company}
+                          </p>
                         </div>
+                        {property.hostVerified && (
+                          <span className="mt-3 inline-flex items-center gap-1.5 text-[9px] font-extrabold text-brand-gray-500">
+                            <ShieldCheck className="h-3 w-3 text-emerald-600" />
+                            {language === 'es' ? 'Perfil verificado' : 'Verified profile'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
