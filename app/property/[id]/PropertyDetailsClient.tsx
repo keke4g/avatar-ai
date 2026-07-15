@@ -864,11 +864,36 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
     }
   };
 
+  const handleBack = () => {
+    if (typeof window === 'undefined') return;
+
+    const cameFromAuraSwap = document.referrer
+      ? new URL(document.referrer).origin === window.location.origin
+      : false;
+
+    if (cameFromAuraSwap) {
+      router.back();
+      return;
+    }
+
+    router.push('/explore');
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-6 sm:px-12 md:px-24">
       
       {/* 1. Sub-Header: Title & Sharing Controls */}
       <div className="flex flex-col gap-2 mb-6">
+        <button
+          type="button"
+          onClick={handleBack}
+          aria-label={language === 'es' ? 'Volver a la página anterior' : 'Return to the previous page'}
+          className="group mb-1 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-full border border-brand-gray-200 bg-white px-3.5 text-xs font-extrabold text-brand-gray-600 shadow-xs transition-all hover:border-brand-gray-300 hover:bg-brand-gray-50 hover:text-brand-black active:scale-[0.97]"
+        >
+          <ChevronLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+          <span>{language === 'es' ? 'Atrás' : 'Back'}</span>
+        </button>
+
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-brand-black">
             {t(`properties.${property.id}.title`).startsWith('properties.') ? property.title : t(`properties.${property.id}.title`)}
