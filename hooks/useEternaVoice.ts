@@ -233,6 +233,7 @@ export function useEternaVoice({
   const isStoppingForSpeechRef = useRef<boolean>(false);
   const recognitionActiveRef = useRef<boolean>(false);
   const pendingSpeechStartRef = useRef<(() => void) | null>(null);
+  const pendingAudioUnlockRef = useRef<(() => void) | null>(null);
   // La configuración global es asíncrona. ElevenLabs es también el valor
   // inicial seguro para evitar que un móvil reproduzca Deepgram antes de
   // terminar la hidratación desde Supabase.
@@ -384,6 +385,7 @@ export function useEternaVoice({
     // Cancel any ongoing speech synthesis first
     window.speechSynthesis?.cancel();
     pendingSpeechStartRef.current = null;
+    pendingAudioUnlockRef.current = null;
     speechRequestRef.current?.abort();
     speechRequestRef.current = null;
     if (audioRef.current) {
@@ -467,6 +469,7 @@ export function useEternaVoice({
         return;
       }
       isFinished = true;
+      pendingAudioUnlockRef.current = null;
 
       speechRequestRef.current?.abort();
       speechRequestRef.current = null;
@@ -631,6 +634,7 @@ export function useEternaVoice({
         const fallbackToBrowser = () => {
           if (fallbackStarted || !speechSessionActiveRef.current) return;
           fallbackStarted = true;
+          pendingAudioUnlockRef.current = null;
           audio.pause();
           audioRef.current = null;
           if (audioObjectUrlRef.current) {
@@ -657,8 +661,35 @@ export function useEternaVoice({
           if (playbackGuard !== null) window.clearTimeout(playbackGuard);
           fallbackToBrowser();
         };
+        const requestPlayback = () => {
+          if (!speechSessionActiveRef.current || controller.signal.aborted) return;
+
+          void audio.play().catch((error: unknown) => {
+            const isAutoplayBlocked = error instanceof DOMException && error.name === 'NotAllowedError';
+            if (isAutoplayBlocked) {
+              pendingAudioUnlockRef.current = requestPlayback;
+              setSimulatedStatusRef.current?.('idle');
+              addVoiceDebugLog(`[VOICE WAITING FOR MOBILE GESTURE] ${engine}`);
+              return;
+            }
+
+            fallbackToBrowser();
+          });
+        };
         console.log(`[VOICE STATE] ${engine} speech start`);
-        await audio.play();
+        try {
+          await audio.play();
+        } catch (error) {
+          const isAutoplayBlocked = error instanceof DOMException && error.name === 'NotAllowedError';
+          if (isAutoplayBlocked) {
+            if (playbackGuard !== null) window.clearTimeout(playbackGuard);
+            pendingAudioUnlockRef.current = requestPlayback;
+            setSimulatedStatusRef.current?.('idle');
+            addVoiceDebugLog(`[VOICE WAITING FOR MOBILE GESTURE] ${engine}`);
+            return;
+          }
+          throw error;
+        }
       } catch (error) {
         if (controller.signal.aborted || !speechSessionActiveRef.current) return;
         if (playbackGuard !== null) window.clearTimeout(playbackGuard);
@@ -707,6 +738,7 @@ export function useEternaVoice({
     setSimulatedStatusRef.current?.('listening');
     isStoppingForSpeechRef.current = false; // Reset flag
     pendingSpeechStartRef.current = null; // Clear any pending speech
+    pendingAudioUnlockRef.current = null;
     speechRequestRef.current?.abort();
     speechRequestRef.current = null;
     if (audioRef.current) {
@@ -753,6 +785,7 @@ export function useEternaVoice({
     lastSpokenTimestampRef.current = 0; // Prevent recent speech window blocking
     isStoppingForSpeechRef.current = false; // Reset flag
     pendingSpeechStartRef.current = null;
+    pendingAudioUnlockRef.current = null;
     speechRequestRef.current?.abort();
     speechRequestRef.current = null;
     if (audioRef.current) {
@@ -784,6 +817,7 @@ export function useEternaVoice({
     isListeningRef.current = false;
     isStoppingForSpeechRef.current = false; // Reset flag
     pendingSpeechStartRef.current = null;
+    pendingAudioUnlockRef.current = null;
     speechRequestRef.current?.abort();
     speechRequestRef.current = null;
     if (audioRef.current) {
@@ -1059,6 +1093,31 @@ export function useEternaVoice({
     };
   }, [language]);
 
+  // Mobile browsers require a real user gesture before playing remote audio.
+  // Keep the generated clip warm and release it on the first touch instead of
+  // silently changing the voice engine.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const unlockPendingAudio = () => {
+      const pendingPlayback = pendingAudioUnlockRef.current;
+      if (!pendingPlayback) return;
+
+      pendingAudioUnlockRef.current = null;
+      pendingPlayback();
+    };
+
+    document.addEventListener('pointerdown', unlockPendingAudio, true);
+    document.addEventListener('touchstart', unlockPendingAudio, true);
+    document.addEventListener('keydown', unlockPendingAudio, true);
+
+    return () => {
+      document.removeEventListener('pointerdown', unlockPendingAudio, true);
+      document.removeEventListener('touchstart', unlockPendingAudio, true);
+      document.removeEventListener('keydown', unlockPendingAudio, true);
+    };
+  }, []);
+
   // Cleanup timers and voice on unmount
   useEffect(() => {
     return () => {
@@ -1072,6 +1131,7 @@ export function useEternaVoice({
         window.speechSynthesis.cancel();
       }
       speechRequestRef.current?.abort();
+      pendingAudioUnlockRef.current = null;
       audioRef.current?.pause();
       if (audioObjectUrlRef.current) URL.revokeObjectURL(audioObjectUrlRef.current);
       pcmSourcesRef.current.forEach(source => {

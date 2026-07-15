@@ -735,7 +735,6 @@ Do not invent any other routes. If the user asks you to go to a section, politel
       }
       setIsOpen(true);
       setChatHistory(prev => [...prev, { role: 'assistant', content: summary }]);
-      setSimulatedStatus('talking');
       speak(summary, () => {
         setSimulatedStatus('idle');
       });
@@ -818,7 +817,6 @@ Do not invent any other routes. If the user asks you to go to a section, politel
           return;
         }
 
-        setSimulatedStatus('talking');
         setChatHistory(prev => prev.length > 0 ? prev : [{ role: 'assistant', content: greeting }]);
 
         speak(greeting, () => {
@@ -2348,7 +2346,7 @@ Explore actualizado: Redirecting to /explore`);
 
     // Check if introduction was already presented in this session
     if (typeof window !== 'undefined') {
-      const introDone = sessionStorage.getItem('eterna_intro_done');
+      const introDone = sessionStorage.getItem('eterna_home_intro_v2');
       if (introDone) return;
     }
 
@@ -2360,10 +2358,6 @@ Explore actualizado: Redirecting to /explore`);
     const timer = setTimeout(() => {
       // Re-verify in case user interacted during the delay
       if (chatHistoryRef.current.length > 0) return;
-
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('eterna_intro_done', 'true');
-      }
 
       const part1 = language === 'es'
         ? "¡Hola! Soy Eterna y estoy aquí para ayudarte a encontrar la propiedad que buscas."
@@ -2380,8 +2374,6 @@ Explore actualizado: Redirecting to /explore`);
         return [...prev, { role: 'assistant', content: welcomeMsg }];
       });
 
-      setSimulatedStatus('talking');
-
       // Speak Part 1 first
       speak(part1, () => {
         // Highlight action cards exactly when Part 2 starts
@@ -2392,6 +2384,7 @@ Explore actualizado: Redirecting to /explore`);
         // Speak Part 2
         speak(part2, () => {
           if (typeof window !== 'undefined') {
+            sessionStorage.setItem('eterna_home_intro_v2', 'true');
             window.dispatchEvent(new CustomEvent('eterna-highlight-actions', { detail: false }));
           }
           setSimulatedStatus('idle');
@@ -2405,7 +2398,7 @@ Explore actualizado: Redirecting to /explore`);
         }, 8000);
       });
 
-    }, 3500); // 3.5 seconds delay after load
+    }, 1800);
 
     return () => {
       clearTimeout(timer);

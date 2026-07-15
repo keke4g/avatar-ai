@@ -6,7 +6,7 @@ import { useSwap } from '../../../lib/context/SwapContext';
 import { useTranslation } from '../../../lib/context/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { 
-  Star, ShieldCheck, Heart, Share, Calendar, MapPin, Sparkles, AlertCircle,
+  ShieldCheck, Heart, Share, Calendar, MapPin, Sparkles, AlertCircle,
   BedDouble, Bath, Users, ArrowRight, ChevronLeft, ChevronRight, ChevronDown,
   Wifi, Waves, Coffee, Monitor, Wind, Key, Flame, Compass, MessageSquareCode,
   ZoomIn, ZoomOut, Maximize, Download, ExternalLink, Play, FileText, Info, ShieldAlert, Award, TrendingUp, BarChart2, FileCheck, RefreshCw,
@@ -15,7 +15,6 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { LeadType, Property, PropertyOffering, PropertyOfferingMode } from '../../../lib/types';
-import { MOCK_USERS } from '../../../lib/mockData';
 import { getActiveOfferings, getOfferingsByMode } from '../../../lib/propertyOfferings';
 import { useLiveContext } from '../../../lib/context/LiveContext';
 import { PropertyEligibilityEngine } from '../../../lib/services/PropertyEligibilityEngine';
@@ -160,7 +159,7 @@ const SECURITY_FIELDS: SpecFieldConfig[] = [
 
 export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps) {
   const router = useRouter();
-  const { properties, myProperties, requestSwap, favorites, toggleFavorite, currentUser, swaps, reviews, users, createLead, loading } = useSwap();
+  const { properties, myProperties, requestSwap, favorites, toggleFavorite, currentUser, swaps, createLead, loading } = useSwap();
   const { t, language } = useTranslation();
   const { setActiveProperty, clearActiveProperty } = useLiveContext();
   const hasMounted = useSyncExternalStore(
@@ -380,9 +379,12 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
     try {
       if (!detailsMapRef.current) {
+        const usesCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
         const map = L.map('property-details-map', {
           zoomControl: true,
           scrollWheelZoom: false,
+          dragging: !usesCoarsePointer,
+          touchZoom: true,
           attributionControl: false
         }).setView([property.latitude, property.longitude], 14);
 
@@ -459,11 +461,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
     return getOfferingsByMode(property, 'SALE', { activeOnly: true })[0] || null;
   }, [property]);
 
-  const hostReviews = useMemo(() => {
-    if (!reviews || !property) return [];
-    return reviews.filter(r => r.reviewedUserId === property.hostId);
-  }, [reviews, property?.hostId]);
-
   const hostCompletedSwapsCount = useMemo(() => {
     if (!swaps || !property) return 0;
     return swaps.filter(s => 
@@ -471,45 +468,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
       (s.senderId === property.hostId || s.receiverId === property.hostId)
     ).length;
   }, [swaps, property?.hostId]);
-
-  const dynamicRating = useMemo(() => {
-    if (!property) return 5;
-    if (hostReviews.length === 0) return property.hostRating;
-    return (hostReviews.reduce((sum, r) => sum + r.rating, 0) / hostReviews.length);
-  }, [hostReviews, property]);
-
-  const dynamicReviewsCount = useMemo(() => {
-    if (!property) return 0;
-    return hostReviews.length > 0 ? hostReviews.length : property.hostReviewsCount;
-  }, [hostReviews, property]);
-
-  const combinedReviews = useMemo(() => {
-    if (!property) return [];
-    const mock = (property.reviews || []).map(r => ({
-      id: r.id,
-      authorName: r.authorName,
-      authorAvatar: r.authorAvatar,
-      rating: r.rating,
-      date: r.date,
-      comment: r.comment,
-      isVerified: false
-    }));
-
-    const verified = hostReviews.map(r => {
-      const reviewer = users.find(u => u.id === r.reviewerId) || MOCK_USERS.find(u => u.id === r.reviewerId);
-      return {
-        id: r.id,
-        authorName: reviewer?.name || (language === 'es' ? 'Otro anfitrión' : 'Other host'),
-        authorAvatar: reviewer?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-        rating: r.rating,
-        date: new Date(r.createdAt).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }),
-        comment: r.comment,
-        isVerified: true
-      };
-    });
-
-    return [...verified, ...mock];
-  }, [hostReviews, property, users, language]);
 
   // Dynamic image error tracker for multi-photo grids
   const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
@@ -911,15 +869,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
       
       {/* 1. Sub-Header: Title & Sharing Controls */}
       <div className="flex flex-col gap-2 mb-6">
-        <div className="flex items-center gap-2">
-          <span className="bg-brand-accent/10 text-brand-accent text-[10px] font-extrabold tracking-widest uppercase px-2.5 py-1 rounded-md">
-            {t('details.swapTier', { tier: t(`valueRatings.${property.valueRating}`).startsWith('valueRatings.') ? property.valueRating : t(`valueRatings.${property.valueRating}`) })}
-          </span>
-          <span className="bg-brand-black text-white text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-md">
-            {t('details.matchScore', { score: property.auraScore })}
-          </span>
-        </div>
-
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-brand-black">
             {t(`properties.${property.id}.title`).startsWith('properties.') ? property.title : t(`properties.${property.id}.title`)}
@@ -944,14 +893,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 text-xs sm:text-sm text-brand-gray-500 font-medium mt-1">
-          <div className="flex items-center gap-1.5">
-            <Star className="w-3.5 h-3.5 fill-brand-black text-brand-black" />
-            <span className="text-brand-black font-semibold">{dynamicRating.toFixed(1)}</span>
-            <span className="text-brand-gray-300">•</span>
-            <span className="underline">{dynamicReviewsCount} {t('details.reviews')}</span>
-          </div>
-          <span className="hidden sm:inline text-brand-gray-300">•</span>
+        <div className="flex items-center text-xs sm:text-sm text-brand-gray-500 font-medium mt-1">
           <div className="flex items-center gap-1.5">
             <MapPin className="w-3.5 h-3.5 text-brand-gray-400" />
             <span>{formatPropertyLocation(property.location, property.country)}</span>
@@ -1376,7 +1318,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 </h3>
 
                 {/* Tab Header */}
-                <div className="flex border-b border-brand-gray-100 bg-brand-gray-100 p-1 rounded-2xl overflow-x-auto gap-1">
+                <div className="grid grid-cols-2 gap-1 rounded-2xl border border-brand-gray-100 bg-brand-gray-100 p-1 sm:flex sm:overflow-x-auto">
                   {videos.length > 0 && (
                     <button
                       type="button"
@@ -1384,7 +1326,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                         setActiveMediaTab('video');
                         setActiveVideoIndex(0);
                       }}
-                      className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap px-4 ${currentTab === 'video' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                      className={`min-h-11 rounded-xl px-2 py-2 text-center text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap sm:flex-1 sm:px-4 sm:text-xs ${currentTab === 'video' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
                     >
                       📹 {language === 'es' ? 'Videos' : 'Videos'} ({videos.length})
                     </button>
@@ -1393,7 +1335,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     <button
                       type="button"
                       onClick={() => setActiveMediaTab('virtual')}
-                      className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap px-4 ${currentTab === 'virtual' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                      className={`min-h-11 rounded-xl px-2 py-2 text-center text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap sm:flex-1 sm:px-4 sm:text-xs ${currentTab === 'virtual' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
                     >
                       🕶️ {language === 'es' ? 'Tour 3D / VR' : '3D / VR Tour'} ({virtualTours.length})
                     </button>
@@ -1402,7 +1344,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     <button
                       type="button"
                       onClick={() => setActiveMediaTab('floorplan')}
-                      className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap px-4 ${currentTab === 'floorplan' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                      className={`min-h-11 rounded-xl px-2 py-2 text-center text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap sm:flex-1 sm:px-4 sm:text-xs ${currentTab === 'floorplan' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
                     >
                       📐 {language === 'es' ? 'Planos' : 'Floor Plans'} ({floorplans.length})
                     </button>
@@ -1411,7 +1353,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     <button
                       type="button"
                       onClick={() => setActiveMediaTab('document')}
-                      className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap px-4 ${currentTab === 'document' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                      className={`min-h-11 rounded-xl px-2 py-2 text-center text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap sm:flex-1 sm:px-4 sm:text-xs ${currentTab === 'document' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
                     >
                       📄 {language === 'es' ? 'Documentación' : 'Documents'} ({documents.length})
                     </button>
@@ -1419,13 +1361,13 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 </div>
 
                 {/* Tab Content */}
-                <div className="relative rounded-3xl overflow-hidden bg-brand-gray-100 aspect-video flex flex-col items-center justify-center border border-brand-gray-200/50 shadow-inner w-full">
+                <div className="relative w-full overflow-hidden rounded-3xl border border-brand-gray-200/50 bg-brand-gray-100 shadow-inner">
                   {currentTab === 'video' && videos.length > 0 && (() => {
                     const activeVideo = videos[activeVideoIndex] || videos[0];
                     return (
-                      <div className="w-full h-full flex flex-col relative bg-brand-black">
+                      <div className="relative flex w-full flex-col bg-brand-black">
                         {/* Video Player Box */}
-                        <div className="flex-1 w-full h-full relative min-h-0">
+                        <div className="relative aspect-video w-full min-h-[190px] sm:min-h-0">
                           {activeVideo.mediaType === 'VIDEO' ? (
                             <video 
                               src={activeVideo.url} 
@@ -1483,7 +1425,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     const activeTour = virtualTours[0];
                     const embedUrl = getEmbeddableMediaUrl(activeTour.url);
                     return (
-                      <div className="w-full h-full relative">
+                      <div className="relative aspect-video w-full min-h-[210px] sm:min-h-0">
                         {embedUrl ? (
                           <iframe
                             src={embedUrl}
@@ -1506,7 +1448,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   {currentTab === 'floorplan' && floorplans.length > 0 && (() => {
                     const activePlan = floorplans[0];
                     return (
-                      <div className="w-full h-full relative group bg-white flex items-center justify-center p-4">
+                      <div className="group relative flex aspect-[4/3] w-full items-center justify-center bg-white p-4 sm:aspect-video">
                         <img 
                           src={activePlan.url} 
                           className="max-w-full max-h-full object-contain rounded-2xl" 
@@ -1528,7 +1470,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   })()}
 
                   {currentTab === 'document' && documents.length > 0 && (
-                    <div className="w-full h-full overflow-y-auto p-6 bg-white grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid w-full grid-cols-1 gap-3 bg-white p-4 sm:p-6 md:grid-cols-2 md:gap-4">
                       {documents.map((doc, idx) => (
                         <div 
                           key={doc.id || idx}
@@ -1575,10 +1517,14 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 </p>
               )}
               
-              <div 
-                id="property-details-map" 
-                className="w-full h-64 rounded-3xl border border-brand-gray-200/60 overflow-hidden shadow-sm relative z-0 bg-[#e4e4e7]"
-              />
+              <div className="relative h-64 w-full overflow-hidden rounded-3xl border border-brand-gray-200/60 bg-[#e4e4e7] shadow-sm">
+                <div id="property-details-map" className="absolute inset-0 z-0" />
+                <div className="pointer-events-none absolute inset-x-0 top-3 z-[500] flex justify-center sm:hidden">
+                  <span className="rounded-full border border-white/70 bg-brand-black/80 px-3 py-1.5 text-[10px] font-bold text-white shadow-md backdrop-blur-sm">
+                    {language === 'es' ? 'Usa dos dedos para mover el mapa' : 'Use two fingers to move the map'}
+                  </span>
+                </div>
+              </div>
 
               <div className="flex flex-wrap gap-2 mt-1">
                 <a 
@@ -1655,21 +1601,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
                 <div className="relative grid gap-7 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-center">
                   <div className="contents">
-                    <div className="flex items-center justify-between gap-4 border-b border-brand-gray-200/70 pb-4 lg:col-span-2">
-                      <div>
-                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-brand-accent">
-                          {language === 'es' ? 'Contacto de esta propiedad' : 'Property contact'}
-                        </span>
-                        <h3 className="mt-1 text-base font-extrabold text-brand-black">
-                          {language === 'es' ? 'Habla directamente con el responsable' : 'Speak directly with the representative'}
-                        </h3>
-                      </div>
-                      <span className="hidden sm:inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-emerald-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-emerald-700">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        {language === 'es' ? 'Disponible' : 'Available'}
-                      </span>
-                    </div>
-
                     <div className="flex items-center gap-4 sm:gap-5">
                       <div className="relative shrink-0">
                         <div className="rounded-full bg-white p-1 shadow-[0_8px_24px_rgba(15,23,42,0.10)] ring-1 ring-brand-gray-200">
@@ -1912,56 +1843,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           {/* 10. Análisis Inmobiliario con IA (Eterna) */}
           <EternaMarketAnalysis property={property} language={language} />
 
-          {/* Guest Reviews Section */}
-          <div>
-            <h3 className="text-base font-bold text-brand-black mb-4">
-              {t('details.guestReviews', { count: dynamicReviewsCount })}
-            </h3>
-            {combinedReviews && combinedReviews.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {combinedReviews.map((rev) => (
-                  <div key={rev.id} className="p-5 bg-white border border-brand-gray-200/60 rounded-2xl shadow-premium hover:shadow-floating transition-all duration-300 flex flex-col justify-between gap-3 relative overflow-hidden">
-                    <div>
-                      <div className="flex items-center gap-3 mb-3">
-                        <img
-                          src={rev.authorAvatar}
-                          alt={rev.authorName}
-                          className="w-10 h-10 rounded-full object-cover border border-white shadow-sm ring-2 ring-brand-gray-100"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                        <div>
-                          <h4 className="text-xs font-bold text-brand-black flex items-center gap-1.5">
-                            {rev.authorName}
-                          </h4>
-                          <p className="text-[10px] text-brand-gray-400 font-semibold">{rev.date}</p>
-                        </div>
-                        <div className="ml-auto flex items-center gap-0.5 text-amber-500">
-                          {Array.from({ length: rev.rating }).map((_, i) => (
-                            <Star key={i} className="w-3.5 h-3.5 fill-current" />
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-xs text-brand-gray-600 leading-relaxed font-semibold italic">
-                        &ldquo;{rev.isVerified ? rev.comment : (t(`properties.${property.id}.reviews.${rev.id}`).startsWith('properties.') ? rev.comment : t(`properties.${property.id}.reviews.${rev.id}`))}&rdquo;
-                      </p>
-                    </div>
-
-                    {rev.isVerified && (
-                      <div className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/40 w-fit self-end mt-2">
-                        <ShieldCheck className="w-3 h-3" />
-                        <span>{language === 'es' ? 'Verificado' : 'Verified'}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-6 text-center bg-brand-gray-50/50 border border-brand-gray-100 rounded-2xl text-xs text-brand-gray-400 font-semibold">
-                {t('details.noReviews')}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Right Column: Sticky Hybrid Booking / Swap / Purchase widget */}
@@ -2240,15 +2121,10 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             {/* EXPERIENCE 2: SHORT_RENT (Airbnb/Wander premium style) */}
             {selectedMode === 'SHORT_RENT' && activeRentOffering && (
               <div className="flex flex-col gap-4 animate-in fade-in duration-200">
-                <div className="flex items-baseline justify-between border-b border-brand-gray-100 pb-4 mb-1">
+                <div className="flex items-baseline border-b border-brand-gray-100 pb-4 mb-1">
                   <div>
                     <span className="text-2xl font-black text-brand-black">${activeRentOffering.priceAmount || 150}</span>
                     <span className="text-xs text-brand-gray-500 font-semibold"> / {language === 'es' ? 'noche' : 'night'}</span>
-                  </div>
-                  <div className="text-right flex items-center gap-1">
-                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                    <span className="text-xs font-bold text-brand-black">{dynamicRating.toFixed(2)}</span>
-                    <span className="text-[10px] text-brand-gray-400 font-semibold">({dynamicReviewsCount})</span>
                   </div>
                 </div>
 
@@ -2573,12 +2449,15 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 </div>
 
                 {/* 1. Simulador Hipotecario Financiero */}
-                <div className="bg-brand-gray-50 border border-brand-gray-200/60 rounded-3xl p-4 flex flex-col gap-3.5 shadow-xs">
-                  <div className="flex items-center justify-between text-brand-black font-extrabold text-[9px] uppercase tracking-wider text-brand-accent">
-                    <BarChart2 className="w-3.5 h-3.5 text-brand-accent shrink-0" />
-                    <span>{language === 'es' ? 'Simulador Hipotecario (Informativo)' : 'Mortgage Simulator'}</span>
-                  </div>
-                  <div className="border-t border-brand-gray-200/60" />
+                <details className="group rounded-3xl border border-brand-gray-200/60 bg-brand-gray-50 shadow-xs">
+                  <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-3xl px-4 py-3.5 text-brand-black transition-colors hover:bg-brand-gray-100/70 [&::-webkit-details-marker]:hidden">
+                    <span className="flex items-center gap-2.5 text-[10px] font-extrabold uppercase tracking-wider text-brand-accent">
+                      <BarChart2 className="h-4 w-4 shrink-0" />
+                      {language === 'es' ? 'Simulador Hipotecario (Informativo)' : 'Mortgage Simulator'}
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-brand-gray-500 transition-transform duration-200 group-open:rotate-180" />
+                  </summary>
+                  <div className="flex flex-col gap-3.5 border-t border-brand-gray-200/60 px-4 pb-4 pt-4">
 
                   {/* Down payment percentage selector */}
                   <div className="flex flex-col gap-1.5">
@@ -2646,15 +2525,19 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                       </div>
                     );
                   })()}
-                </div>
+                  </div>
+                </details>
 
                 {/* 2. Desglose de Gastos de Adquisición */}
-                <div className="bg-brand-gray-50 border border-brand-gray-200/60 rounded-3xl p-4 flex flex-col gap-3 shadow-xs">
-                  <div className="flex items-center justify-between text-brand-black font-extrabold text-[9px] uppercase tracking-wider text-brand-accent">
-                    <span>💵</span>
-                    <span>{language === 'es' ? 'Costos de Adquisición (Escrituración)' : 'Acquisition & Notary Costs'}</span>
-                  </div>
-                  <div className="border-t border-brand-gray-200/60" />
+                <details className="group rounded-3xl border border-brand-gray-200/60 bg-brand-gray-50 shadow-xs">
+                  <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-3xl px-4 py-3.5 text-brand-black transition-colors hover:bg-brand-gray-100/70 [&::-webkit-details-marker]:hidden">
+                    <span className="flex items-center gap-2.5 text-[10px] font-extrabold uppercase tracking-wider text-brand-accent">
+                      <span aria-hidden="true">💵</span>
+                      {language === 'es' ? 'Costos de Adquisición (Escrituración)' : 'Acquisition & Notary Costs'}
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-brand-gray-500 transition-transform duration-200 group-open:rotate-180" />
+                  </summary>
+                  <div className="border-t border-brand-gray-200/60 px-4 pb-4 pt-4">
 
                   {(() => {
                     const price = activeSaleOffering.priceAmount || 450000;
@@ -2699,7 +2582,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                       </div>
                     );
                   })()}
-                </div>
+                  </div>
+                </details>
 
                 {isSelfProperty ? (
                   <div className="mt-3 p-4 bg-brand-accent/5 border border-brand-accent/20 rounded-2xl text-xs font-semibold text-brand-black">
