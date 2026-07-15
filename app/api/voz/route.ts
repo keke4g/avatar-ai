@@ -173,6 +173,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const startedAt = Date.now();
+  const requestId = req.headers.get('x-vercel-id');
   try {
     let body: unknown;
     try {
@@ -202,12 +204,39 @@ export async function POST(req: Request) {
     }
 
     const text = rawText.trim();
-    if (engine === 'azure') return await synthesizeWithAzure(text);
-    if (engine === 'deepgram') return await synthesizeWithDeepgram(text, deepgramVoiceProfile);
-    return await synthesizeWithElevenLabs(text);
+    console.log(JSON.stringify({
+      level: 'info',
+      message: 'Voice synthesis started',
+      route: '/api/voz',
+      requestId,
+      engine,
+    }));
+
+    let response: Response;
+    if (engine === 'azure') response = await synthesizeWithAzure(text);
+    else if (engine === 'deepgram') response = await synthesizeWithDeepgram(text, deepgramVoiceProfile);
+    else response = await synthesizeWithElevenLabs(text);
+
+    console.log(JSON.stringify({
+      level: 'info',
+      message: 'Voice synthesis completed',
+      route: '/api/voz',
+      requestId,
+      engine,
+      status: response.status,
+      durationMs: Date.now() - startedAt,
+    }));
+    return response;
   } catch (error) {
     const isTimeout = error instanceof Error && error.name === 'TimeoutError';
-    console.error('[Voice API] Error generando audio:', isTimeout ? 'timeout' : error);
+    console.error(JSON.stringify({
+      level: 'error',
+      message: 'Voice synthesis failed',
+      route: '/api/voz',
+      requestId,
+      error: isTimeout ? 'timeout' : error instanceof Error ? error.message : String(error),
+      durationMs: Date.now() - startedAt,
+    }));
     return Response.json(
       { error: isTimeout ? 'El motor de voz tardó demasiado en responder.' : 'Error de voz.' },
       { status: isTimeout ? 504 : 500 },

@@ -24,8 +24,8 @@ import {
   EternaVoiceEngine,
   getEternaVoiceEngine,
   getDeepgramVoiceProfile,
-  saveDeepgramVoiceProfile,
-  saveEternaVoiceEngine,
+  loadGlobalEternaVoiceSettings,
+  saveGlobalEternaVoiceSettings,
 } from '../../lib/eterna/voiceConfig';
 
 type AdminTab = 'overview' | 'properties' | 'users' | 'swaps' | 'reports' | 'moderation' | 'settings';
@@ -77,6 +77,8 @@ export default function AdminPage() {
   const [verificationFee, setVerificationFee] = useState(29);
   const [commissionRate, setCommissionRate] = useState(1.5);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
+  const [settingsError, setSettingsError] = useState('');
+  const [settingsSaving, setSettingsSaving] = useState(false);
   const [voiceEngine, setVoiceEngine] = useState<EternaVoiceEngine>(DEFAULT_ETERNA_VOICE_ENGINE);
   const [deepgramVoiceProfile, setDeepgramVoiceProfile] = useState<DeepgramVoiceProfile>(getDeepgramVoiceProfile);
   const [voiceEngineStatus, setVoiceEngineStatus] = useState<Record<EternaVoiceEngine, boolean>>({
@@ -105,6 +107,17 @@ export default function AdminPage() {
     const storedDeepgramVoiceProfile = getDeepgramVoiceProfile();
     queueMicrotask(() => setDeepgramVoiceProfile(storedDeepgramVoiceProfile));
     let active = true;
+    loadGlobalEternaVoiceSettings()
+      .then(settings => {
+        if (!active) return;
+        setVoiceEngine(settings.engine);
+        setDeepgramVoiceProfile(settings.deepgramVoiceProfile);
+      })
+      .catch(error => {
+        if (!active) return;
+        console.warn('[Admin Voice Settings] No se pudo cargar la configuración global.', error);
+        setSettingsError('No se pudo cargar el motor global. Se muestra la copia guardada en este navegador.');
+      });
     fetch('/api/voz', { cache: 'no-store' })
       .then(response => response.ok ? response.json() : null)
       .then(data => {
@@ -446,12 +459,21 @@ export default function AdminPage() {
     addAudit('DISPUTE', 'auditDisputeDesc', { id: swapId }, 'success');
   };
 
-  const handleSaveSettings = () => {
-    saveEternaVoiceEngine(voiceEngine);
-    saveDeepgramVoiceProfile(deepgramVoiceProfile);
-    setSettingsSuccess(true);
-    addAudit('SETTINGS', 'auditSettingDesc', {}, 'success');
-    setTimeout(() => setSettingsSuccess(false), 3000);
+  const handleSaveSettings = async () => {
+    setSettingsSaving(true);
+    setSettingsSuccess(false);
+    setSettingsError('');
+    try {
+      await saveGlobalEternaVoiceSettings({ engine: voiceEngine, deepgramVoiceProfile });
+      setSettingsSuccess(true);
+      addAudit('SETTINGS', 'auditSettingDesc', {}, 'success');
+      setTimeout(() => setSettingsSuccess(false), 3000);
+    } catch (error) {
+      console.error('[Admin Voice Settings] No se pudo guardar la configuración global.', error);
+      setSettingsError('No se pudo guardar el motor global. Confirma que tu sesión tenga permisos de administrador.');
+    } finally {
+      setSettingsSaving(false);
+    }
   };
 
   // Multi-select handler for amenities
@@ -1889,9 +1911,10 @@ export default function AdminPage() {
                   <div className="pt-4 border-t border-brand-gray-100 mt-2">
                     <button
                       onClick={handleSaveSettings}
-                      className="w-full py-3 px-6 rounded-full bg-brand-black hover:bg-brand-black/90 text-white font-bold text-xs tracking-wider uppercase transition-colors shadow-sm select-none cursor-pointer"
+                      disabled={settingsSaving}
+                      className="w-full py-3 px-6 rounded-full bg-brand-black hover:bg-brand-black/90 disabled:cursor-wait disabled:opacity-60 text-white font-bold text-xs tracking-wider uppercase transition-colors shadow-sm select-none cursor-pointer"
                     >
-                      {t('admin.settingsSave')}
+                      {settingsSaving ? 'Guardando para todos los dispositivos…' : t('admin.settingsSave')}
                     </button>
 
                     {settingsSuccess && (
@@ -1901,6 +1924,16 @@ export default function AdminPage() {
                         className="mt-4 p-3 bg-emerald-50 border border-emerald-250 rounded-xl text-center text-xs font-bold text-emerald-600"
                       >
                         {t('admin.settingsSuccess')}
+                      </motion.div>
+                    )}
+
+                    {settingsError && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-center text-xs font-bold text-rose-700"
+                      >
+                        {settingsError}
                       </motion.div>
                     )}
                   </div>

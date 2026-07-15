@@ -2,9 +2,11 @@ import { useState, useEffect, useRef, useCallback, Dispatch, SetStateAction } fr
 import { StreamStatus } from './useWebSocketStream';
 import {
   ETERNA_VOICE_ENGINE_EVENT,
+  DEFAULT_ETERNA_VOICE_ENGINE,
   EternaVoiceEngine,
   getDeepgramVoiceProfile,
   getEternaVoiceEngine,
+  loadGlobalEternaVoiceSettings,
 } from '../lib/eterna/voiceConfig';
 
 export type VoiceModeState = 'disabled' | 'LISTENING' | 'PROCESSING' | 'SPEAKING' | 'COOLDOWN';
@@ -231,7 +233,10 @@ export function useEternaVoice({
   const isStoppingForSpeechRef = useRef<boolean>(false);
   const recognitionActiveRef = useRef<boolean>(false);
   const pendingSpeechStartRef = useRef<(() => void) | null>(null);
-  const voiceEngineRef = useRef<EternaVoiceEngine>(getEternaVoiceEngine());
+  // La configuración global es asíncrona. ElevenLabs es también el valor
+  // inicial seguro para evitar que un móvil reproduzca Deepgram antes de
+  // terminar la hidratación desde Supabase.
+  const voiceEngineRef = useRef<EternaVoiceEngine>(DEFAULT_ETERNA_VOICE_ENGINE);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioObjectUrlRef = useRef<string | null>(null);
   const speechRequestRef = useRef<AbortController | null>(null);
@@ -348,9 +353,25 @@ export function useEternaVoice({
       addVoiceDebugLog(`[VOICE ENGINE] ${voiceEngineRef.current}`);
     };
 
-    syncVoiceEngine();
+    let active = true;
+    loadGlobalEternaVoiceSettings()
+      .then((settings) => {
+        if (!active) return;
+        voiceEngineRef.current = settings.engine;
+        addVoiceDebugLog(`[VOICE ENGINE GLOBAL] ${settings.engine}`);
+      })
+      .catch((error) => {
+        if (!active) return;
+        voiceEngineRef.current = getEternaVoiceEngine();
+        console.warn('[Eterna Voice] No se pudo cargar el motor global; usando caché local.', error);
+        addVoiceDebugLog(`[VOICE ENGINE CACHE] ${voiceEngineRef.current}`);
+      });
+
     window.addEventListener(ETERNA_VOICE_ENGINE_EVENT, syncVoiceEngine);
-    return () => window.removeEventListener(ETERNA_VOICE_ENGINE_EVENT, syncVoiceEngine);
+    return () => {
+      active = false;
+      window.removeEventListener(ETERNA_VOICE_ENGINE_EVENT, syncVoiceEngine);
+    };
   }, []);
 
   // Centralized, optimized SpeechSynthesis controller
