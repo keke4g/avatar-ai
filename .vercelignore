@@ -1,0 +1,26 @@
+# Dependencias y artefactos generados localmente
+.git/
+.next/
+node_modules/
+.vercel/
+
+# Evidencias y perfiles usados durante las pruebas locales
+.audit-shots/
+.diagnostic-edge-profile/
+.playwright-cli/
+output/
+scratch/
+
+# Runtime, modelos y archivos temporales del avatar local
+backend-local/models/
+backend-local/venv/
+backend-local/uploads/
+backend-local/**/__pycache__/
+backend/**/__pycache__/
+*.pyc
+
+# Configuración y datos únicamente locales
+.env*
+*.log
+*.csv
+*.tsbuildinfo
