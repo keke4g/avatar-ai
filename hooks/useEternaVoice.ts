@@ -511,6 +511,14 @@ export function useEternaVoice({
     };
 
     const playWithBrowser = () => {
+      const userActivation = navigator.userActivation;
+      if (userActivation && !userActivation.hasBeenActive) {
+        pendingAudioUnlockRef.current = playWithBrowser;
+        setSimulatedStatusRef.current?.('idle');
+        addVoiceDebugLog('[VOICE WAITING FOR MOBILE GESTURE] browser');
+        return;
+      }
+
       if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
         handleEnd();
         return;
@@ -527,11 +535,10 @@ export function useEternaVoice({
         utterance.rate = 0.95;
         utterance.pitch = 1.1;
         utterance.volume = 1;
+        utterance.onstart = markAudibleSpeechStarted;
         utterance.onend = handleEnd;
         utterance.onerror = handleEnd;
         console.log('[VOICE STATE] browser speech start');
-        // Conserva el comportamiento inmediato de la voz del navegador.
-        markAudibleSpeechStarted();
         window.speechSynthesis.speak(utterance);
       } catch (e) {
         console.warn('[Eterna Voice] browser speech failed:', e);
