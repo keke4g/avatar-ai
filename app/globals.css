@@ -927,8 +927,8 @@
   .hero-search-shell {
     border-radius: 22px;
     padding: 7px;
-    width: calc(100vw - 40px);
-    max-width: 350px;
+    width: 100%;
+    max-width: 100%;
     margin-top: 0;
   }
 

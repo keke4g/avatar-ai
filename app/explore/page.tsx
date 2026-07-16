@@ -629,12 +629,9 @@ function ExploreContent() {
 
   // Calculate base properties matching all other filters EXCEPT category/type filter
   const basePropertiesForCategoryCounts = useMemo(() => {
-    if (activeSearch) {
-      if (activeSearch.loading) return [];
-      return activeSearch.results;
-    }
-    // But since search results are already filtered by type, we should fetch base properties using filterAndSortProperties
-    // which aligns in-memory filtering with database search criteria.
+    // Always derive counts from the full local catalog. Search results can already
+    // be narrowed to the active category, which would incorrectly disable every
+    // sibling category after the first selection.
     const base = filterAndSortProperties({
       properties,
       swaps,
@@ -653,7 +650,7 @@ function ExploreContent() {
       constructionAgeMax: ageLimits.ageMax,
     });
     return base.filter((property) => propertyMatchesOfferingTab(property, activeOfferingTab));
-  }, [properties, swaps, searchQuery, selectedSwapType, sortBy, startDate, endDate, guestsCount, activeOfferingTab, searchBudget, selectedAmenityCategory, selectedViewType, ageLimits, activeSearch]);
+  }, [properties, swaps, searchQuery, selectedSwapType, sortBy, startDate, endDate, guestsCount, activeOfferingTab, searchBudget, selectedAmenityCategory, selectedViewType, ageLimits]);
 
   // Compute dynamic category counts
   const categoryCounts = useMemo(() => {
