@@ -7,7 +7,7 @@ import { useTranslation } from '../../lib/context/LanguageContext';
 import CategorySlider from '../../components/CategorySlider';
 import PropertyCard from '../../components/PropertyCard';
 import InteractiveMap from '../../components/InteractiveMap';
-import { Map, List, RefreshCw, Compass, ArrowUpDown, Filter, Sparkles } from 'lucide-react';
+import { Map, List, RefreshCw, Compass, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { buildExploreSearchParams, filterAndSortProperties, resolveSearchDestination, PROPERTY_TYPE_MAPPING, normalizeSearchText } from '../../lib/searchFilters';
@@ -24,16 +24,6 @@ import { searchLogger } from '../../lib/search/searchLogger';
 import { getCacheKey } from '../../lib/search/SearchCache';
 
 type ExploreOfferingTab = 'ALL' | 'SWAP' | 'RENT' | 'SALE';
-
-const EXPLORE_OFFERING_TABS: Array<{
-  id: ExploreOfferingTab;
-  label: { es: string; en: string };
-}> = [
-  { id: 'ALL', label: { es: 'Todo', en: 'All' } },
-  { id: 'SALE', label: { es: 'Venta', en: 'Sale' } },
-  { id: 'RENT', label: { es: 'Renta', en: 'Rent' } },
-  { id: 'SWAP', label: { es: 'Intercambio', en: 'Swap' } },
-];
 
 function propertyMatchesOfferingTab(property: Property, tab: ExploreOfferingTab): boolean {
   if (tab === 'ALL') {
@@ -58,7 +48,7 @@ function ExploreContent() {
   
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchBudget, setSearchBudget] = useState('');
-  const [activeOfferingTab, setActiveOfferingTab] = useState<ExploreOfferingTab>('ALL');
+  const [activeOfferingTab, setActiveOfferingTab] = useState<ExploreOfferingTab>('SALE');
   const [hoveredPropertyId, setHoveredPropertyId] = useState<string | null>(null);
   
   // View states: 'split' on desktop by default; can toggle between grid/map on mobile
@@ -97,7 +87,15 @@ function ExploreContent() {
   // Search infrastructure refs (debouncing and race protection)
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastRequestIdRef = useRef(0);
-  const prevImmediateFiltersRef = useRef({ activeCategory, activeOfferingTab, sortBy, selectedSwapType });
+  const prevImmediateFiltersRef = useRef({
+    activeCategory,
+    activeOfferingTab,
+    sortBy,
+    selectedSwapType,
+    selectedViewType,
+    selectedAgeRange,
+    selectedAmenityCategory,
+  });
   const lastSearchedFiltersKeyRef = useRef<string>('');
 
   // Sync with URL query parameter (BUG #7 & availability/capacity integration)
@@ -165,10 +163,10 @@ function ExploreContent() {
       } else if (normalizedOffering === 'SALE') {
         setActiveOfferingTab('SALE');
       } else {
-        setActiveOfferingTab('ALL');
+        setActiveOfferingTab('SALE');
       }
     } else {
-      setActiveOfferingTab('ALL');
+      setActiveOfferingTab('SALE');
     }
 
     if (tierVal) {
@@ -357,9 +355,9 @@ function ExploreContent() {
       prevImmediateFiltersRef.current.activeOfferingTab !== activeOfferingTab ||
       prevImmediateFiltersRef.current.sortBy !== sortBy ||
       prevImmediateFiltersRef.current.selectedSwapType !== selectedSwapType ||
-      (prevImmediateFiltersRef.current as any).selectedViewType !== selectedViewType ||
-      (prevImmediateFiltersRef.current as any).selectedAgeRange !== selectedAgeRange ||
-      (prevImmediateFiltersRef.current as any).selectedAmenityCategory !== selectedAmenityCategory;
+      prevImmediateFiltersRef.current.selectedViewType !== selectedViewType ||
+      prevImmediateFiltersRef.current.selectedAgeRange !== selectedAgeRange ||
+      prevImmediateFiltersRef.current.selectedAmenityCategory !== selectedAmenityCategory;
 
     prevImmediateFiltersRef.current = { 
       activeCategory, 
@@ -369,7 +367,7 @@ function ExploreContent() {
       selectedViewType,
       selectedAgeRange,
       selectedAmenityCategory
-    } as any;
+    };
 
     const executeSearch = () => {
       const requestId = ++lastRequestIdRef.current;
@@ -434,6 +432,7 @@ function ExploreContent() {
     selectedViewType,
     selectedAgeRange,
     selectedAmenityCategory,
+    searchBudget,
     searchQuery,
     startDate,
     endDate,
@@ -458,7 +457,7 @@ function ExploreContent() {
   // Clear all filters
   const handleClearFilters = () => {
     setActiveCategory('All');
-    setActiveOfferingTab('ALL');
+    setActiveOfferingTab('SALE');
     setSearchQuery('');
     setStartDate('');
     setEndDate('');
@@ -705,18 +704,6 @@ function ExploreContent() {
     return allModeFilteredProperties.filter((property) => propertyMatchesOfferingTab(property, activeOfferingTab));
   }, [allModeFilteredProperties, activeOfferingTab, activeSearch]);
 
-  const offeringTabCounts = useMemo(() => {
-    return EXPLORE_OFFERING_TABS.reduce<Record<ExploreOfferingTab, number>>((counts, tab) => {
-      counts[tab.id] = allModeFilteredProperties.filter((property) => propertyMatchesOfferingTab(property, tab.id)).length;
-      return counts;
-    }, {
-      ALL: 0,
-      SWAP: 0,
-      RENT: 0,
-      SALE: 0,
-    });
-  }, [allModeFilteredProperties]);
-
   // Paginated properties for progressive load
   const paginatedProperties = useMemo(() => {
     return filteredSortedProperties.slice(0, pageSize);
@@ -785,6 +772,10 @@ function ExploreContent() {
           </p>
         </div>
 
+        <section
+          aria-label={language === 'es' ? 'Buscar y filtrar propiedades' : 'Search and filter properties'}
+          className="rounded-[28px] border border-brand-gray-200/80 bg-white/90 p-3 shadow-[0_18px_55px_rgba(25,25,35,0.07)] backdrop-blur-xl sm:p-5"
+        >
         <AuraSearchBar
           value={searchQuery}
           onValueChange={(value) => {
@@ -807,7 +798,6 @@ function ExploreContent() {
           mobileDateButtonRef={mobileDateButtonRef}
           desktopGuestButtonRef={desktopGuestButtonRef}
           mobileGuestButtonRef={mobileGuestButtonRef}
-          mobileSubmitLabel="Buscar destinos"
           operation={activeOfferingTab === 'ALL' ? 'SALE' : activeOfferingTab}
           onOperationChange={(op) => {
             setActiveOfferingTab(op);
@@ -824,23 +814,6 @@ function ExploreContent() {
                 params.delete('start');
                 params.delete('end');
                 params.delete('guests');
-              }
-              router.push(params.toString() ? `/explore?${params.toString()}` : '/explore');
-            }
-          }}
-          propertyType={activeCategory}
-          onPropertyTypeChange={(type) => {
-            setActiveCategory(type);
-            setPageSize(4);
-            if (activeSearch) setActiveSearch(null);
-            
-            // Sync URL search params
-            if (typeof window !== 'undefined') {
-              const params = new URLSearchParams(window.location.search);
-              if (type === 'All') {
-                params.delete('category');
-              } else {
-                params.set('category', type);
               }
               router.push(params.toString() ? `/explore?${params.toString()}` : '/explore');
             }
@@ -864,187 +837,39 @@ function ExploreContent() {
           }}
         />
 
-        <div className="flex flex-col gap-4 rounded-3xl border border-brand-gray-200/70 bg-white/80 p-4 shadow-sm backdrop-blur-xl">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1.5 px-3.5 py-2.5 border border-brand-gray-200 rounded-2xl text-xs font-bold text-brand-gray-600 bg-white">
-              <Filter className="w-3.5 h-3.5 text-brand-gray-400" />
-              <select
-                value={selectedSwapType}
-                onChange={(e) => {
-                  setSelectedSwapType(e.target.value);
-                  setPageSize(4);
-                  if (activeSearch) setActiveSearch(null);
-                }}
-                className="outline-none bg-transparent font-bold cursor-pointer"
-              >
-                <option value="All">{t('explore.tierSelector')}</option>
-                <option value="Premium">Premium</option>
-                <option value="Curated">Curated</option>
-                <option value="Exclusive">Exclusive</option>
-                <option value="Luxury">Luxury</option>
-              </select>
-            </div>
+        <CategorySlider
+          activeCategory={activeCategory}
+          setActiveCategory={(cat) => {
+            setActiveCategory(cat);
+            setPageSize(4);
+            if (activeSearch) setActiveSearch(null);
 
-            <div className="flex items-center gap-1.5 px-3.5 py-2.5 border border-brand-gray-200 rounded-2xl text-xs font-bold text-brand-gray-600 bg-white">
-              <Filter className="w-3.5 h-3.5 text-brand-gray-400" />
-              <select
-                value={selectedViewType}
-                onChange={(e) => {
-                  setSelectedViewType(e.target.value);
-                  setPageSize(4);
-                  if (activeSearch) setActiveSearch(null);
-                }}
-                className="outline-none bg-transparent font-bold cursor-pointer"
-              >
-                <option value="All">Cualquier Vista</option>
-                <option value="Marina">Vista a la Marina</option>
-                <option value="Al Mar">Vista al Mar</option>
-                <option value="Al Bosque">Vista al Bosque</option>
-                <option value="Golf">Vista al Campo de Golf</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-1.5 px-3.5 py-2.5 border border-brand-gray-200 rounded-2xl text-xs font-bold text-brand-gray-600 bg-white">
-              <Filter className="w-3.5 h-3.5 text-brand-gray-400" />
-              <select
-                value={selectedAgeRange}
-                onChange={(e) => {
-                  setSelectedAgeRange(e.target.value);
-                  setPageSize(4);
-                  if (activeSearch) setActiveSearch(null);
-                }}
-                className="outline-none bg-transparent font-bold cursor-pointer"
-              >
-                <option value="All">Cualquier Antigüedad</option>
-                <option value="0-2">Nueva (0-2 años)</option>
-                <option value="3-5">3-5 años</option>
-                <option value="6-10">6-10 años</option>
-                <option value="10+">Más de 10 años</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-1.5 px-3.5 py-2.5 border border-brand-gray-200 rounded-2xl text-xs font-bold text-brand-gray-600 bg-white">
-              <Filter className="w-3.5 h-3.5 text-brand-gray-400" />
-              <select
-                value={selectedAmenityCategory}
-                onChange={(e) => {
-                  setSelectedAmenityCategory(e.target.value);
-                  setPageSize(4);
-                  if (activeSearch) setActiveSearch(null);
-                }}
-                className="outline-none bg-transparent font-bold cursor-pointer"
-              >
-                <option value="All">Cualquier Amenidad</option>
-                <option value="Alberca">Alberca</option>
-                <option value="Seguridad 24/7">Seguridad 24/7</option>
-                <option value="Gimnasio">Gimnasio</option>
-                <option value="Domótica">Domótica</option>
-                <option value="Cerradura inteligente">Cerradura inteligente</option>
-                <option value="Vista al mar">Vista al mar</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-1.5 px-3.5 py-2.5 border border-brand-gray-200 rounded-2xl text-xs font-bold text-brand-gray-600 bg-white">
-              <ArrowUpDown className="w-3.5 h-3.5 text-brand-gray-400" />
-              <select
-                value={sortBy}
-                onChange={(e) => {
-                  setSortBy(e.target.value);
-                  if (activeSearch) setActiveSearch(null);
-                }}
-                className="outline-none bg-transparent font-bold cursor-pointer"
-              >
-                <option value="match">{t('explore.sortMatch')}</option>
-                <option value="capacity">{t('explore.sortGuests')}</option>
-                <option value="rating">{t('explore.sortRating')}</option>
-              </select>
-            </div>
-
-            {(searchQuery || startDate || endDate || hasFilteredGuests || activeCategory !== 'All' || activeOfferingTab !== 'ALL' || selectedSwapType !== 'All' || sortBy !== 'match') && (
-              <button
-                onClick={handleClearFilters}
-                className="px-4 py-2.5 text-xs font-bold text-brand-rose bg-brand-rose/5 rounded-2xl hover:bg-brand-rose/10 transition-colors cursor-pointer animate-in fade-in"
-              >
-                {t('explore.clearFilters')}
-              </button>
-            )}
-          </div>
-
-          <CategorySlider 
-            activeCategory={activeCategory} 
-            setActiveCategory={(cat) => {
-              setActiveCategory(cat);
-              setPageSize(4);
-              if (activeSearch) setActiveSearch(null);
-              
-              // Sync URL search params
-              if (typeof window !== 'undefined') {
-                const params = new URLSearchParams(window.location.search);
-                if (cat === 'All') {
-                  params.delete('category');
-                } else {
-                  params.set('category', cat);
-                }
-                router.push(params.toString() ? `/explore?${params.toString()}` : '/explore');
+            if (typeof window !== 'undefined') {
+              const params = new URLSearchParams(window.location.search);
+              if (cat === 'All') {
+                params.delete('category');
+              } else {
+                params.set('category', cat);
               }
-            }} 
-            counts={categoryCounts}
-          />
+              router.push(params.toString() ? `/explore?${params.toString()}` : '/explore');
+            }
+          }}
+          counts={categoryCounts}
+        />
 
-          <div className="border-t border-brand-gray-100 pt-3">
-            <div className="flex w-full gap-2 overflow-x-auto pb-1">
-              {EXPLORE_OFFERING_TABS.map((tab) => {
-                const isActive = activeOfferingTab === tab.id;
-                const label = tab.label[language === 'es' ? 'es' : 'en'];
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveOfferingTab(tab.id);
-                      setPageSize(4);
-                      if (activeSearch) setActiveSearch(null);
-
-                      // Sync URL search params
-                      if (typeof window !== 'undefined') {
-                        const params = new URLSearchParams(window.location.search);
-                        if (tab.id === 'ALL') {
-                          params.delete('offering');
-                        } else {
-                          params.set('offering', tab.id);
-                        }
-                        
-                        // Clear incompatible parameters
-                        if (tab.id === 'SWAP') {
-                          params.delete('budget');
-                        } else if (tab.id === 'SALE' || tab.id === 'RENT') {
-                          params.delete('start');
-                          params.delete('end');
-                          params.delete('guests');
-                        }
-                        router.push(params.toString() ? `/explore?${params.toString()}` : '/explore');
-                      }
-                    }}
-                    className={`group flex min-w-fit items-center gap-2 rounded-full border px-4 py-2 text-xs font-black transition-all ${
-                      isActive
-                        ? 'border-brand-black bg-brand-black text-white shadow-sm'
-                        : 'border-brand-gray-200 bg-white text-brand-gray-500 hover:border-brand-black hover:text-brand-black'
-                    }`}
-                  >
-                    <span>{label}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
-                      isActive
-                        ? 'bg-white/15 text-white'
-                        : 'bg-brand-gray-100 text-brand-gray-400 group-hover:bg-brand-gray-900 group-hover:text-white'
-                    }`}>
-                      {offeringTabCounts[tab.id]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+        {(searchQuery || startDate || endDate || hasFilteredGuests || activeCategory !== 'All' || searchBudget || selectedSwapType !== 'All' || selectedViewType !== 'All' || selectedAgeRange !== 'All' || selectedAmenityCategory !== 'All' || sortBy !== 'match') && (
+          <div className="flex justify-end pt-3">
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="min-h-10 rounded-full px-4 text-[11px] font-extrabold text-brand-gray-500 transition-colors hover:bg-brand-gray-50 hover:text-brand-black"
+            >
+              {t('explore.clearFilters')}
+            </button>
           </div>
-        </div>
+        )}
+        </section>
+
       </div>
 
       {/* C. Split Explorer Workspace (Grid + Dynamic Map) */}

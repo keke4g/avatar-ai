@@ -5,7 +5,6 @@ import { ArrowRight, Search, Sparkles, Mic } from 'lucide-react';
 import { formatHumanDate } from '../CalendarPicker';
 import { 
   OperationMode, 
-  PROPERTY_TYPE_OPTIONS, 
   SEARCH_CONFIG 
 } from '../../lib/search/searchConfig';
 
@@ -24,14 +23,11 @@ type AuraSearchBarProps = {
   desktopGuestButtonRef: React.RefObject<HTMLButtonElement | null>;
   mobileGuestButtonRef: React.RefObject<HTMLButtonElement | null>;
   className?: string;
-  mobileSubmitLabel?: string;
   onMicClick?: () => void;
   
   // Operation-specific properties
   operation: OperationMode;
   onOperationChange: (op: OperationMode) => void;
-  propertyType: string;
-  onPropertyTypeChange: (type: string) => void;
   budget: string;
   onBudgetChange: (budget: string) => void;
 };
@@ -51,18 +47,15 @@ export function AuraSearchBar({
   desktopGuestButtonRef,
   mobileGuestButtonRef,
   className = '',
-  mobileSubmitLabel = 'Preguntar a Eterna',
   onMicClick,
   
   operation = 'SWAP',
   onOperationChange,
-  propertyType = 'All',
-  onPropertyTypeChange,
   budget = '',
   onBudgetChange,
 }: AuraSearchBarProps) {
   const config = SEARCH_CONFIG[operation];
-  const [activeDropdown, setActiveDropdown] = useState<'type' | 'budget' | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<'budget' | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -101,7 +94,7 @@ export function AuraSearchBar({
   ];
 
   return (
-    <div ref={containerRef} className={`flex flex-col w-full max-w-[760px] ${className}`}>
+    <div ref={containerRef} className={`flex w-full flex-col ${className}`}>
       {/* 1. Operation Tabs Selector */}
       <div className="flex items-center gap-2 mb-2 ml-1 self-start pointer-events-auto">
         {operations.map((op) => (
@@ -187,51 +180,6 @@ export function AuraSearchBar({
             </>
           ) : (
             <>
-              {/* Property Type Custom Dropdown */}
-              <div className="flex items-center gap-1.5 px-5 py-3 bg-transparent shrink-0 relative min-w-[130px] max-w-[160px]">
-                <button
-                  type="button"
-                  onClick={() => setActiveDropdown(activeDropdown === 'type' ? null : 'type')}
-                  className="flex items-center gap-2 cursor-pointer outline-none bg-transparent w-full text-left"
-                >
-                  <ArrowRight className="w-3.5 h-3.5 shrink-0 text-[#8179e7]" />
-                  <span
-                    className="text-[12px] font-bold truncate max-w-[110px]"
-                    style={{ color: propertyType !== 'All' ? '#17142f' : 'rgba(23,20,47,0.45)' }}
-                  >
-                    {PROPERTY_TYPE_OPTIONS.find(opt => opt.value === propertyType)?.label || 'Tipo'}
-                  </span>
-                  <span className="text-brand-gray-400 text-[9px] ml-auto select-none">▼</span>
-                </button>
-
-                {activeDropdown === 'type' && (
-                  <div className="absolute top-[calc(100%+8px)] left-0 z-50 bg-white border border-brand-gray-200/80 rounded-[24px] shadow-2xl p-4 backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200 min-w-[200px]">
-                    <h4 className="text-[10px] font-black text-brand-black mb-3 uppercase tracking-widest text-[#7169df]">Tipo</h4>
-                    <div className="flex flex-col gap-1 max-h-[220px] overflow-y-auto pr-1 scrollbar-thin">
-                      {PROPERTY_TYPE_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => {
-                            onPropertyTypeChange(opt.value);
-                            setActiveDropdown(null);
-                          }}
-                          className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                            propertyType === opt.value
-                              ? 'bg-brand-black text-white'
-                              : 'text-brand-gray-600 hover:bg-brand-gray-50'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="hero-search-divider" />
-
               {/* Budget Custom Dropdown */}
               <div className="flex items-center gap-1.5 px-5 py-3 bg-transparent shrink-0 relative min-w-[170px] max-w-[220px]">
                 <button
@@ -328,47 +276,6 @@ export function AuraSearchBar({
             </>
           ) : (
             <>
-              {/* Property Type Custom Dropdown Mobile */}
-              <div className="relative w-full">
-                <button
-                  type="button"
-                  onClick={() => setActiveDropdown(activeDropdown === 'type' ? null : 'type')}
-                  className="hero-search-mobile-row text-left cursor-pointer w-full flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2">
-                    <ArrowRight className="w-4 h-4 text-[#8179e7] shrink-0" />
-                    <span className="text-[12px] font-bold">
-                      {PROPERTY_TYPE_OPTIONS.find(opt => opt.value === propertyType)?.label || 'Tipo'}
-                    </span>
-                  </div>
-                  <span className="text-brand-gray-400 text-[9px] mr-1">▼</span>
-                </button>
-                {activeDropdown === 'type' && (
-                  <div className="absolute left-0 right-0 mt-1 z-50 bg-white border border-brand-gray-200/80 rounded-[24px] shadow-2xl p-4 backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200">
-                    <h4 className="text-[10px] font-black text-brand-black mb-3 uppercase tracking-widest text-[#7169df]">Tipo</h4>
-                    <div className="flex flex-col gap-1 max-h-[180px] overflow-y-auto">
-                      {PROPERTY_TYPE_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => {
-                            onPropertyTypeChange(opt.value);
-                            setActiveDropdown(null);
-                          }}
-                          className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-                            propertyType === opt.value
-                              ? 'bg-brand-black text-white'
-                              : 'text-brand-gray-600 hover:bg-brand-gray-50'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Budget Custom Dropdown Mobile */}
               <div className="relative w-full">
                 <button

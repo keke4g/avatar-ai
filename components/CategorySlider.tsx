@@ -25,8 +25,12 @@ export default function CategorySlider({ activeCategory, setActiveCategory, coun
   ];
 
   return (
-    <div className="w-full border-b border-brand-gray-200/80 bg-white/50 backdrop-blur-md sticky top-[72px] z-30 py-4 px-6 sm:px-12 md:px-24">
-      <div className="max-w-7xl mx-auto flex items-center justify-start overflow-x-auto gap-8 no-scrollbar scroll-smooth">
+    <div className="w-full border-t border-brand-gray-100 pt-4 sm:pt-5">
+      <div
+        role="tablist"
+        aria-label={t('explore.allCategories')}
+        className="flex w-full snap-x snap-mandatory items-stretch gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth sm:gap-2.5"
+      >
         {CATEGORIES.map((category) => {
           const isActive = activeCategory === category.id;
           const count = counts[category.id] ?? 0;
@@ -35,31 +39,44 @@ export default function CategorySlider({ activeCategory, setActiveCategory, coun
           return (
             <button
               key={category.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
               onClick={() => !isDisabled && setActiveCategory(category.id)}
               disabled={isDisabled}
-              className={`relative flex flex-col items-center gap-2 pb-2.5 outline-none group transition-colors duration-200 shrink-0 ${
+              className={`group relative flex min-h-[86px] min-w-[104px] snap-start flex-col items-start justify-between overflow-hidden rounded-2xl border px-3 py-3 text-left outline-none transition-all duration-200 sm:min-w-0 sm:flex-1 sm:px-3.5 ${
                 isDisabled
-                  ? 'opacity-35 cursor-not-allowed text-brand-gray-300'
+                  ? 'cursor-not-allowed border-brand-gray-100 bg-brand-gray-50/60 text-brand-gray-300 opacity-55'
                   : isActive
-                    ? 'text-brand-accent cursor-pointer'
-                    : 'text-brand-gray-500 hover:text-brand-black cursor-pointer'
+                    ? 'cursor-pointer border-brand-black bg-brand-black text-white shadow-[0_10px_24px_rgba(10,10,12,0.14)]'
+                    : 'cursor-pointer border-brand-gray-200 bg-white text-brand-gray-600 hover:-translate-y-0.5 hover:border-brand-gray-300 hover:text-brand-black hover:shadow-sm'
               }`}
             >
-              <category.icon className={`w-5 h-5 transition-transform duration-200 ${
+              <span className={`flex h-8 w-8 items-center justify-center rounded-xl transition-colors ${
                 isDisabled
-                  ? 'text-brand-gray-300'
+                  ? 'bg-white text-brand-gray-300'
                   : isActive
-                    ? 'text-brand-accent'
-                    : 'text-brand-gray-400 group-hover:text-brand-black group-hover:scale-105'
-              }`} />
-              <span className="text-xs font-semibold tracking-tight">
-                {category.label} ({count})
+                    ? 'bg-white/14 text-white'
+                    : 'bg-brand-gray-50 text-brand-gray-500 group-hover:bg-brand-gray-100 group-hover:text-brand-black'
+              }`}>
+                <category.icon className="h-[17px] w-[17px]" strokeWidth={1.9} />
+              </span>
+
+              <span className="flex w-full items-end justify-between gap-2">
+                <span className="truncate text-[11px] font-extrabold tracking-tight sm:text-xs">
+                  {category.label}
+                </span>
+                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-black tabular-nums ${
+                  isActive ? 'bg-white/14 text-white/85' : 'bg-brand-gray-100 text-brand-gray-500'
+                }`}>
+                  {count}
+                </span>
               </span>
               
               {isActive && (
                 <motion.div
                   layoutId="activeCategoryUnderline"
-                  className="absolute bottom-0 left-0 right-0 h-[2px] bg-brand-accent rounded-full"
+                  className="absolute inset-x-3 bottom-0 h-[2px] rounded-full bg-brand-accent"
                   transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                 />
               )}
