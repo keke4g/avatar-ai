@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { Property, PropertyOfferingMode } from '../lib/types';
 import { useSwap } from '../lib/context/SwapContext';
 import { Heart, ChevronLeft, ChevronRight, Star, ShieldCheck } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '../lib/context/LanguageContext';
 import { getActiveOfferings } from '../lib/propertyOfferings';
 import { formatCount, formatBathrooms, formatPropertyLocation } from '../lib/textHelpers';
@@ -17,22 +16,22 @@ interface PropertyCardProps {
 
 const OFFERING_BADGE_ORDER: PropertyOfferingMode[] = ['SWAP', 'SHORT_RENT', 'MONTHLY_RENT', 'SALE'];
 
-const OFFERING_BADGE_META: Record<PropertyOfferingMode, { label: string; className: string }> = {
+const OFFERING_BADGE_LABELS: Record<PropertyOfferingMode, { es: string; en: string }> = {
   SWAP: {
-    label: 'INTERCAMBIO',
-    className: 'border-brand-accent/25 bg-brand-accent/5 text-brand-accent',
+    es: 'INTERCAMBIO',
+    en: 'SWAP',
   },
   SHORT_RENT: {
-    label: 'RENTA TEMPORAL',
-    className: 'border-emerald-200 bg-emerald-50/80 text-emerald-700',
+    es: 'RENTA TEMPORAL',
+    en: 'SHORT-TERM RENT',
   },
   MONTHLY_RENT: {
-    label: 'RENTA MENSUAL',
-    className: 'border-sky-200 bg-sky-50/80 text-sky-700',
+    es: 'RENTA MENSUAL',
+    en: 'MONTHLY RENT',
   },
   SALE: {
-    label: 'VENTA',
-    className: 'border-amber-200 bg-amber-50/80 text-amber-700',
+    es: 'VENTA',
+    en: 'SALE',
   },
 };
 
@@ -40,7 +39,6 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
   const { favorites, toggleFavorite, reviews } = useSwap();
   const { t, language } = useTranslation();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
 
   const isFavorited = favorites.includes(property.id);
@@ -94,20 +92,17 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
     return priceTexts.join('  |  ');
   }, [property, language]);
 
-  // Reset image error state whenever slide index changes
-  React.useEffect(() => {
-    setImageError(false);
-  }, [currentImageIndex]);
-
-  const handleNextImage = (e: React.MouseEvent) => {
+  const handleNextImage = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    setImageError(false);
     setCurrentImageIndex((prev) => (prev + 1) % property.images.length);
   };
 
-  const handlePrevImage = (e: React.MouseEvent) => {
+  const handlePrevImage = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    setImageError(false);
     setCurrentImageIndex((prev) => (prev - 1 + property.images.length) % property.images.length);
   };
 
@@ -125,11 +120,7 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
       href={`/property/${property.id}`} 
       className="group block"
     >
-      <div 
-        className="flex flex-col gap-3"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-      >
+      <div className="flex flex-col gap-3">
         {/* Image Container */}
         <div className="relative aspect-[4/3] w-full rounded-2xl overflow-hidden bg-brand-gray-100 shadow-premium group-hover:shadow-floating transition-all duration-300">
           
@@ -166,10 +157,14 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
 
           {/* Quick Info Badges */}
           <div className="absolute top-3 left-3 flex flex-col gap-1.5 pointer-events-none">
-            {/* Match Score */}
-            <div className="glass px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider text-brand-accent flex items-center gap-1 shadow-sm bg-white/95">
-              <span>{language === 'es' ? `Compatibilidad ${property.auraScore}%` : `${property.auraScore}% Match`}</span>
-            </div>
+            {activeOfferingModes.map((mode) => (
+              <div
+                key={mode}
+                className="glass flex w-fit items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold tracking-wider text-brand-accent shadow-sm"
+              >
+                <span>{OFFERING_BADGE_LABELS[mode][language === 'es' ? 'es' : 'en']}</span>
+              </div>
+            ))}
             
             {/* Host Verified */}
             {property.hostVerified && (
@@ -183,6 +178,7 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
           {/* Favorite Button */}
           <button
             onClick={handleFavoriteClick}
+            aria-label={language === 'es' ? 'Guardar propiedad' : 'Save property'}
             className={`absolute top-3 right-3 p-2 rounded-full border transition-all duration-300 ${
               isFavorited
                 ? 'bg-white border-white text-brand-rose scale-110 shadow-md'
@@ -192,30 +188,27 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
             <Heart className={`w-4 h-4 ${isFavorited ? 'fill-brand-rose' : ''}`} />
           </button>
 
-          {/* Image Navigation Arrows (Show only on hover, desktop only) */}
-          <AnimatePresence>
-            {isHovered && property.images.length > 1 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="hidden md:block"
+          {/* Image Navigation Arrows */}
+          {property.images.length > 1 && (
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 z-20 flex -translate-y-1/2 items-center justify-between px-2.5 opacity-100 transition-opacity md:px-3 md:opacity-0 md:group-hover:opacity-100">
+              <button
+                type="button"
+                onClick={handlePrevImage}
+                aria-label={language === 'es' ? 'Imagen anterior' : 'Previous image'}
+                className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/60 bg-white/90 text-brand-black shadow-md backdrop-blur-md transition-all hover:bg-white active:scale-95 md:h-8 md:w-8"
               >
-                <button
-                  onClick={handlePrevImage}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/90 hover:bg-white text-brand-black border border-brand-gray-200/50 hover:scale-105 active:scale-95 transition-all shadow-md"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleNextImage}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/90 hover:bg-white text-brand-black border border-brand-gray-200/50 hover:scale-105 active:scale-95 transition-all shadow-md"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                <ChevronLeft className="h-5 w-5 md:h-4 md:w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleNextImage}
+                aria-label={language === 'es' ? 'Imagen siguiente' : 'Next image'}
+                className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/60 bg-white/90 text-brand-black shadow-md backdrop-blur-md transition-all hover:bg-white active:scale-95 md:h-8 md:w-8"
+              >
+                <ChevronRight className="h-5 w-5 md:h-4 md:w-4" />
+              </button>
+            </div>
+          )}
 
           {/* Image Dots Indicators */}
           {property.images.length > 1 && (
@@ -274,21 +267,6 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
             </div>
           )}
 
-          {showOfferingBadges && activeOfferingModes.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {activeOfferingModes.map((mode) => {
-                const meta = OFFERING_BADGE_META[mode];
-                return (
-                  <span
-                    key={mode}
-                    className={`inline-flex h-6 items-center rounded-full border px-2.5 text-[9px] font-black leading-none tracking-wider shadow-sm ${meta.className}`}
-                  >
-                    {meta.label}
-                  </span>
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
     </Link>

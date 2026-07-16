@@ -247,6 +247,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   // Premium Lightbox Gallery States
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [heroMediaIndex, setHeroMediaIndex] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -290,6 +291,20 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
     setZoomScale(1);
     setPanOffset({ x: 0, y: 0 });
     setGalleryIndex((prev) => (prev === mediaItems.length - 1 ? 0 : prev + 1));
+  };
+
+  const handlePrevHeroMedia = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (mediaItems.length === 0) return;
+    setHeroMediaIndex((prev) => (prev === 0 ? mediaItems.length - 1 : prev - 1));
+  };
+
+  const handleNextHeroMedia = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (mediaItems.length === 0) return;
+    setHeroMediaIndex((prev) => (prev === mediaItems.length - 1 ? 0 : prev + 1));
   };
 
   useEffect(() => {
@@ -949,24 +964,74 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 rounded-2xl overflow-hidden shadow-premium mb-10 cursor-pointer">
         {/* Left main large image */}
         <div 
-          onClick={() => { setGalleryIndex(0); setIsGalleryOpen(true); }}
+          onClick={() => { setGalleryIndex(heroMediaIndex); setIsGalleryOpen(true); }}
           className="md:col-span-2 aspect-[4/3] md:aspect-square relative overflow-hidden bg-brand-gray-100 group"
         >
-          {mediaItems[0] ? (
-            renderMediaItem(mediaItems[0], "w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500 ease-out")
-          ) : (
-            <div className="w-full h-full bg-brand-gray-100 flex items-center justify-center">
-              <Compass className="w-12 h-12 text-brand-gray-300 animate-pulse" />
-            </div>
-          )}
-          <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+          <div className="h-full w-full md:hidden">
+            {mediaItems[heroMediaIndex] ? (
+              renderMediaItem(mediaItems[heroMediaIndex], "h-full w-full object-cover")
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-brand-gray-100">
+                <Compass className="h-12 w-12 animate-pulse text-brand-gray-300" />
+              </div>
+            )}
+          </div>
+          <div className="hidden h-full w-full md:block">
+            {mediaItems[0] ? (
+              renderMediaItem(mediaItems[0], "h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]")
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-brand-gray-100">
+                <Compass className="h-12 w-12 animate-pulse text-brand-gray-300" />
+              </div>
+            )}
+          </div>
+
+          <div className="absolute inset-0 hidden items-center justify-center bg-black/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100 md:flex">
             <span className="bg-white/95 text-brand-black text-xs font-black px-4 py-2 rounded-full shadow-md flex items-center gap-1.5 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
               <ZoomIn className="w-3.5 h-3.5" />
               <span>{language === 'es' ? 'Ver galería' : 'View gallery'}</span>
             </span>
           </div>
+
+          {mediaItems.length > 1 && (
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 z-20 flex -translate-y-1/2 items-center justify-between px-3 md:hidden">
+              <button
+                type="button"
+                onClick={handlePrevHeroMedia}
+                aria-label={language === 'es' ? 'Imagen anterior' : 'Previous image'}
+                className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-white/90 text-brand-black shadow-lg backdrop-blur-md active:scale-95"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleNextHeroMedia}
+                aria-label={language === 'es' ? 'Imagen siguiente' : 'Next image'}
+                className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-white/90 text-brand-black shadow-lg backdrop-blur-md active:scale-95"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          )}
+
+          {mediaItems.length > 1 && (
+            <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 md:hidden">
+              {mediaItems.map((_, index) => (
+                <span
+                  key={index}
+                  className={`h-1.5 rounded-full shadow-sm transition-all ${index === heroMediaIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/55'}`}
+                />
+              ))}
+            </div>
+          )}
+
+          {mediaItems[heroMediaIndex]?.type === 'video' && (
+            <div className="absolute right-4 top-4 z-10 flex items-center justify-center rounded-full bg-brand-black/60 p-2 text-white md:hidden">
+              <Play className="w-4 h-4 fill-white text-white" />
+            </div>
+          )}
           {mediaItems[0]?.type === 'video' && (
-            <div className="absolute top-4 right-4 bg-brand-black/60 text-white p-2 rounded-full z-10 flex items-center justify-center">
+            <div className="absolute right-4 top-4 z-10 hidden items-center justify-center rounded-full bg-brand-black/60 p-2 text-white md:flex">
               <Play className="w-4 h-4 fill-white text-white" />
             </div>
           )}
