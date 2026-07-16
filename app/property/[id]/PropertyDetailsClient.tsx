@@ -999,17 +999,17 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 type="button"
                 onClick={handlePrevHeroMedia}
                 aria-label={language === 'es' ? 'Imagen anterior' : 'Previous image'}
-                className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-white/90 text-brand-black shadow-lg backdrop-blur-md active:scale-95"
+                className="group/arrow pointer-events-auto flex h-12 w-12 items-center justify-center border-0 bg-transparent transition-transform active:scale-90"
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft aria-hidden="true" className="liquid-glass-chevron h-9 w-9 transition-all group-active/arrow:scale-90" />
               </button>
               <button
                 type="button"
                 onClick={handleNextHeroMedia}
                 aria-label={language === 'es' ? 'Imagen siguiente' : 'Next image'}
-                className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-white/90 text-brand-black shadow-lg backdrop-blur-md active:scale-95"
+                className="group/arrow pointer-events-auto flex h-12 w-12 items-center justify-center border-0 bg-transparent transition-transform active:scale-90"
               >
-                <ChevronRight className="h-5 w-5" />
+                <ChevronRight aria-hidden="true" className="liquid-glass-chevron h-9 w-9 transition-all group-active/arrow:scale-90" />
               </button>
             </div>
           )}

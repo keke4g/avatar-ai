@@ -195,17 +195,17 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
                 type="button"
                 onClick={handlePrevImage}
                 aria-label={language === 'es' ? 'Imagen anterior' : 'Previous image'}
-                className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/60 bg-white/90 text-brand-black shadow-md backdrop-blur-md transition-all hover:bg-white active:scale-95 md:h-8 md:w-8"
+                className="group/arrow pointer-events-auto flex h-11 w-11 items-center justify-center border-0 bg-transparent transition-transform hover:-translate-x-0.5 active:scale-90 md:h-9 md:w-9"
               >
-                <ChevronLeft className="h-5 w-5 md:h-4 md:w-4" />
+                <ChevronLeft aria-hidden="true" className="liquid-glass-chevron h-8 w-8 transition-all group-hover/arrow:scale-110 md:h-6 md:w-6" />
               </button>
               <button
                 type="button"
                 onClick={handleNextImage}
                 aria-label={language === 'es' ? 'Imagen siguiente' : 'Next image'}
-                className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/60 bg-white/90 text-brand-black shadow-md backdrop-blur-md transition-all hover:bg-white active:scale-95 md:h-8 md:w-8"
+                className="group/arrow pointer-events-auto flex h-11 w-11 items-center justify-center border-0 bg-transparent transition-transform hover:translate-x-0.5 active:scale-90 md:h-9 md:w-9"
               >
-                <ChevronRight className="h-5 w-5 md:h-4 md:w-4" />
+                <ChevronRight aria-hidden="true" className="liquid-glass-chevron h-8 w-8 transition-all group-hover/arrow:scale-110 md:h-6 md:w-6" />
               </button>
             </div>
           )}
