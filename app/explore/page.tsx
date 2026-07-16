@@ -771,7 +771,7 @@ function ExploreContent() {
 
         <section
           aria-label={language === 'es' ? 'Buscar y filtrar propiedades' : 'Search and filter properties'}
-          className="rounded-[28px] border border-brand-gray-200/80 bg-white/90 p-3 shadow-[0_18px_55px_rgba(25,25,35,0.07)] backdrop-blur-xl sm:p-5"
+          className="relative z-[60] rounded-[28px] border border-brand-gray-200/80 bg-white/90 p-3 shadow-[0_18px_55px_rgba(25,25,35,0.07)] backdrop-blur-xl sm:p-5"
         >
         <AuraSearchBar
           value={searchQuery}
@@ -870,7 +870,7 @@ function ExploreContent() {
       </div>
 
       {/* C. Split Explorer Workspace (Grid + Dynamic Map) */}
-      <div className="flex flex-col lg:flex-row gap-8 items-start w-full relative">
+      <div className="relative z-0 isolate flex w-full flex-col items-start gap-8 lg:flex-row">
         
         {/* Left Side: Property Grid (Lists cards dynamically) */}
         <div className={`flex-1 flex flex-col gap-8 w-full transition-all duration-300 ${
