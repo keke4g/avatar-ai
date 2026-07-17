@@ -7,6 +7,9 @@ import {
 } from "../../../lib/services/GeminiService";
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
+  const requestId = request.headers.get('x-vercel-id') || crypto.randomUUID();
+  let resolvedMode = 'standard';
   try {
     let body;
     try {
@@ -27,6 +30,7 @@ export async function POST(request: Request) {
       currentSearchState,
       pageContext,
     } = body as Record<string, unknown>;
+    resolvedMode = typeof responseMode === 'string' ? responseMode : 'standard';
 
     // Validación del mensaje
     if (typeof message !== "string" || message.trim() === "" || message.length > 4_000) {
@@ -98,10 +102,21 @@ export async function POST(request: Request) {
         pageContext,
       });
 
+      console.info(JSON.stringify({
+        level: 'info',
+        message: 'Eterna response completed',
+        route: '/api/avatar',
+        requestId,
+        mode: resolvedMode,
+        model,
+        durationMs: Date.now() - startedAt,
+      }));
+
       return NextResponse.json({
         ...pageResponse,
         provider: "gemini",
         model,
+        durationMs: Date.now() - startedAt,
       });
     }
 
@@ -158,7 +173,15 @@ export async function POST(request: Request) {
       model,
     });
   } catch (error: unknown) {
-    console.error("[AvatarRoute] Error en el endpoint de Avatar:", error);
+    console.error(JSON.stringify({
+      level: 'error',
+      message: 'Eterna response failed',
+      route: '/api/avatar',
+      requestId,
+      mode: resolvedMode,
+      durationMs: Date.now() - startedAt,
+      error: error instanceof Error ? error.message : String(error),
+    }));
 
     const retryable = isRetryableGeminiError(error);
     const upstreamStatus = getGeminiErrorStatus(error);

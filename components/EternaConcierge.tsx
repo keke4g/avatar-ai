@@ -45,6 +45,7 @@ import {
   parseSearchConciergeResponse,
   SearchConciergeResponse,
 } from '../lib/eterna/searchConcierge';
+import { planFastPropertySearch } from '../lib/eterna/fastSearchPlanner';
 import { useSearchActions } from '../lib/eterna/actions/SearchActions';
 import { useNavigationActions } from '../lib/eterna/actions/NavigationActions';
 import { useGeneralActions } from '../lib/eterna/actions/GeneralActions';
@@ -172,7 +173,7 @@ export default function EternaConcierge() {
   const [conversationalSession, setConversationalSession] = useState<ConversationSession>({
     activeIntent: ConversationIntent.NONE,
     status: ConversationStatus.IDLE,
-    step: 'purpose',
+    step: 'operation',
     memory: {},
     createdAt: 0,
     updatedAt: 0
@@ -1290,8 +1291,8 @@ Do not invent any other routes. If the user asks you to go to a section, politel
     
     // Parse budget and minBudget ranges
     const range = searchMemory.budget?.value ? parseBudgetRange(searchMemory.budget.value) : {};
-    const budgetVal = range.max;
-    const minBudgetVal = range.min;
+    const budgetVal = range.max && range.max > 0 ? range.max : undefined;
+    const minBudgetVal = range.min && range.min > 0 ? range.min : undefined;
     
     const roomsVal = searchMemory.rooms?.value;
 
@@ -1332,8 +1333,42 @@ Do not invent any other routes. If the user asks you to go to a section, politel
       filters.type = type;
     }
 
+    const buildExploreUrl = (appliedFilters: PropertySearchFilters) => {
+      let url = `/explore?search=${encodeURIComponent(appliedFilters.city || city)}&offering=${offeringMode}`;
+      if (appliedFilters.budget !== undefined) url += `&budget=${appliedFilters.budget}`;
+      if (appliedFilters.minBudget !== undefined) url += `&minBudget=${appliedFilters.minBudget}`;
+      if (appliedFilters.rooms !== undefined) url += `&rooms=${appliedFilters.rooms}`;
+      if (type) url += `&category=${type.toLowerCase()}`;
+      if (amenityCategories.length > 0) url += `&amenity=${encodeURIComponent(amenityCategories[0])}`;
+      if (viewTypeId) url += `&view=${encodeURIComponent(viewTypeId)}`;
+      return url;
+    };
+
+    const navigateToExplore = (appliedFilters: PropertySearchFilters) => {
+      setExploreFilters({
+        category: type || 'All',
+        offeringTab: offeringMode,
+        query: appliedFilters.city || city,
+        guests: 0,
+        swapType: 'All',
+        sortBy: 'match',
+      });
+      router.push(buildExploreUrl(appliedFilters));
+      if (window.innerWidth < 768) {
+        setIsCompact(true);
+        setIsOpen(true);
+      } else {
+        setIsOpen(false);
+      }
+    };
+
     setThinkingContext('property_search');
-    setSimulatedStatus('thinking');
+    const immediateSearchMessage = intelligentIntro || (language === 'es'
+      ? `Voy a buscar opciones en ${city || 'el catálogo'} con los criterios que me diste.`
+      : `I will search the catalog using the criteria you gave me.`);
+    setChatHistory((previous) => [...previous, { role: 'assistant', content: immediateSearchMessage }]);
+    setSimulatedStatus('talking');
+    speak(immediateSearchMessage);
 
     const sessionId = `session-${Date.now()}`;
     const sessionStart = Date.now();
@@ -1350,6 +1385,14 @@ Do not invent any other routes. If the user asks you to go to a section, politel
       loading: true,
       error: null
     });
+
+    // When there is no price fallback to resolve, the destination URL is
+    // already final. Navigate now and let the catalogue load concurrently.
+    let navigatedEarly = false;
+    if (budgetVal === undefined && minBudgetVal === undefined) {
+      navigateToExplore(filters);
+      navigatedEarly = true;
+    }
 
     try {
       let searchResult = await ServiceFactory.getPropertyService().search(filters);
@@ -1423,8 +1466,11 @@ Do not invent any other routes. If the user asks you to go to a section, politel
           : `I did not find matches for your search in ${city}, but I will show you some alternatives in the explorer.`;
       }
 
-      setChatHistory(prev => [...prev, { role: 'assistant', content: searchMsg }]);
-      setSimulatedStatus('talking');
+      if (searchMsg !== immediateSearchMessage) {
+        setChatHistory(prev => [...prev, { role: 'assistant', content: searchMsg }]);
+        setSimulatedStatus('talking');
+        speak(searchMsg);
+      }
 
       console.log(`[SEARCH]
 Query original: "${userPrompt}"
@@ -1452,45 +1498,7 @@ Explore actualizado: Redirecting to /explore`);
         error: null
       });
 
-      speak(searchMsg);
-
-      // Build URL with used filters. If budget was deleted, it won't be in finalFilters.
-      let url = `/explore?search=${encodeURIComponent(finalFilters.city || city)}&offering=${offeringMode}`;
-      if (finalFilters.budget !== undefined) {
-        url += `&budget=${finalFilters.budget}`;
-      }
-      if (finalFilters.minBudget !== undefined) {
-        url += `&minBudget=${finalFilters.minBudget}`;
-      }
-      if (finalFilters.rooms !== undefined) {
-        url += `&rooms=${finalFilters.rooms}`;
-      }
-      if (type) {
-        url += `&category=${type.toLowerCase()}`;
-      }
-      if (amenityCategories.length > 0) {
-        url += `&amenity=${encodeURIComponent(amenityCategories[0])}`;
-      }
-      if (viewTypeId) {
-        url += `&view=${encodeURIComponent(viewTypeId)}`;
-      }
-
-      setExploreFilters({
-        category: type || 'All',
-        offeringTab: offeringMode,
-        query: finalFilters.city || city,
-        guests: 0,
-        swapType: 'All',
-        sortBy: 'match',
-      });
-
-      router.push(url);
-      if (window.innerWidth < 768) {
-        setIsCompact(true);
-        setIsOpen(true);
-      } else {
-        setIsOpen(false);
-      }
+      if (!navigatedEarly) navigateToExplore(finalFilters);
     } catch (err) {
       searchLogger.error("[Eterna Concierge] Error performing activeSearch:", err);
       setActiveSearch({
@@ -1503,13 +1511,13 @@ Explore actualizado: Redirecting to /explore`);
         loading: false,
         error: err.message || 'Error searching properties'
       });
-      router.push(`/explore?search=${encodeURIComponent(city)}&offering=${offeringMode}`);
+      if (!navigatedEarly) navigateToExplore(filters);
     }
 
     const resetSession: ConversationSession = {
       activeIntent: ConversationIntent.NONE,
       status: ConversationStatus.IDLE,
-      step: 'purpose',
+      step: 'operation',
       memory: {},
       createdAt: Date.now(),
       updatedAt: Date.now()
@@ -1558,11 +1566,11 @@ Explore actualizado: Redirecting to /explore`);
     geminiAbortControllerRef.current?.abort();
     const controller = new AbortController();
     geminiAbortControllerRef.current = controller;
-    const timeoutId = window.setTimeout(() => controller.abort(), 22_000);
+    const timeoutId = window.setTimeout(() => controller.abort(), 8_500);
 
     try {
       const conversationHistory = chatHistoryRef.current
-        .slice(-24)
+        .slice(-12)
         .map((message) => ({ role: message.role, content: message.content }));
       const response = await fetch('/api/avatar', {
         method: 'POST',
@@ -1571,7 +1579,6 @@ Explore actualizado: Redirecting to /explore`);
           message: prompt,
           userId: currentUser?.id,
           conversationHistory,
-          systemPrompt: systemPrompt.content,
           responseMode: 'page_agent',
           pageContext,
         }),
@@ -1592,7 +1599,7 @@ Explore actualizado: Redirecting to /explore`);
         geminiAbortControllerRef.current = null;
       }
     }
-  }, [currentUser?.id, systemPrompt.content]);
+  }, [currentUser?.id]);
 
   const executePageAgentAction = useCallback(async (
     response: PageAgentResponse,
@@ -1795,6 +1802,45 @@ Explore actualizado: Redirecting to /explore`);
       }, null, 2);
     }
 
+    // High-confidence catalog searches do not need a round trip to the LLM.
+    // This preserves context across turns and makes the most common flow feel
+    // immediate, while Gemini remains responsible for nuanced conversation,
+    // property advice and page actions.
+    if (!activeProperty) {
+      const fastSearchPlan = planFastPropertySearch({
+        prompt,
+        currentMemory: conversationalSession.memory,
+        catalogLocations: properties,
+      });
+
+      if (fastSearchPlan.matched) {
+        if (fastSearchPlan.ready) {
+          await runSearchAndRedirect(fastSearchPlan.memory, prompt, fastSearchPlan.reply);
+          return;
+        }
+
+        const updatedSession: ConversationSession = {
+          activeIntent: ConversationIntent.PROPERTY_SEARCH,
+          status: ConversationStatus.COLLECTING,
+          step: fastSearchPlan.missing || 'operation',
+          memory: fastSearchPlan.memory,
+          createdAt: conversationalSession.createdAt || Date.now(),
+          updatedAt: Date.now(),
+        };
+        setConversationalSession(updatedSession);
+        localStorage.setItem('eterna_conversation_session', JSON.stringify(updatedSession));
+        setThinkingContext('property_search');
+        setChatHistory((previous) => [...previous, {
+          role: 'assistant',
+          content: fastSearchPlan.reply,
+          suggestedReplies: fastSearchPlan.suggestedReplies,
+        }]);
+        setSimulatedStatus('talking');
+        speak(fastSearchPlan.reply, () => setSimulatedStatus('idle'));
+        return;
+      }
+    }
+
     // Gemini is the primary decision-maker on every screen. The local intent
     // catalog below remains only as a resilient fallback when the AI endpoint
     // is disabled or temporarily unavailable.
@@ -1824,19 +1870,20 @@ Explore actualizado: Redirecting to /explore`);
             conversationalSession.memory,
             pageDecision.search,
           );
-          const canSearch = pageDecision.search.readyToSearch
-            && Boolean(updatedMemory.operation?.value);
+          // The model may be conservative about readyToSearch. The product
+          // rule is deterministic: operation + location are sufficient;
+          // budget and purpose are optional refinements.
+          const canSearch = Boolean(
+            updatedMemory.operation?.value
+            && (updatedMemory.city?.value || updatedMemory.zone?.value),
+          );
 
           if (canSearch) {
             await runSearchAndRedirect(updatedMemory, prompt, pageDecision.reply);
             return;
           }
 
-          const nextStep: ConversationStep = pageDecision.search.missingField === 'city'
-            ? 'city'
-            : pageDecision.search.missingField === 'budget'
-              ? 'budget'
-              : 'purpose';
+          const nextStep: ConversationStep = updatedMemory.operation?.value ? 'city' : 'operation';
           const updatedSession: ConversationSession = {
             activeIntent: ConversationIntent.PROPERTY_SEARCH,
             status: ConversationStatus.COLLECTING,
@@ -1892,10 +1939,37 @@ Explore actualizado: Redirecting to /explore`);
         }
         return;
       } catch (error) {
-        if ((error as { name?: string }).name !== 'AbortError') {
-          console.warn('[Eterna-Gemini] Page agent failed; using the resilient local flow.', error);
+        if ((error as { name?: string }).name === 'AbortError') return;
+
+        console.warn('[Eterna-Gemini] Page agent failed without activating the legacy questionnaire.', error);
+        const navigationFallback = resolveIntent(prompt);
+        if (
+          navigationFallback.matched
+          && navigationFallback.action === 'navigate'
+          && navigationFallback.route
+        ) {
+          navigateToRoute(navigationFallback.route, prompt, 'view_dashboard');
+          setChatHistory((previous) => [...previous, {
+            role: 'assistant',
+            content: navigationFallback.response,
+            route: navigationFallback.route,
+          }]);
+          setSimulatedStatus('talking');
+          speak(navigationFallback.response, () => setSimulatedStatus('idle'));
+          return;
         }
-        setSimulatedStatus('thinking');
+
+        const recoveryMessage = activeProperty
+          ? 'Conservo la propiedad y tu pregunta, pero no pude completar el análisis en este instante. Inténtalo de nuevo y retomaré exactamente desde aquí.'
+          : 'Conservo lo que me dijiste, pero no pude completar el análisis en este instante. Inténtalo de nuevo y retomaré desde aquí.';
+        setChatHistory((previous) => [...previous, {
+          role: 'assistant',
+          content: recoveryMessage,
+          suggestedReplies: ['Reintentar'],
+        }]);
+        setSimulatedStatus('talking');
+        speak(recoveryMessage, () => setSimulatedStatus('idle'));
+        return;
       }
     }
 
@@ -1939,13 +2013,13 @@ Explore actualizado: Redirecting to /explore`);
       const isReject = /\b(no|incorrecto|cambiar|modificar|corregir|modify|change|correct|edit)\b/i.test(cleanPrompt);
       if (!isConfirm && !isReject) {
         activeIntent = ConversationIntent.NONE;
-        currentStep = 'purpose';
+        currentStep = 'operation';
         memory = {};
         
         const resetSession: ConversationSession = {
           activeIntent: ConversationIntent.NONE,
           status: ConversationStatus.IDLE,
-          step: 'purpose',
+          step: 'operation',
           memory: {},
           createdAt: Date.now(),
           updatedAt: Date.now()
@@ -1977,8 +2051,7 @@ Explore actualizado: Redirecting to /explore`);
           const operation = updatedMemory.operation?.value;
           const hasSearchRequirements = Boolean(
             updatedMemory.city
-            && operation
-            && (operation === 'swap' || updatedMemory.budget),
+            && operation,
           );
 
           if (hasSearchRequirements) {
@@ -1986,11 +2059,7 @@ Explore actualizado: Redirecting to /explore`);
             return;
           }
 
-          const nextStep: ConversationStep = analysis.missingField === 'city'
-            ? 'city'
-            : analysis.missingField === 'budget'
-              ? 'budget'
-              : 'purpose';
+          const nextStep: ConversationStep = operation ? 'city' : 'operation';
           const updatedSession: ConversationSession = {
             activeIntent: ConversationIntent.PROPERTY_SEARCH,
             status: ConversationStatus.COLLECTING,
@@ -2032,7 +2101,7 @@ Explore actualizado: Redirecting to /explore`);
         const resetSession: ConversationSession = {
           activeIntent: ConversationIntent.NONE,
           status: ConversationStatus.IDLE,
-          step: 'purpose',
+          step: 'operation',
           memory: {},
           createdAt: Date.now(),
           updatedAt: Date.now()
@@ -2239,17 +2308,14 @@ Explore actualizado: Redirecting to /explore`);
       const extraSlots = IntentClassifier.extractSlots(prompt);
       updatedMemory = IntentClassifier.mergeSlotsIntoMemory(updatedMemory, extraSlots);
 
-      // If we have both city and budget in updatedMemory, run search and redirect immediately!
-      if (updatedMemory.city && updatedMemory.budget) {
+      // Location + operation are enough to start. All other criteria can be
+      // refined from the result page without blocking the user.
+      if (updatedMemory.city && updatedMemory.operation) {
         await runSearchAndRedirect(updatedMemory, prompt);
         return;
       }
 
-      // Determine next step from the shortened flow: purpose -> city -> budget
-      let nextStep: ConversationStep = 'purpose';
-      if (!updatedMemory.purpose) nextStep = 'purpose';
-      else if (!updatedMemory.city) nextStep = 'city';
-      else if (!updatedMemory.budget) nextStep = 'budget';
+      const nextStep = ConversationEngine.getNextStep(updatedMemory);
 
       const updatedSession: ConversationSession = {
         activeIntent: ConversationIntent.PROPERTY_SEARCH,
@@ -2313,17 +2379,12 @@ Explore actualizado: Redirecting to /explore`);
       // Prefill slots extracted from the prompt
       initialMemory = IntentClassifier.mergeSlotsIntoMemory(initialMemory, classification.slots);
 
-      // If we already have both city and budget, run search and redirect immediately!
-      if (initialMemory.city && initialMemory.budget) {
+      if (initialMemory.city && initialMemory.operation) {
         await runSearchAndRedirect(initialMemory, prompt);
         return;
       }
 
-      // Determine next step from the shortened flow: purpose -> city -> budget
-      let nextStep: ConversationStep = 'purpose';
-      if (!initialMemory.purpose) nextStep = 'purpose';
-      else if (!initialMemory.city) nextStep = 'city';
-      else if (!initialMemory.budget) nextStep = 'budget';
+      const nextStep = ConversationEngine.getNextStep(initialMemory);
 
       const newSession: ConversationSession = {
         activeIntent: ConversationIntent.PROPERTY_SEARCH,

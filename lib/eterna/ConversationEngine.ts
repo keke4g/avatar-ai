@@ -21,6 +21,7 @@ export enum ConversationStatus {
 }
 
 export type ConversationStep =
+  | "operation"
   | "purpose"
   | "city"
   | "budget"
@@ -41,6 +42,7 @@ export interface ConversationMemory {
   zone?: MemoryField<string>;
   propertyType?: MemoryField<string>;
   budget?: MemoryField<string>;
+  budgetOpen?: MemoryField<boolean>;
   currency?: MemoryField<string>;
   rooms?: MemoryField<number>;
   bathrooms?: MemoryField<number>;
@@ -86,6 +88,21 @@ export class ConversationEngine {
         memory[key] = { value, confidence } as unknown as ConversationMemory[K];
       }
     };
+
+    // Operation is a required search key; purpose and budget are optional
+    // refinements and must never block the first useful result set.
+    if (/\b(intercambio|intercambiar|swap|trueque|permuta)\b/i.test(clean)) {
+      setField('operation', 'swap', 0.98);
+    } else if (/\b(rentar|renta|alquilar|alquiler|arrendar|arriendo)\b/i.test(clean)) {
+      setField('operation', 'rent', 0.98);
+    } else if (/\b(comprar|compra|adquirir|adquisicion|venta)\b/i.test(clean)) {
+      setField('operation', 'sale', 0.98);
+    }
+
+    if (/\b(sin (?:un )?presupuesto|no tengo (?:un )?presupuesto|presupuesto abierto|cualquier presupuesto|aun no (?:se|lo se)|todavia no (?:se|lo se))\b/i.test(clean)) {
+      delete memory.budget;
+      setField('budgetOpen', true, 1);
+    }
 
     // 1. Parse purpose
     if (/\b(vivir|residir|habitar|mi familia|casa propia|mi hogar|live|reside|dwelling|home)\b/i.test(clean)) {
@@ -184,11 +201,8 @@ export class ConversationEngine {
 
   // Find the next empty step in order
   static getNextStep(memory: ConversationMemory): ConversationStep {
-    if (!memory.purpose) return 'purpose';
+    if (!memory.operation) return 'operation';
     if (!memory.city) return 'city';
-    if (!memory.budget) return 'budget';
-    if (memory.rooms === undefined) return 'rooms';
-    if (!memory.preferences) return 'preferences';
     return 'confirm';
   }
 
@@ -200,6 +214,10 @@ export class ConversationEngine {
   ): string {
     const isEs = language === 'es';
     switch (step) {
+      case 'operation':
+        return isEs
+          ? '¿Quieres comprar, rentar o intercambiar?'
+          : 'Would you like to buy, rent, or exchange?';
       case 'purpose':
         return isEs
           ? '¿Buscas la propiedad para vivir o como inversión?'

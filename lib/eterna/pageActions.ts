@@ -54,7 +54,7 @@ function getAccessibleName(element: Element): string {
     || html.innerText
     || image?.alt
     || ''
-  ).replace(/\s+/g, ' ').trim().slice(0, 180);
+  ).replace(/\s+/g, ' ').trim().slice(0, 120);
 }
 
 export function captureEternaPageSnapshot(appState: unknown): EternaPageSnapshot {
@@ -63,7 +63,7 @@ export function captureEternaPageSnapshot(appState: unknown): EternaPageSnapshot
     .map((element) => getAccessibleName(element))
     .filter(Boolean)
     .filter((value, index, all) => all.indexOf(value) === index)
-    .slice(0, 35);
+    .slice(0, 20);
 
   const controls = Array.from(document.querySelectorAll(
     'button, a[href], input, select, textarea, summary, [role="button"], [role="link"], [data-eterna-action]',
@@ -83,7 +83,7 @@ export function captureEternaPageSnapshot(appState: unknown): EternaPageSnapshot
     }))
     .filter((control) => control.name)
     .filter((control, index, all) => all.findIndex((item) => item.kind === control.kind && item.name === control.name) === index)
-    .slice(0, 90);
+    .slice(0, 60);
 
   const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
   return {
@@ -159,4 +159,3 @@ export async function executeSemanticPageAction(action: PageAgentAction): Promis
   }
   return { status: 'completed', target: action.target };
 }
-
