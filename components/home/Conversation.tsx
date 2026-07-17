@@ -11,7 +11,7 @@ interface ConversationProps {
 }
 
 export default function Conversation({ searchInput, setSearchInput, isDark }: ConversationProps) {
-  const { eternaChatState } = useLiveContext();
+  const { eternaChatState, sendPrompt } = useLiveContext();
   const { chatHistory } = eternaChatState;
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -112,6 +112,24 @@ export default function Conversation({ searchInput, setSearchInput, isDark }: Co
                   >
                     {msg.content}
                   </div>
+                  {!isUser && msg.suggestedReplies && msg.suggestedReplies.length > 0 && (
+                    <div className="mt-2 flex max-w-[94%] flex-wrap gap-1.5">
+                      {msg.suggestedReplies.map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onClick={() => sendPrompt(suggestion)}
+                          className={`rounded-full border px-3 py-1.5 text-left text-[10px] font-semibold transition-all hover:-translate-y-0.5 ${
+                            isDark
+                              ? 'border-white/10 bg-white/[0.04] text-white/65 hover:border-blue-400/40 hover:text-white'
+                              : 'border-zinc-200 bg-white text-zinc-600 hover:border-[#6C63FF]/40 hover:text-[#6C63FF]'
+                          }`}
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </motion.div>
               );
             })

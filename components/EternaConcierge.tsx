@@ -35,6 +35,11 @@ import {
 import { IntentClassifier } from '../lib/eterna/IntentClassifier';
 import { generatePropertySummary } from '../lib/eterna/actions/PropertyActions';
 import { EternaChatMessage } from '../lib/eterna/propertySales';
+import { PageAgentResponse, parsePageAgentResponse } from '../lib/eterna/pageAgent';
+import {
+  captureEternaPageSnapshot,
+  executeSemanticPageAction,
+} from '../lib/eterna/pageActions';
 import {
   mergeSearchAnalysisIntoMemory,
   parseSearchConciergeResponse,
@@ -85,6 +90,7 @@ export default function EternaConcierge() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [typedInput, setTypedInput] = useState('');
   const [chatHistory, setChatHistory] = useState<EternaChatMessage[]>([]);
+  const chatHistoryRestoredRef = useRef(false);
   const [geminiActive, setGeminiActive] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('auraswap_gemini_active') !== 'false';
@@ -95,6 +101,37 @@ export default function EternaConcierge() {
   useEffect(() => {
     setIsHydrated(true);
   }, []);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('eterna_chat_history_v3');
+      if (stored) {
+        const parsed = JSON.parse(stored) as { updatedAt?: number; messages?: EternaChatMessage[] };
+        if (
+          parsed.updatedAt
+          && Date.now() - parsed.updatedAt < 30 * 60 * 1000
+          && Array.isArray(parsed.messages)
+        ) {
+          setChatHistory(parsed.messages.slice(-30));
+        } else {
+          localStorage.removeItem('eterna_chat_history_v3');
+        }
+      }
+    } catch (error) {
+      console.warn('[Eterna] No fue posible restaurar la conversación.', error);
+      localStorage.removeItem('eterna_chat_history_v3');
+    } finally {
+      chatHistoryRestoredRef.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!chatHistoryRestoredRef.current) return;
+    localStorage.setItem('eterna_chat_history_v3', JSON.stringify({
+      updatedAt: Date.now(),
+      messages: chatHistory.slice(-30),
+    }));
+  }, [chatHistory]);
 
   useEffect(() => {
     const handleEvent = (e: Event) => {
@@ -1240,7 +1277,11 @@ Do not invent any other routes. If the user asks you to go to a section, politel
     return baseQuestion;
   };
 
-  const runSearchAndRedirect = useCallback(async (searchMemory: ConversationMemory, userPrompt: string) => {
+  const runSearchAndRedirect = useCallback(async (
+    searchMemory: ConversationMemory,
+    userPrompt: string,
+    intelligentIntro?: string,
+  ) => {
     const city = searchMemory.city?.value || '';
     const promptHistory = chatHistory.filter(h => h.role === 'user').map(h => h.content).join(' ') + ' ' + userPrompt;
     const offeringMode = determineOfferingMode(searchMemory, promptHistory);
@@ -1372,9 +1413,9 @@ Do not invent any other routes. If the user asks you to go to a section, politel
               : `I did not find properties for that price in ${city || 'that location'}, but I will show you the alternatives in the explorer.`;
           }
         } else {
-          searchMsg = language === 'es'
-            ? `¡Excelente! He encontrado propiedades interesantes en ${city} que se ajustan a tu presupuesto. Te muestro las opciones en el explorador.`
-            : `Excellent! I have found interesting properties in ${city} that match your budget. Showing you the options in the explorer.`;
+          searchMsg = intelligentIntro || (language === 'es'
+            ? `Encontré opciones que coinciden con lo que buscas en ${city || 'el catálogo'}. Te las muestro en el explorador.`
+            : `I found options matching what you need in ${city || 'the catalog'}. I am showing them in the explorer.`);
         }
       } else {
         searchMsg = language === 'es'
@@ -1509,6 +1550,113 @@ Explore actualizado: Redirecting to /explore`);
       },
     }));
   }, [liveContext.property]);
+
+  const requestPageAgentResponse = useCallback(async (
+    prompt: string,
+    pageContext: unknown,
+  ): Promise<PageAgentResponse> => {
+    geminiAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    geminiAbortControllerRef.current = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), 22_000);
+
+    try {
+      const conversationHistory = chatHistoryRef.current
+        .slice(-24)
+        .map((message) => ({ role: message.role, content: message.content }));
+      const response = await fetch('/api/avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: prompt,
+          userId: currentUser?.id,
+          conversationHistory,
+          systemPrompt: systemPrompt.content,
+          responseMode: 'page_agent',
+          pageContext,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(payload?.error || `Eterna page agent HTTP ${response.status}`);
+      }
+
+      const parsed = parsePageAgentResponse(await response.json());
+      if (!parsed) throw new Error('Gemini devolvió una decisión de página inválida.');
+      return parsed;
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (geminiAbortControllerRef.current === controller) {
+        geminiAbortControllerRef.current = null;
+      }
+    }
+  }, [currentUser?.id, systemPrompt.content]);
+
+  const executePageAgentAction = useCallback(async (
+    response: PageAgentResponse,
+    originalPrompt: string,
+  ) => {
+    const { action } = response;
+    if (action.type === 'none' || action.type === 'search_properties') {
+      return { status: 'ignored' as const };
+    }
+
+    if (action.type === 'navigate') {
+      const route = action.route.trim();
+      const isSafeInternalRoute = /^\/(?:$|explore(?:[/?].*)?|dashboard(?:[/?].*)?|messages(?:[/?].*)?|profile(?:[/?].*)?|login(?:[/?].*)?|admin(?:[/?].*)?|property\/[a-zA-Z0-9-]+(?:[/?].*)?)$/.test(route);
+      if (!isSafeInternalRoute) return { status: 'not_found' as const, target: route };
+
+      let intentKey = 'view_dashboard';
+      if (route.includes('tab=properties')) intentKey = response.intent === 'publish' ? 'publish_property' : 'view_properties';
+      else if (route.includes('tab=trips')) intentKey = 'view_trips';
+      else if (route.includes('tab=swaps')) intentKey = 'view_swaps';
+      else if (route.startsWith('/messages')) intentKey = 'view_messages';
+      else if (route.startsWith('/profile')) intentKey = 'edit_profile';
+
+      navigateToRoute(route, originalPrompt, intentKey);
+      return { status: 'completed' as const, target: route };
+    }
+
+    if (action.type === 'go_back') {
+      router.back();
+      return { status: 'completed' as const, target: 'back' };
+    }
+
+    if (action.type === 'open_property_contact') {
+      if (!liveContext.property) return { status: 'not_found' as const, target: 'property contact' };
+      const channel = action.channel === 'call' ? 'call' : 'message';
+      openPropertyContact(channel, response.leadSummary);
+      return { status: 'completed' as const, target: channel };
+    }
+
+    if (action.type === 'open_property_wizard') {
+      if (!currentUser || pathname !== '/dashboard' || searchParams.get('tab') !== 'properties') {
+        navigateToRoute('/dashboard?tab=properties', originalPrompt, 'publish_property');
+      } else {
+        setActiveGuidedFlow('publish_property');
+        window.dispatchEvent(new CustomEvent('open-property-wizard'));
+      }
+      return { status: 'completed' as const, target: 'property wizard' };
+    }
+
+    const result = await executeSemanticPageAction(action);
+    if (window.innerWidth < 768 && result.status === 'completed') {
+      setIsCompact(true);
+      setIsOpen(true);
+    }
+    return result;
+  }, [
+    currentUser,
+    liveContext.property,
+    navigateToRoute,
+    openPropertyContact,
+    pathname,
+    router,
+    searchParams,
+    setActiveGuidedFlow,
+  ]);
 
   const handleSend = async (textToSend?: string) => {
     console.log("[Eterna Voice Console] handleSend() entry point. textToSend:", textToSend, "typedInput:", typedInput);
@@ -1645,6 +1793,110 @@ Explore actualizado: Redirecting to /explore`);
           horarioPreferido: activeProperty.ownerContactTime || "No especificado",
         },
       }, null, 2);
+    }
+
+    // Gemini is the primary decision-maker on every screen. The local intent
+    // catalog below remains only as a resilient fallback when the AI endpoint
+    // is disabled or temporarily unavailable.
+    if (geminiActive) {
+      try {
+        setThinkingContext(activeProperty ? 'property_detail' : 'general');
+        setSimulatedStatus('thinking');
+
+        const pageContext = captureEternaPageSnapshot({
+          route: liveContext.currentUrl,
+          dashboard: liveContext.dashboard,
+          wizard: liveContext.wizard,
+          explore: liveContext.explore,
+          propertyPage: liveContext.propertyPage,
+          auth: liveContext.auth,
+          activeGuidedFlow: liveContext.eterna.activeGuidedFlow,
+          accountSummary: contextBridgeJSON,
+          currentPropertyDossier: activePropertyDossier,
+          currentSearchMemory: conversationalSession.memory,
+        });
+        const pageDecision = await requestPageAgentResponse(prompt, pageContext);
+        const isSearchDecision = pageDecision.intent === 'property_search'
+          || pageDecision.action.type === 'search_properties';
+
+        if (isSearchDecision) {
+          const updatedMemory = mergeSearchAnalysisIntoMemory(
+            conversationalSession.memory,
+            pageDecision.search,
+          );
+          const canSearch = pageDecision.search.readyToSearch
+            && Boolean(updatedMemory.operation?.value);
+
+          if (canSearch) {
+            await runSearchAndRedirect(updatedMemory, prompt, pageDecision.reply);
+            return;
+          }
+
+          const nextStep: ConversationStep = pageDecision.search.missingField === 'city'
+            ? 'city'
+            : pageDecision.search.missingField === 'budget'
+              ? 'budget'
+              : 'purpose';
+          const updatedSession: ConversationSession = {
+            activeIntent: ConversationIntent.PROPERTY_SEARCH,
+            status: ConversationStatus.COLLECTING,
+            step: nextStep,
+            memory: updatedMemory,
+            createdAt: conversationalSession.createdAt || Date.now(),
+            updatedAt: Date.now(),
+          };
+          setConversationalSession(updatedSession);
+          localStorage.setItem('eterna_conversation_session', JSON.stringify(updatedSession));
+          setChatHistory((previous) => [...previous, {
+            role: 'assistant',
+            content: pageDecision.reply,
+            suggestedReplies: pageDecision.suggestedReplies,
+          }]);
+          setSimulatedStatus('talking');
+          speak(pageDecision.reply, () => setSimulatedStatus('idle'));
+          return;
+        }
+
+        const shouldAttachPropertyActions = Boolean(
+          activeProperty
+          && (
+            pageDecision.contactIntent
+            || pageDecision.propertyStage === 'ready_to_contact'
+            || pageDecision.action.type === 'open_property_contact'
+          ),
+        );
+        const propertySales = shouldAttachPropertyActions ? {
+          reply: pageDecision.reply,
+          stage: pageDecision.propertyStage,
+          contactIntent: pageDecision.contactIntent,
+          preferredContact: pageDecision.preferredContact,
+          leadSummary: pageDecision.leadSummary,
+          suggestedQuestions: pageDecision.suggestedReplies,
+        } : undefined;
+
+        setChatHistory((previous) => [...previous, {
+          role: 'assistant',
+          content: pageDecision.reply,
+          propertySales,
+          suggestedReplies: propertySales ? undefined : pageDecision.suggestedReplies,
+        }]);
+        setSimulatedStatus('talking');
+        speak(pageDecision.reply, () => setSimulatedStatus('idle'));
+
+        const actionResult = await executePageAgentAction(pageDecision, prompt);
+        if (actionResult.status === 'not_found') {
+          const clarification = language === 'es'
+            ? `No encuentro “${actionResult.target}” en esta pantalla. Puedo llevarte a la sección correcta si me dices qué deseas conseguir.`
+            : `I cannot find “${actionResult.target}” on this screen. I can take you to the right section if you tell me what you want to accomplish.`;
+          setChatHistory((previous) => [...previous, { role: 'assistant', content: clarification }]);
+        }
+        return;
+      } catch (error) {
+        if ((error as { name?: string }).name !== 'AbortError') {
+          console.warn('[Eterna-Gemini] Page agent failed; using the resilient local flow.', error);
+        }
+        setSimulatedStatus('thinking');
+      }
     }
 
     // On a property page Gemini owns the conversation. Local regex flows only
@@ -2346,7 +2598,7 @@ Explore actualizado: Redirecting to /explore`);
 
     // Check if introduction was already presented in this session
     if (typeof window !== 'undefined') {
-      const introDone = sessionStorage.getItem('eterna_home_intro_v2');
+      const introDone = sessionStorage.getItem('eterna_home_intro_v3');
       if (introDone) return;
     }
 
@@ -2360,11 +2612,11 @@ Explore actualizado: Redirecting to /explore`);
       if (chatHistoryRef.current.length > 0) return;
 
       const part1 = language === 'es'
-        ? "¡Hola! Soy Eterna y estoy aquí para ayudarte a encontrar la propiedad que buscas."
-        : "Hello! I'm Eterna, and I'm here to help you find the property you need.";
+        ? "Hola, soy Eterna, tu asesora inmobiliaria en AuraSwap."
+        : "Hello, I am Eterna, your real estate advisor at AuraSwap.";
       const part2 = language === 'es'
-        ? "A un lado tienes las consultas más frecuentes, o bien, puedes hacer clic en mí en cualquier momento para decirme directamente lo que necesitas."
-        : "Nearby are the most common queries, or you can click on me at any time to tell me directly what you need.";
+        ? "Dime qué quieres lograr: puedo buscar y comparar propiedades, revisar la que estás viendo o llevarte exactamente a la sección que necesitas."
+        : "Tell me what you want to accomplish: I can search and compare properties, review the one you are viewing, or take you directly to the section you need.";
 
       const welcomeMsg = part1 + " " + part2;
 
@@ -2384,7 +2636,7 @@ Explore actualizado: Redirecting to /explore`);
         // Speak Part 2
         speak(part2, () => {
           if (typeof window !== 'undefined') {
-            sessionStorage.setItem('eterna_home_intro_v2', 'true');
+            sessionStorage.setItem('eterna_home_intro_v3', 'true');
             window.dispatchEvent(new CustomEvent('eterna-highlight-actions', { detail: false }));
           }
           setSimulatedStatus('idle');
@@ -2477,6 +2729,7 @@ Explore actualizado: Redirecting to /explore`);
       <AnimatePresence>
         {showOrb && !isOpen && !isHome && (
           <motion.div
+            data-eterna-ui
             initial={{ opacity: 0, scale: 0.5, y: 20 }}
             animate={{ 
               opacity: isDiscrete ? 0.4 : 1, 
@@ -2572,7 +2825,7 @@ Explore actualizado: Redirecting to /explore`);
       {/* B. PERSISTENT FLOATING DRAWER */}
       <AnimatePresence>
         {isOpen && !isHome && (
-          <div className="fixed inset-x-0 bottom-0 md:bottom-6 md:right-6 md:left-auto z-50 flex flex-col items-end pointer-events-none">
+          <div data-eterna-ui className="fixed inset-x-0 bottom-0 md:bottom-6 md:right-6 md:left-auto z-50 flex flex-col items-end pointer-events-none">
             <motion.div
               initial={{ y: '100%', opacity: 0, scale: 0.95 }}
               animate={{ y: 0, opacity: 1, scale: 1 }}
@@ -2837,6 +3090,27 @@ Explore actualizado: Redirecting to /explore`);
                                   {msg.role === 'user' ? t('messages.typing') : 'Eterna IA'}
                                 </span>
                                 <p className="whitespace-pre-line">{msg.content}</p>
+                                {!msg.propertySales && msg.suggestedReplies && msg.suggestedReplies.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {msg.suggestedReplies.map((suggestion) => (
+                                      <button
+                                        key={suggestion}
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          handleSend(suggestion);
+                                        }}
+                                        className={`max-w-full rounded-full border px-2.5 py-1.5 text-left text-[9px] font-bold transition-colors ${
+                                          isHome
+                                            ? 'border-white/15 bg-white/5 text-white/75 hover:border-white/35 hover:text-white'
+                                            : 'border-brand-gray-200 bg-white text-brand-gray-600 hover:border-brand-accent/50 hover:text-brand-accent'
+                                        }`}
+                                      >
+                                        {suggestion}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
                                 {msg.route && (
                                   <button
                                     onClick={(e) => {

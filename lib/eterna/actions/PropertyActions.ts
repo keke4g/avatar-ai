@@ -10,30 +10,13 @@ export const generatePropertySummary = (property: EternaProperty, lang: 'es' | '
   const t = property.title || 'Propiedad';
   const loc = property.location || 'Destino';
   const c = property.country || '';
-  const bedrooms = property.bedrooms || 0;
-  const bathrooms = property.bathrooms || 0;
-  const debtStatus = property.legalDebtFree;
 
   if (lang === 'es') {
-    const legalClause = debtStatus === true
-      ? ' y se encuentra libre de gravamen'
-      : debtStatus === false
-        ? ' y registra un gravamen activo'
-        : '';
-    const bedText = formatCount(bedrooms, 'habitación', 'habitaciones', 'feminine', true);
-    const bathText = formatCount(bathrooms, 'baño', 'baños', 'masculine', true);
-    
-    return `Estamos en "${t}", ubicada en ${loc} (${c}). Esta exclusiva propiedad cuenta con ${bedText} y ${bathText}${legalClause}. ¿Deseas que te explique los detalles de sus características, expediente jurídico o modalidades de adquisición?`;
+    const location = [loc, c].filter(Boolean).join(', ');
+    return `Ya tengo abierta la ficha de "${t}" en ${location}. Puedo analizar contigo cualquier dato del anuncio, señalar lo que falta o llevarte a la sección que necesites; pregúntame con total libertad.`;
   } else {
-    const legalClause = debtStatus === true
-      ? ' and is confirmed free of liens'
-      : debtStatus === false
-        ? ' and has an active lien on record'
-        : '';
-    const bedText = bedrooms === 1 ? '1 bedroom' : `${bedrooms} bedrooms`;
-    const bathText = bathrooms === 1 ? '1 bathroom' : `${bathrooms} bathrooms`;
-
-    return `We are viewing "${t}", located in ${loc} (${c}). This exclusive property features ${bedText} and ${bathText}${legalClause}. Would you like me to explain its features, legal dossier, or acquisition terms?`;
+    const location = [loc, c].filter(Boolean).join(', ');
+    return `I have the full listing for "${t}" in ${location} open. I can analyze any detail with you, point out what is missing, or take you to the section you need—ask me naturally.`;
   }
 };
 

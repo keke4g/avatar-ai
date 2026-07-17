@@ -68,6 +68,7 @@ export interface ChatMessage {
   route?: string;
   showAuthButtons?: boolean;
   showPublishButton?: boolean;
+  suggestedReplies?: string[];
 }
 
 export interface EternaChatState {

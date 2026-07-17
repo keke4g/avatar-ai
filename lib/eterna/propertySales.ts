@@ -22,6 +22,7 @@ export interface EternaChatMessage {
   showAuthButtons?: boolean;
   showPublishButton?: boolean;
   propertySales?: PropertySalesResponse;
+  suggestedReplies?: string[];
 }
 
 const STAGES = new Set<PropertyConversationStage>([

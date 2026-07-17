@@ -18,7 +18,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const { message, userId, conversationHistory, systemPrompt, responseMode, currentSearchState } = body as Record<string, unknown>;
+    const {
+      message,
+      userId,
+      conversationHistory,
+      systemPrompt,
+      responseMode,
+      currentSearchState,
+      pageContext,
+    } = body as Record<string, unknown>;
 
     // Validación del mensaje
     if (typeof message !== "string" || message.trim() === "" || message.length > 4_000) {
@@ -64,11 +72,37 @@ export async function POST(request: Request) {
       && responseMode !== "standard"
       && responseMode !== "property_sales"
       && responseMode !== "search_concierge"
+      && responseMode !== "page_agent"
     ) {
       return NextResponse.json(
         { error: "El campo 'responseMode' no es válido." },
         { status: 400 },
       );
+    }
+
+    if (responseMode === "page_agent") {
+      if (
+        pageContext !== undefined
+        && (!pageContext || typeof pageContext !== "object" || JSON.stringify(pageContext).length > 60_000)
+      ) {
+        return NextResponse.json(
+          { error: "El contexto actual de la página no es válido." },
+          { status: 400 },
+        );
+      }
+
+      const { result: pageResponse, model } = await GeminiService.generatePageAgentResponse({
+        message: message.trim(),
+        conversationHistory: typedHistory,
+        systemPrompt: typeof systemPrompt === "string" ? systemPrompt : undefined,
+        pageContext,
+      });
+
+      return NextResponse.json({
+        ...pageResponse,
+        provider: "gemini",
+        model,
+      });
     }
 
     if (responseMode === "property_sales") {
