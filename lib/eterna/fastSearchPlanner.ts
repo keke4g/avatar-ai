@@ -52,8 +52,18 @@ function extractPropertyType(prompt: string): 'departamento' | 'casa' | null {
 function extractCity(prompt: string, hints: CatalogLocationHint[]): string | null {
   const clean = normalize(prompt);
   const aliases: Array<[RegExp, string]> = [
-    [/\b(?:gdl)\b/, 'Guadalajara'],
+    [/\b(?:gdl|guadalajara)\b/, 'Guadalajara'],
     [/\b(?:cdmx|ciudad de mexico)\b/, 'Ciudad de México'],
+    [/\bmazatlan\b/, 'Mazatlán'],
+    [/\bculiacan\b/, 'Culiacán'],
+    [/\bcancun\b/, 'Cancún'],
+    [/\bmerida\b/, 'Mérida'],
+    [/\bqueretaro\b/, 'Querétaro'],
+    [/\bmonterrey\b/, 'Monterrey'],
+    [/\bzapopan\b/, 'Zapopan'],
+    [/\bchihuahua\b/, 'Chihuahua'],
+    [/\bpuebla\b/, 'Puebla'],
+    [/\btulum\b/, 'Tulum'],
   ];
   for (const [pattern, city] of aliases) {
     if (pattern.test(clean)) return city;
