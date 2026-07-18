@@ -66,6 +66,12 @@ import { useThinkingContext } from '../hooks/useThinkingContext';
 
 type ThinkingContext = 'property_search' | 'property_detail' | 'publish_property' | 'swap' | 'navigation' | 'general';
 
+const ETERNA_CHAT_SESSION_KEY = 'eterna_chat_history_v4';
+const ETERNA_CONVERSATION_SESSION_KEY = 'eterna_conversation_session_v2';
+const ETERNA_HOME_INTRO_SESSION_KEY = 'eterna_home_intro_v4';
+const ETERNA_SESSION_TTL_MS = 30 * 60 * 1000;
+const LEGACY_ETERNA_LOCAL_KEYS = ['eterna_chat_history_v3', 'eterna_conversation_session'] as const;
+
 export default function EternaConcierge() {
   const pathname = usePathname();
   const isHome = pathname === "/";
@@ -105,22 +111,23 @@ export default function EternaConcierge() {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('eterna_chat_history_v3');
+      LEGACY_ETERNA_LOCAL_KEYS.forEach((key) => localStorage.removeItem(key));
+      const stored = sessionStorage.getItem(ETERNA_CHAT_SESSION_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as { updatedAt?: number; messages?: EternaChatMessage[] };
         if (
           parsed.updatedAt
-          && Date.now() - parsed.updatedAt < 30 * 60 * 1000
+          && Date.now() - parsed.updatedAt < ETERNA_SESSION_TTL_MS
           && Array.isArray(parsed.messages)
         ) {
           setChatHistory(parsed.messages.slice(-30));
         } else {
-          localStorage.removeItem('eterna_chat_history_v3');
+          sessionStorage.removeItem(ETERNA_CHAT_SESSION_KEY);
         }
       }
     } catch (error) {
       console.warn('[Eterna] No fue posible restaurar la conversación.', error);
-      localStorage.removeItem('eterna_chat_history_v3');
+      sessionStorage.removeItem(ETERNA_CHAT_SESSION_KEY);
     } finally {
       chatHistoryRestoredRef.current = true;
     }
@@ -128,7 +135,7 @@ export default function EternaConcierge() {
 
   useEffect(() => {
     if (!chatHistoryRestoredRef.current) return;
-    localStorage.setItem('eterna_chat_history_v3', JSON.stringify({
+    sessionStorage.setItem(ETERNA_CHAT_SESSION_KEY, JSON.stringify({
       updatedAt: Date.now(),
       messages: chatHistory.slice(-30),
     }));
@@ -181,15 +188,18 @@ export default function EternaConcierge() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('eterna_conversation_session');
+      const stored = sessionStorage.getItem(ETERNA_CONVERSATION_SESSION_KEY);
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
-          if (parsed && Date.now() - parsed.updatedAt < 30 * 60 * 1000) {
+          if (parsed && Date.now() - parsed.updatedAt < ETERNA_SESSION_TTL_MS) {
             setConversationalSession(parsed);
+          } else {
+            sessionStorage.removeItem(ETERNA_CONVERSATION_SESSION_KEY);
           }
         } catch (e) {
           console.warn("[Eterna] Failed to parse conversational session:", e);
+          sessionStorage.removeItem(ETERNA_CONVERSATION_SESSION_KEY);
         }
       }
     }
@@ -1524,7 +1534,7 @@ Explore actualizado: Redirecting to /explore`);
     };
     setConversationalSession(resetSession);
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('eterna_conversation_session');
+      sessionStorage.removeItem(ETERNA_CONVERSATION_SESSION_KEY);
     }
   }, [
     language,
@@ -1828,7 +1838,7 @@ Explore actualizado: Redirecting to /explore`);
           updatedAt: Date.now(),
         };
         setConversationalSession(updatedSession);
-        localStorage.setItem('eterna_conversation_session', JSON.stringify(updatedSession));
+        sessionStorage.setItem(ETERNA_CONVERSATION_SESSION_KEY, JSON.stringify(updatedSession));
         setThinkingContext('property_search');
         setChatHistory((previous) => [...previous, {
           role: 'assistant',
@@ -1893,7 +1903,7 @@ Explore actualizado: Redirecting to /explore`);
             updatedAt: Date.now(),
           };
           setConversationalSession(updatedSession);
-          localStorage.setItem('eterna_conversation_session', JSON.stringify(updatedSession));
+          sessionStorage.setItem(ETERNA_CONVERSATION_SESSION_KEY, JSON.stringify(updatedSession));
           setChatHistory((previous) => [...previous, {
             role: 'assistant',
             content: pageDecision.reply,
@@ -2026,7 +2036,7 @@ Explore actualizado: Redirecting to /explore`);
         };
         setConversationalSession(resetSession);
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('eterna_conversation_session');
+          sessionStorage.removeItem(ETERNA_CONVERSATION_SESSION_KEY);
         }
       }
     }
@@ -2070,7 +2080,7 @@ Explore actualizado: Redirecting to /explore`);
           };
 
           setConversationalSession(updatedSession);
-          localStorage.setItem('eterna_conversation_session', JSON.stringify(updatedSession));
+          sessionStorage.setItem(ETERNA_CONVERSATION_SESSION_KEY, JSON.stringify(updatedSession));
           setChatHistory(prev => [...prev, { role: 'assistant', content: analysis.reply }]);
           setSimulatedStatus('talking');
           speak(analysis.reply, () => setSimulatedStatus('idle'));
@@ -2108,7 +2118,7 @@ Explore actualizado: Redirecting to /explore`);
         };
         setConversationalSession(resetSession);
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('eterna_conversation_session');
+          sessionStorage.removeItem(ETERNA_CONVERSATION_SESSION_KEY);
         }
 
         if (isTopicChange) {
@@ -2223,7 +2233,7 @@ Explore actualizado: Redirecting to /explore`);
             };
             setConversationalSession(updatedSession);
             if (typeof window !== 'undefined') {
-              localStorage.setItem('eterna_conversation_session', JSON.stringify(updatedSession));
+              sessionStorage.setItem(ETERNA_CONVERSATION_SESSION_KEY, JSON.stringify(updatedSession));
             }
 
             const question = await askStepOrConfirm(nextStep, memory, prompt);
@@ -2275,7 +2285,7 @@ Explore actualizado: Redirecting to /explore`);
             };
             setConversationalSession(updatedSession);
             if (typeof window !== 'undefined') {
-              localStorage.setItem('eterna_conversation_session', JSON.stringify(updatedSession));
+              sessionStorage.setItem(ETERNA_CONVERSATION_SESSION_KEY, JSON.stringify(updatedSession));
             }
 
             const question = await askStepOrConfirm(nextStep, memory, prompt);
@@ -2327,7 +2337,7 @@ Explore actualizado: Redirecting to /explore`);
       };
       setConversationalSession(updatedSession);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('eterna_conversation_session', JSON.stringify(updatedSession));
+        sessionStorage.setItem(ETERNA_CONVERSATION_SESSION_KEY, JSON.stringify(updatedSession));
       }
 
       const question = await askStepOrConfirm(nextStep, updatedMemory, prompt);
@@ -2396,7 +2406,7 @@ Explore actualizado: Redirecting to /explore`);
       };
       setConversationalSession(newSession);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('eterna_conversation_session', JSON.stringify(newSession));
+        sessionStorage.setItem(ETERNA_CONVERSATION_SESSION_KEY, JSON.stringify(newSession));
       }
 
       const question = await askStepOrConfirm(nextStep, initialMemory, prompt);
@@ -2659,7 +2669,7 @@ Explore actualizado: Redirecting to /explore`);
 
     // Check if introduction was already presented in this session
     if (typeof window !== 'undefined') {
-      const introDone = sessionStorage.getItem('eterna_home_intro_v3');
+      const introDone = sessionStorage.getItem(ETERNA_HOME_INTRO_SESSION_KEY);
       if (introDone) return;
     }
 
@@ -2687,7 +2697,16 @@ Explore actualizado: Redirecting to /explore`);
         return [...prev, { role: 'assistant', content: welcomeMsg }];
       });
 
-      // Speak Part 1 first
+      let welcomeBecameAudible = false;
+      const welcomeSpeechOptions = {
+        preferImmediate: true,
+        onStart: () => {
+          welcomeBecameAudible = true;
+        },
+      };
+
+      // Speak Part 1 first. Before the first user gesture, browser speech is
+      // intentionally preferred because remote audio autoplay is commonly blocked.
       speak(part1, () => {
         // Highlight action cards exactly when Part 2 starts
         if (typeof window !== 'undefined') {
@@ -2697,11 +2716,13 @@ Explore actualizado: Redirecting to /explore`);
         // Speak Part 2
         speak(part2, () => {
           if (typeof window !== 'undefined') {
-            sessionStorage.setItem('eterna_home_intro_v3', 'true');
+            if (welcomeBecameAudible) {
+              sessionStorage.setItem(ETERNA_HOME_INTRO_SESSION_KEY, 'true');
+            }
             window.dispatchEvent(new CustomEvent('eterna-highlight-actions', { detail: false }));
           }
           setSimulatedStatus('idle');
-        });
+        }, welcomeSpeechOptions);
 
         // Safety timeout to disable highlight after 8 seconds in case speech fails to end
         safetyTimer = setTimeout(() => {
@@ -2709,7 +2730,7 @@ Explore actualizado: Redirecting to /explore`);
             window.dispatchEvent(new CustomEvent('eterna-highlight-actions', { detail: false }));
           }
         }, 8000);
-      });
+      }, welcomeSpeechOptions);
 
     }, 1800);
 

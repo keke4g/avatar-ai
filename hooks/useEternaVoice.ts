@@ -8,8 +8,14 @@ import {
   getEternaVoiceEngine,
   loadGlobalEternaVoiceSettings,
 } from '../lib/eterna/voiceConfig';
+import { normalizeEternaSpeechText } from '../lib/eterna/speechText';
 
 export type VoiceModeState = 'disabled' | 'LISTENING' | 'PROCESSING' | 'SPEAKING' | 'COOLDOWN';
+
+interface SpeakOptions {
+  onStart?: () => void;
+  preferImmediate?: boolean;
+}
 
 function calculateSimilarity(str1: string, str2: string): number {
   const s1 = str1.trim().toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "");
@@ -376,7 +382,7 @@ export function useEternaVoice({
   }, []);
 
   // Centralized, optimized SpeechSynthesis controller
-  const speak = useCallback((text: string, onEnd?: () => void) => {
+  const speak = useCallback((text: string, onEnd?: () => void, options: SpeakOptions = {}) => {
     if (typeof window === 'undefined') {
       onEnd?.();
       return;
@@ -415,7 +421,9 @@ export function useEternaVoice({
       }
     }
 
-    if (isMutedRef.current || !text.trim()) {
+    const speechText = normalizeEternaSpeechText(text, languageRef.current);
+
+    if (isMutedRef.current || !speechText.trim()) {
       setThinkingContextRef.current?.('general');
       setSimulatedStatusRef.current?.('idle');
       isStoppingForSpeechRef.current = false; // Reset the flag since we're not speaking
@@ -426,7 +434,9 @@ export function useEternaVoice({
       return;
     }
 
-    const selectedEngine = voiceEngineRef.current;
+    const shouldUseImmediateBrowser = options.preferImmediate
+      && (!navigator.userActivation || !navigator.userActivation.hasBeenActive);
+    const selectedEngine = shouldUseImmediateBrowser ? 'browser' : voiceEngineRef.current;
     setIsSpeaking(false);
     isSpeakingRef.current = false;
     if (selectedEngine !== 'browser') {
@@ -438,7 +448,7 @@ export function useEternaVoice({
 
     // La sesión empieza ahora para poder cancelarla durante la petición, pero
     // el avatar no entra en modo hablando hasta que el audio sea audible.
-    lastSpokenTextRef.current = text;
+    lastSpokenTextRef.current = speechText;
     console.log('[AUDIT] speechSessionActiveRef -> true');
     speechSessionActiveRef.current = true;
 
@@ -452,6 +462,7 @@ export function useEternaVoice({
       setSimulatedStatusRef.current?.('talking');
       setIsSpeaking(true);
       isSpeakingRef.current = true;
+      options.onStart?.();
       console.log('[VOICE STATE] audible speech start');
     };
 
@@ -511,21 +522,13 @@ export function useEternaVoice({
     };
 
     const playWithBrowser = () => {
-      const userActivation = navigator.userActivation;
-      if (userActivation && !userActivation.hasBeenActive) {
-        pendingAudioUnlockRef.current = playWithBrowser;
-        setSimulatedStatusRef.current?.('idle');
-        addVoiceDebugLog('[VOICE WAITING FOR MOBILE GESTURE] browser');
-        return;
-      }
-
       if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
         handleEnd();
         return;
       }
 
       try {
-        const utterance = new SpeechSynthesisUtterance(text);
+        const utterance = new SpeechSynthesisUtterance(speechText);
         if (selectedVoiceRef.current) {
           utterance.voice = selectedVoiceRef.current;
           utterance.lang = selectedVoiceRef.current.lang;
@@ -557,7 +560,7 @@ export function useEternaVoice({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            texto: text,
+            texto: speechText,
             engine,
             deepgramVoiceProfile: engine === 'deepgram' ? getDeepgramVoiceProfile() : undefined,
           }),
