@@ -34,7 +34,7 @@ const isScenarioChange = (prompt: string) => /\b(enganche|plazo|tasa|anos?|years
 const isAffirmative = (prompt: string) => /^(si|claro|ok|okay|yes|por supuesto|dale)$/.test(prompt.trim());
 
 function extractScenario(prompt: string, base: MortgageScenario): MortgageScenario {
-  const downPaymentMatch = prompt.match(/enganche(?:\s+(?:de|del))?\s*(\d+(?:\.\d+)?)\s*%?/) 
+  const downPaymentMatch = prompt.match(/enganche(?:\s+(?:de|del))?\s*(\d+(?:\.\d+)?)\s*%?/)
     ?? prompt.match(/(\d+(?:\.\d+)?)\s*%\s*(?:de\s+)?enganche/);
   const rateMatch = prompt.match(/tasa(?:\s+(?:de|del))?\s*(\d+(?:\.\d+)?)\s*%?/)
     ?? prompt.match(/(\d+(?:\.\d+)?)\s*%\s*(?:de\s+)?(?:tasa|anual)/);
