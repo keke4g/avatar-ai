@@ -213,7 +213,7 @@ export default function GooglePropertyLocation({ property, places, loading, erro
           </div>
         )}
         {!loading && !error && featuredPlaces.length === 0 && <p className="rounded-2xl bg-slate-50 px-4 py-4 text-xs font-semibold text-slate-500">{language === 'es' ? 'No encontramos puntos de interés dentro del radio consultado.' : 'No nearby places were found in the search radius.'}</p>}
-        {!loading && error && <p className="rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3 text-[11px] font-semibold leading-relaxed text-amber-800">{error}</p>}
+        {!loading && error && <p className="rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3 text-[11px] font-semibold leading-relaxed text-amber-800">{language === 'es' ? 'El mapa está disponible. El análisis automático del entorno se está preparando y volverá a intentarse más adelante.' : 'The map is available. The nearby-area analysis is being prepared and will retry later.'}</p>}
       </div>
     </div>
   );
