@@ -36,6 +36,7 @@ export function normalizeEternaSpeechText(text: string, language: 'es' | 'en' = 
   normalized = replaceCurrencyAmount(normalized, 'USD', 'dólares estadounidenses');
 
   return normalized
+    .replace(new RegExp(String.raw`\$\s*(${SPOKEN_AMOUNT})\s+pesos\b`, 'gi'), '$1 pesos')
     .replace(/\bpesos(?:\s+mexicanos)?\s+(?:MXN|M\.?\s*N\.?)\b/gi, 'pesos')
     .replace(/\bdólares(?:\s+estadounidenses)?\s+USD\b/gi, 'dólares estadounidenses')
     .replace(/\b(?:MXN|M\.?\s*N\.?)\b/gi, 'pesos mexicanos')

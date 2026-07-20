@@ -24,6 +24,12 @@ import { EternaMarketAnalysis } from '../../../components/property/sections/Eter
 import { getEmbeddableMediaUrl, getVimeoEmbedUrl, getYouTubeEmbedUrl } from '../../../lib/mediaEmbeds';
 import GooglePropertyLocation from '../../../components/property/GooglePropertyLocation';
 import { useNearbyPlaces } from '../../../hooks/useNearbyPlaces';
+import {
+  calculateMortgage,
+  DEFAULT_MORTGAGE_SCENARIO,
+  MORTGAGE_SIMULATION_EVENT,
+} from '../../../lib/finance/mortgage';
+import type { MortgageSimulationEventDetail } from '../../../lib/finance/mortgage';
 
 interface PropertyDetailsClientProps {
   id: string;
@@ -266,8 +272,22 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   };
 
   // Financing Calculator States
-  const [downPaymentPct, setDownPaymentPct] = useState(20);
-  const [financingTermYears, setFinancingTermYears] = useState(20);
+  const [downPaymentPct, setDownPaymentPct] = useState<number>(DEFAULT_MORTGAGE_SCENARIO.downPaymentPercent);
+  const [financingTermYears, setFinancingTermYears] = useState<number>(DEFAULT_MORTGAGE_SCENARIO.years);
+  const [mortgageAnnualRatePct, setMortgageAnnualRatePct] = useState<number>(DEFAULT_MORTGAGE_SCENARIO.annualRatePercent);
+
+  useEffect(() => {
+    const handleMortgageSimulation = (event: Event) => {
+      const detail = (event as CustomEvent<MortgageSimulationEventDetail>).detail;
+      if (!detail || detail.propertyId !== id) return;
+      setDownPaymentPct(detail.downPaymentPercent);
+      setFinancingTermYears(detail.years);
+      setMortgageAnnualRatePct(detail.annualRatePercent);
+    };
+
+    window.addEventListener(MORTGAGE_SIMULATION_EVENT, handleMortgageSimulation);
+    return () => window.removeEventListener(MORTGAGE_SIMULATION_EVENT, handleMortgageSimulation);
+  }, [id]);
 
   // Multimedia Tab States
   const [activeMediaTab, setActiveMediaTab] = useState<string>('');
@@ -2465,12 +2485,13 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   {/* Calculator Payment display */}
                   {(() => {
                     const price = activeSaleOffering.priceAmount || 450000;
-                    const downPayment = price * (downPaymentPct / 100);
-                    const loan = price - downPayment;
-                    const annualRate = 0.105; // 10.5% annual rate
-                    const monthlyRate = annualRate / 12;
-                    const totalPayments = financingTermYears * 12;
-                    const monthlyPayment = loan * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+                    const mortgage = calculateMortgage(price, {
+                      downPaymentPercent: downPaymentPct,
+                      years: financingTermYears,
+                      annualRatePercent: mortgageAnnualRatePct,
+                    });
+
+                    if (!mortgage) return null;
 
                     return (
                       <div className="bg-brand-accent/5 p-3 rounded-2xl border border-brand-accent/20 flex flex-col gap-1 text-center">
@@ -2478,12 +2499,12 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                           {language === 'es' ? 'Mensualidad Estimada' : 'Estimated Monthly Payment'}
                         </span>
                         <span className="text-xl font-black text-brand-black">
-                          ${Math.round(monthlyPayment).toLocaleString()} {activeSaleOffering.currency || 'USD'}
+                          ${Math.round(mortgage.monthlyPayment).toLocaleString()} {activeSaleOffering.currency || 'USD'}
                         </span>
                         <span className="text-[9px] text-brand-gray-500 font-semibold">
                           {language === 'es'
-                            ? `Financiando el ${100 - downPaymentPct}% a tasa fija de 10.5%`
-                            : `Financing ${100 - downPaymentPct}% at 10.5% fixed rate`}
+                            ? `Financiando el ${100 - downPaymentPct}% a tasa fija de ${mortgageAnnualRatePct}%`
+                            : `Financing ${100 - downPaymentPct}% at a ${mortgageAnnualRatePct}% fixed rate`}
                         </span>
                       </div>
                     );

@@ -34,6 +34,9 @@ import {
 } from '../lib/eterna/ConversationEngine';
 import { IntentClassifier } from '../lib/eterna/IntentClassifier';
 import { generatePropertySummary } from '../lib/eterna/actions/PropertyActions';
+import { resolveMortgageQuestion } from '../lib/eterna/actions/MortgageActions';
+import type { MortgageConversationContext } from '../lib/eterna/actions/MortgageActions';
+import { MORTGAGE_SIMULATION_EVENT } from '../lib/finance/mortgage';
 import { EternaChatMessage } from '../lib/eterna/propertySales';
 import { PageAgentResponse, parsePageAgentResponse } from '../lib/eterna/pageAgent';
 import {
@@ -97,6 +100,7 @@ export default function EternaConcierge() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [typedInput, setTypedInput] = useState('');
   const [chatHistory, setChatHistory] = useState<EternaChatMessage[]>([]);
+  const mortgageConversationRef = useRef<MortgageConversationContext | null>(null);
   const chatHistoryRestoredRef = useRef(false);
   const [geminiActive, setGeminiActive] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -1854,6 +1858,32 @@ Explore actualizado: Redirecting to /explore`);
         }]);
         setSimulatedStatus('talking');
         speak(fastSearchPlan.reply, () => setSimulatedStatus('idle'));
+        return;
+      }
+    }
+
+    // Mortgage questions are deterministic and must run before the general AI
+    // agent so the figure is immediate, auditable, and identical to the UI.
+    if (activeProperty) {
+      const mortgageAnswer = resolveMortgageQuestion(
+        prompt,
+        activeProperty,
+        language === 'es' ? 'es' : 'en',
+        mortgageConversationRef.current,
+      );
+
+      if (mortgageAnswer) {
+        mortgageConversationRef.current = mortgageAnswer.scenario;
+        window.dispatchEvent(new CustomEvent(MORTGAGE_SIMULATION_EVENT, {
+          detail: mortgageAnswer.scenario,
+        }));
+        setChatHistory((previous) => [...previous, {
+          role: 'assistant',
+          content: mortgageAnswer.reply,
+          suggestedReplies: mortgageAnswer.suggestedReplies,
+        }]);
+        setSimulatedStatus('talking');
+        speak(mortgageAnswer.reply, () => setSimulatedStatus('idle'));
         return;
       }
     }
