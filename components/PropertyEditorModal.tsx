@@ -24,6 +24,8 @@ import { Property, PropertyMedia, PropertyOffering, PropertyOfferingMode } from 
 import ImageUploadDropzone, { ImageMetadata } from './ImageUploadDropzone';
 import VideoUploadDropzone from './VideoUploadDropzone';
 import { getVirtualTourProvider } from '../lib/mediaEmbeds';
+import GoogleAddressAutocomplete from './maps/GoogleAddressAutocomplete';
+import type { GoogleAddressResult } from '../lib/maps/types';
 
 interface PropertyEditorModalProps {
   isOpen: boolean;
@@ -69,6 +71,9 @@ type EditorForm = {
   showPublicAddress: boolean;
   latitude: string;
   longitude: string;
+  placeId: string;
+  formattedAddress: string;
+  geometrySource: NonNullable<Property['geometrySource']> | '';
   bedrooms: string;
   bathrooms: string;
   halfBathrooms: string;
@@ -204,6 +209,9 @@ function formFromProperty(property: Property): EditorForm {
     showPublicAddress: property.showPublicAddress ?? true,
     latitude: stringValue(property.latitude),
     longitude: stringValue(property.longitude),
+    placeId: property.placeId || '',
+    formattedAddress: property.formattedAddress || '',
+    geometrySource: property.geometrySource || '',
     bedrooms: stringValue(property.bedrooms),
     bathrooms: stringValue(property.bathrooms),
     halfBathrooms: stringValue(property.halfBathrooms ?? 0),
@@ -381,6 +389,25 @@ export default function PropertyEditorModal({ isOpen, property, onClose, onSubmi
     setForm((current) => ({ ...current, [key]: value }));
   };
 
+  const applyGoogleAddress = (result: GoogleAddressResult) => {
+    setSaved(false);
+    setForm((current) => ({
+      ...current,
+      city: result.city || current.city,
+      state: result.state || current.state,
+      country: result.country || current.country,
+      neighborhood: result.neighborhood || current.neighborhood,
+      streetName: result.streetName || current.streetName,
+      streetNumber: result.streetNumber || current.streetNumber,
+      postalCode: result.postalCode || current.postalCode,
+      latitude: String(result.latitude),
+      longitude: String(result.longitude),
+      placeId: result.placeId,
+      formattedAddress: result.formattedAddress,
+      geometrySource: 'google_places',
+    }));
+  };
+
   useEffect(() => {
     const next = formFromProperty(property);
     setForm(next);
@@ -521,6 +548,9 @@ export default function PropertyEditorModal({ isOpen, property, onClose, onSubmi
       showPublicAddress: form.showPublicAddress,
       latitude: numberOrNull(form.latitude),
       longitude: numberOrNull(form.longitude),
+      placeId: form.placeId || null,
+      formattedAddress: form.formattedAddress || null,
+      geometrySource: form.geometrySource || 'manual',
       bedrooms: numberOrZero(form.bedrooms),
       bathrooms: numberOrZero(form.bathrooms),
       halfBathrooms: numberOrZero(form.halfBathrooms),
@@ -693,6 +723,13 @@ export default function PropertyEditorModal({ isOpen, property, onClose, onSubmi
               </Section>
 
               <Section id="location" eyebrow="02 · Dirección" title="Ubicación de la propiedad" description="La ciudad es el dato principal de búsqueda. La dirección exacta puede mantenerse privada en la vista pública.">
+                <div className="mb-5">
+                  <GoogleAddressAutocomplete
+                    compact
+                    onSelect={applyGoogleAddress}
+                    selectedAddress={form.formattedAddress}
+                  />
+                </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   <Field label="Ciudad" required><input value={form.city} onChange={(event) => update('city', event.target.value)} className={inputClass} autoComplete="address-level2" /></Field>
                   <Field label="Estado / provincia"><input value={form.state} onChange={(event) => update('state', event.target.value)} className={inputClass} autoComplete="address-level1" /></Field>

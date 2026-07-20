@@ -1801,6 +1801,13 @@ Explore actualizado: Redirecting to /explore`);
           estadoConservacion: activeProperty.conservationStateId || null,
         },
         amenidades: activeProperty.amenities || [],
+        entornoGoogle: (activeProperty.nearbyPlaces || []).map((place) => ({
+          categoria: place.category,
+          nombre: place.name,
+          distanciaMetros: place.distanceMeters,
+          tiempoEnAutoMinutos: place.durationSeconds ? Math.max(1, Math.round(place.durationSeconds / 60)) : null,
+          fuenteDistancia: place.routeSource === 'google_routes' ? 'Ruta de Google Maps' : 'Distancia lineal',
+        })),
         expedienteJuridico: legalStatus,
         modalidadesYMetodosPago: paymentMethods,
         responsableComercial: {

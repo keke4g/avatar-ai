@@ -29,6 +29,36 @@ export const resolveLocalPropertyQA = (prompt: string, property: EternaProperty,
   const desc = (property.description || '').toLowerCase();
   const amenities = (property.amenities || []).map(a => a.toLowerCase());
 
+  const asksAboutNearby = ['escuela', 'colegio', 'supermercado', 'super ', 'hospital', 'clinica', 'parque', 'cerca', 'alrededor', 'zona'].some((keyword) => clean.includes(keyword));
+  if (asksAboutNearby && property.nearbyPlaces?.length) {
+    const categoryNames = lang === 'es'
+      ? { school: 'escuela', supermarket: 'supermercado', hospital: 'hospital', park: 'parque' }
+      : { school: 'school', supermarket: 'supermarket', hospital: 'hospital', park: 'park' };
+    const requestedCategories = (Object.keys(categoryNames) as Array<keyof typeof categoryNames>).filter((category) => {
+      if (category === 'school') return /escuela|colegio|school/.test(clean);
+      if (category === 'supermarket') return /supermercado|super |tienda|grocery/.test(clean);
+      if (category === 'hospital') return /hospital|clinica|salud/.test(clean);
+      return /parque|park/.test(clean);
+    });
+    const categories = requestedCategories.length ? requestedCategories : (Object.keys(categoryNames) as Array<keyof typeof categoryNames>);
+    const highlights = categories.flatMap((category) => {
+      const place = property.nearbyPlaces
+        ?.filter((item) => item.category === category)
+        .sort((a, b) => a.distanceMeters - b.distanceMeters)[0];
+      if (!place) return [];
+      const distance = place.distanceMeters < 1000 ? `${Math.round(place.distanceMeters / 10) * 10} m` : `${(place.distanceMeters / 1000).toFixed(1)} km`;
+      const duration = place.durationSeconds
+        ? (lang === 'es' ? `${Math.max(1, Math.round(place.durationSeconds / 60))} min en auto` : `${Math.max(1, Math.round(place.durationSeconds / 60))} min drive`)
+        : distance;
+      return [`${categoryNames[category]}: ${place.name}, a ${duration}`];
+    });
+    if (highlights.length) {
+      return lang === 'es'
+        ? `Sí. Según Google Maps, cerca tienes ${highlights.join('; ')}. Puedes verlos marcados en la sección “Ubicación y Entorno”.`
+        : `Yes. According to Google Maps, nearby you have ${highlights.join('; ')}. You can see them in “Location & Neighborhood”.`;
+    }
+  }
+
   // 1. Wifi queries
   if (clean.includes('wifi') || clean.includes('internet') || clean.includes('conexion')) {
     const hasWifi = amenities.some(a => a.includes('wifi') || a.includes('internet')) || desc.includes('wifi') || desc.includes('internet');

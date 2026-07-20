@@ -13,6 +13,8 @@ import { getVirtualTourProvider } from '../lib/mediaEmbeds';
 import { PropertyValidator } from '../lib/services/PropertyValidator';
 import { useSwap } from '../lib/context/SwapContext';
 import { formatCount } from '../lib/textHelpers';
+import GoogleAddressAutocomplete from './maps/GoogleAddressAutocomplete';
+import type { GoogleAddressResult } from '../lib/maps/types';
 
 
 interface PropertyWizardModalProps {
@@ -968,21 +970,6 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     }
   }, [initialData, isOpen]);
 
-  // Google Maps se carga únicamente para resolver coordenadas en segundo plano.
-  // El usuario ya no necesita buscar ni colocar marcadores manualmente.
-  useEffect(() => {
-    if (step !== 2 || !isOpen || typeof window === 'undefined') return;
-    if ((window as any).google?.maps) return;
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY || '';
-    if (!apiKey || document.getElementById('google-maps-geocoder-script')) return;
-    const script = document.createElement('script');
-    script.id = 'google-maps-geocoder-script';
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
-    script.async = true;
-    script.defer = true;
-    document.head.appendChild(script);
-  }, [step, isOpen]);
-
   // Auto-save to localStorage
   useEffect(() => {
     // Only auto-save if we are in draft mode and not publishing/submitting
@@ -1454,6 +1441,26 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     setPlaceId(null);
     setFormattedAddress(null);
     setGeometrySource(null);
+  };
+
+  const applyGoogleAddress = (result: GoogleAddressResult) => {
+    setPlaceId(result.placeId);
+    setFormattedAddress(result.formattedAddress);
+    setLatitude(result.latitude);
+    setLongitude(result.longitude);
+    setGeometrySource('google_places');
+    if (result.city) {
+      setCity(result.city);
+      setLocation(result.city);
+    }
+    if (result.state) setStateName(result.state);
+    if (result.country) setCountry(result.country);
+    if (result.neighborhood) setNeighborhood(result.neighborhood);
+    if (result.postalCode) setPostalCode(result.postalCode);
+    if (result.streetName) setStreetName(result.streetName);
+    if (result.streetNumber) setStreetNumber(result.streetNumber);
+    setAddress([result.streetName, result.streetNumber].filter(Boolean).join(' '));
+    setFieldErrors((previous) => ({ ...previous, city: '', country: '' }));
   };
 
   const buildLocationValues = () => {
@@ -2331,6 +2338,11 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                     </div>
 
                     <div className="flex flex-col gap-4">
+                      <GoogleAddressAutocomplete
+                        onSelect={applyGoogleAddress}
+                        selectedAddress={formattedAddress}
+                      />
+
                       <section className="rounded-2xl border border-brand-gray-200 bg-white p-4 shadow-sm">
                         <div className="mb-4 flex items-start gap-3">
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-accent/10 text-brand-accent">

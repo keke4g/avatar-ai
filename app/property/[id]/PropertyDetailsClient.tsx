@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { formatCount, formatPropertyLocation } from '../../../lib/textHelpers';
 import { useSwap } from '../../../lib/context/SwapContext';
 import { useTranslation } from '../../../lib/context/LanguageContext';
@@ -9,7 +9,7 @@ import {
   ShieldCheck, Heart, Share, Calendar, MapPin, Sparkles, AlertCircle,
   BedDouble, Bath, Users, ArrowRight, ChevronLeft, ChevronRight, ChevronDown,
   Wifi, Waves, Coffee, Monitor, Wind, Key, Flame, Compass, MessageSquareCode,
-  ZoomIn, ZoomOut, Maximize, Download, ExternalLink, Play, FileText, Info, ShieldAlert, Award, TrendingUp, BarChart2, FileCheck, RefreshCw,
+  ZoomIn, ZoomOut, Maximize, Download, Play, FileText, Info, ShieldAlert, Award, TrendingUp, BarChart2, FileCheck, RefreshCw,
   Car, Building, Home, PhoneCall, Mail, UserRound, MessageCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,6 +22,8 @@ import { LegalDossierSection } from '../../../components/property/sections/Legal
 import { FinancingCompatibility } from '../../../components/property/sections/FinancingCompatibility';
 import { EternaMarketAnalysis } from '../../../components/property/sections/EternaMarketAnalysis';
 import { getEmbeddableMediaUrl, getVimeoEmbedUrl, getYouTubeEmbedUrl } from '../../../lib/mediaEmbeds';
+import GooglePropertyLocation from '../../../components/property/GooglePropertyLocation';
+import { useNearbyPlaces } from '../../../hooks/useNearbyPlaces';
 
 interface PropertyDetailsClientProps {
   id: string;
@@ -238,12 +240,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
     );
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const detailsMapRef = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const detailsMarkerRef = useRef<any>(null);
-  const [detailsLeafletLoaded, setDetailsLeafletLoaded] = useState(false);
-
   // Premium Lightbox Gallery States
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -347,112 +343,20 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
       setZoomScale(2.5);
     }
   };
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!property || property.latitude === null || property.longitude === null) return;
-
-    const loadLeaflet = async () => {
-      if (!document.getElementById('leaflet-css-cdn')) {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-        link.id = 'leaflet-css-cdn';
-        document.head.appendChild(link);
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((window as any).L) {
-        setDetailsLeafletLoaded(true);
-        return;
-      }
-
-      return new Promise<void>((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-        script.id = 'leaflet-js-cdn';
-        script.onload = () => {
-          setDetailsLeafletLoaded(true);
-          resolve();
-        };
-        script.onerror = () => reject(new Error('Failed to load Leaflet'));
-        document.head.appendChild(script);
-      });
-    };
-
-    loadLeaflet().catch(err => console.error('[Details Leaflet Load Error]:', err));
-  }, [property]);
+  const nearby = useNearbyPlaces(property?.latitude ?? null, property?.longitude ?? null);
+  const enrichedProperty = useMemo(
+    () => property ? { ...property, nearbyPlaces: nearby.data?.places || [] } : null,
+    [property, nearby.data?.places],
+  );
 
   useEffect(() => {
-    if (!detailsLeafletLoaded || !property || property.latitude === null || property.longitude === null) return;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const L = (window as any).L;
-    if (!L) return;
-
-    const container = document.getElementById('property-details-map');
-    if (!container) return;
-
-    try {
-      if (!detailsMapRef.current) {
-        const usesCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
-        const map = L.map('property-details-map', {
-          zoomControl: true,
-          scrollWheelZoom: false,
-          dragging: !usesCoarsePointer,
-          touchZoom: true,
-          attributionControl: false
-        }).setView([property.latitude, property.longitude], 14);
-
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-          maxZoom: 19,
-        }).addTo(map);
-
-        const customIcon = L.divIcon({
-          className: 'custom-leaflet-marker-selected',
-          html: `<div class="w-3 h-3 bg-brand-black rounded-full border-2 border-white shadow-premium"></div>`
-        });
-
-        const marker = L.marker([property.latitude, property.longitude], { icon: customIcon }).addTo(map);
-
-        detailsMapRef.current = map;
-        detailsMarkerRef.current = marker;
-      } else {
-        const map = detailsMapRef.current;
-        const marker = detailsMarkerRef.current;
-        map.setView([property.latitude, property.longitude], 14);
-        if (marker) {
-          marker.setLatLng([property.latitude, property.longitude]);
-        }
-      }
-
-      setTimeout(() => {
-        if (detailsMapRef.current) {
-          detailsMapRef.current.invalidateSize();
-        }
-      }, 150);
-    } catch (e) {
-      console.error('[Details Map Init Error]:', e);
-    }
-
-    return () => {
-      if (detailsMapRef.current) {
-        try {
-          detailsMapRef.current.remove();
-        } catch {}
-        detailsMapRef.current = null;
-        detailsMarkerRef.current = null;
-      }
-    };
-  }, [detailsLeafletLoaded, property]);
-
-  useEffect(() => {
-    if (property) {
-      setActiveProperty(property);
+    if (enrichedProperty) {
+      setActiveProperty(enrichedProperty);
     }
     return () => {
       clearActiveProperty();
     };
-  }, [property, setActiveProperty, clearActiveProperty]);
+  }, [enrichedProperty, setActiveProperty, clearActiveProperty]);
 
   const activeOfferingModes = useMemo(() => {
     if (!property) return [];
@@ -1607,44 +1511,13 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 </p>
               )}
               
-              <div className="relative h-64 w-full overflow-hidden rounded-3xl border border-brand-gray-200/60 bg-[#e4e4e7] shadow-sm">
-                <div id="property-details-map" className="absolute inset-0 z-0" />
-                <div className="pointer-events-none absolute inset-x-0 top-3 z-[500] flex justify-center sm:hidden">
-                  <span className="rounded-full border border-white/70 bg-brand-black/80 px-3 py-1.5 text-[10px] font-bold text-white shadow-md backdrop-blur-sm">
-                    {language === 'es' ? 'Usa dos dedos para mover el mapa' : 'Use two fingers to move the map'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2 mt-1">
-                <a 
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${property.latitude},${property.longitude}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200 rounded-xl text-xs font-bold text-brand-black flex items-center gap-1.5 transition-colors shadow-xs active:scale-95 duration-200"
-                >
-                  <Compass className="w-3.5 h-3.5 text-brand-black shrink-0" />
-                  <span>{language === 'es' ? 'Cómo llegar' : 'Get Directions'}</span>
-                </a>
-                <a 
-                  href={`https://www.google.com/maps/search/?api=1&query=${property.latitude},${property.longitude}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200 rounded-xl text-xs font-bold text-brand-black flex items-center gap-1.5 transition-colors shadow-xs active:scale-95 duration-200"
-                >
-                  <ExternalLink className="w-3.5 h-3.5 text-brand-black shrink-0" />
-                  <span>{language === 'es' ? 'Ver en Google Maps' : 'View on Google Maps'}</span>
-                </a>
-                <a 
-                  href={`https://waze.com/ul?ll=${property.latitude},${property.longitude}&navigate=yes`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200 rounded-xl text-xs font-bold text-brand-black flex items-center gap-1.5 transition-colors shadow-xs active:scale-95 duration-200"
-                >
-                  <Compass className="w-3.5 h-3.5 text-brand-black shrink-0" />
-                  <span>{language === 'es' ? 'Abrir en Waze' : 'Open in Waze'}</span>
-                </a>
-              </div>
+              <GooglePropertyLocation
+                property={property}
+                places={nearby.data?.places || []}
+                loading={nearby.loading}
+                error={nearby.error}
+                language={language === 'es' ? 'es' : 'en'}
+              />
             </div>
           )}
 

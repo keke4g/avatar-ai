@@ -192,6 +192,7 @@ export interface Property {
   city?: string | null;
   state?: string | null;
   geometrySource?: 'google_places' | 'google_geocoding' | 'manual' | 'legacy' | null;
+  nearbyPlaces?: import('./maps/types').NearbyPlace[];
   rules?: string[]; // Custom house rules
   reviews?: PropertyReview[]; // Review log records
   isPublished?: boolean; // CMS active visibility flag
