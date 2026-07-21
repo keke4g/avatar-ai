@@ -1,5 +1,6 @@
 import { Property } from '../../types';
 import { formatCount } from '../../textHelpers';
+import { formatGooglePlaceName } from '../../maps/placeNames';
 
 export interface EternaProperty extends Property {
   price?: number;
@@ -50,7 +51,7 @@ export const resolveLocalPropertyQA = (prompt: string, property: EternaProperty,
       const duration = place.durationSeconds
         ? (lang === 'es' ? `${Math.max(1, Math.round(place.durationSeconds / 60))} min en auto` : `${Math.max(1, Math.round(place.durationSeconds / 60))} min drive`)
         : distance;
-      return [`${categoryNames[category]}: ${place.name}, a ${duration}`];
+      return [`${categoryNames[category]}: ${formatGooglePlaceName(place.name)}, a ${duration}`];
     });
     if (highlights.length) {
       return lang === 'es'

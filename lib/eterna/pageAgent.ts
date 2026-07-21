@@ -1,4 +1,5 @@
 import type { SearchConciergeResponse } from './searchConcierge';
+import { stripEternaMarkup } from './textSanitization';
 
 export type PageAgentIntent =
   | 'answer'
@@ -83,7 +84,7 @@ const positiveNumber = (value: unknown): number => {
 export function parsePageAgentResponse(value: unknown): PageAgentResponse | null {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Record<string, unknown>;
-  const reply = text(candidate.reply);
+  const reply = stripEternaMarkup(text(candidate.reply));
   if (!reply) return null;
 
   const actionCandidate = candidate.action && typeof candidate.action === 'object'
@@ -150,7 +151,7 @@ export function parsePageAgentResponse(value: unknown): PageAgentResponse | null
       : 'none',
     leadSummary: text(candidate.leadSummary, 1_000),
     suggestedReplies: Array.isArray(candidate.suggestedReplies)
-      ? candidate.suggestedReplies.map((item) => text(item, 140)).filter(Boolean).slice(0, 3)
+      ? candidate.suggestedReplies.map((item) => stripEternaMarkup(text(item, 140))).filter(Boolean).slice(0, 3)
       : [],
     understoodGoal: text(candidate.understoodGoal, 500),
   };
@@ -220,4 +221,3 @@ export const PAGE_AGENT_RESPONSE_SCHEMA = {
   ],
   additionalProperties: false,
 } as const;
-

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { NearbyPlace, NearbyPlaceCategory, NearbyPlacesResponse } from '../../../../lib/maps/types';
+import { formatGooglePlaceName } from '../../../../lib/maps/placeNames';
 
 export const runtime = 'nodejs';
 
@@ -69,7 +70,7 @@ async function searchCategory(apiKey: string, category: NearbyPlaceCategory, lat
     if (!place.id || !place.displayName?.text || !Number.isFinite(lat) || !Number.isFinite(lng)) return [];
     return [{
       id: place.id,
-      name: place.displayName.text,
+      name: formatGooglePlaceName(place.displayName.text),
       category,
       address: place.formattedAddress,
       latitude: lat as number,
@@ -159,4 +160,3 @@ export async function GET(request: NextRequest) {
     }, { status: status === 403 ? 503 : 502 });
   }
 }
-

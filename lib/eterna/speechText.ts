@@ -1,4 +1,6 @@
-const SPOKEN_AMOUNT = String.raw`\d(?:[\d.,\s]*\d)?`;
+import { stripEternaMarkup } from './textSanitization';
+
+const SPOKEN_AMOUNT = String.raw`\d(?:[\d.,\s]*\d)?(?:\s+(?:mil|mill[oó]n(?:es)?))?`;
 
 function replaceCurrencyAmount(
   text: string,
@@ -30,13 +32,24 @@ function replaceCurrencyAmount(
  * before an MXN amount or several engines announce it as US dollars.
  */
 export function normalizeEternaSpeechText(text: string, language: 'es' | 'en' = 'es'): string {
-  if (language !== 'es' || !text.trim()) return text;
+  const plainText = stripEternaMarkup(text);
+  if (language !== 'es' || !plainText.trim()) return plainText;
 
-  let normalized = replaceCurrencyAmount(text, String.raw`MXN|M\.?\s*N\.?`, 'pesos');
-  normalized = replaceCurrencyAmount(normalized, 'USD', 'dólares estadounidenses');
+  let normalized = replaceCurrencyAmount(
+    plainText,
+    String.raw`USD|US\$|d[oó]lares?(?:\s+estadounidenses)?`,
+    'dólares estadounidenses',
+  );
+  normalized = replaceCurrencyAmount(normalized, String.raw`MXN|M\.?\s*N\.?`, 'pesos');
 
   return normalized
     .replace(new RegExp(String.raw`\$\s*(${SPOKEN_AMOUNT})\s+pesos\b`, 'gi'), '$1 pesos')
+    .replace(new RegExp(String.raw`\$\s*(${SPOKEN_AMOUNT})\s+dólares estadounidenses\b`, 'gi'), '$1 dólares estadounidenses')
+    // AuraSwap opera por defecto en México. A falta de un código de moneda
+    // explícito, el signo "$" representa pesos y nunca dólares para Eterna.
+    .replace(new RegExp(String.raw`\$\s*(${SPOKEN_AMOUNT})\b`, 'gi'), '$1 pesos')
+    .replace(/\b(mil|mill[oó]n(?:es)?)\s+pesos\b/gi, '$1 de pesos')
+    .replace(/\b(mil|mill[oó]n(?:es)?)\s+dólares estadounidenses\b/gi, '$1 de dólares estadounidenses')
     .replace(/\bpesos(?:\s+mexicanos)?\s+(?:MXN|M\.?\s*N\.?)\b/gi, 'pesos')
     .replace(/\bdólares(?:\s+estadounidenses)?\s+USD\b/gi, 'dólares estadounidenses')
     .replace(/\b(?:MXN|M\.?\s*N\.?)\b/gi, 'pesos mexicanos')

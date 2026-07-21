@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { NearbyPlacesResponse } from '../lib/maps/types';
+import { formatGooglePlaceName } from '../lib/maps/placeNames';
 
 export function useNearbyPlaces(latitude: number | null, longitude: number | null) {
   const [data, setData] = useState<NearbyPlacesResponse | null>(null);
@@ -24,7 +25,14 @@ export function useNearbyPlaces(latitude: number | null, longitude: number | nul
       .then(async (response) => {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || 'No fue posible consultar el entorno.');
-        return payload as NearbyPlacesResponse;
+        const nearby = payload as NearbyPlacesResponse;
+        return {
+          ...nearby,
+          places: nearby.places.map((place) => ({
+            ...place,
+            name: formatGooglePlaceName(place.name),
+          })),
+        };
       })
       .then(setData)
       .catch((requestError) => {
