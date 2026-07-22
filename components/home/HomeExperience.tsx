@@ -124,11 +124,6 @@ export default function HomeExperience() {
     sendPrompt(text);
   };
 
-  const handlePromptSuggestion = (text: string) => {
-    setSearchInput(text);
-    sendPrompt(text);
-  };
-
   return (
     <div 
       className={`relative w-full min-h-dvh lg:h-dvh flex flex-col justify-start overflow-x-hidden lg:overflow-y-hidden pb-6 lg:pb-0 transition-colors duration-300 ${
@@ -176,14 +171,8 @@ export default function HomeExperience() {
           marginTop: "calc(var(--navbar-height) + 12px)",
         }}
       >
-        <EternaPromptRail
-          isDark={isDark}
-          language={language}
-          onSelect={handlePromptSuggestion}
-        />
-
         {/* Main 3-Column Layout Grid */}
-        <div className="mt-4 flex w-full flex-1 flex-col select-none lg:mt-3 lg:min-h-0 lg:grid lg:grid-cols-[240px_minmax(280px,1fr)_340px] lg:gap-8 lg:items-stretch xl:grid-cols-[260px_minmax(300px,1fr)_400px] xl:gap-12">
+        <div className="flex w-full flex-1 flex-col select-none lg:min-h-0 lg:grid lg:grid-cols-[240px_minmax(280px,1fr)_340px] lg:gap-8 lg:items-stretch xl:grid-cols-[260px_minmax(300px,1fr)_400px] xl:gap-12">
         
         {/* Left Column: Acciones recomendadas */}
         <div className="order-2 mx-auto mt-10 flex w-full max-w-[340px] flex-col items-center self-start lg:order-1 lg:mt-0 lg:h-full lg:max-w-none lg:min-h-0 lg:items-start">
@@ -235,8 +224,9 @@ export default function HomeExperience() {
           </div>
         </div>
 
-        {/* Center Column: Video only */}
-        <div className="order-1 flex w-full flex-shrink-0 flex-col items-center justify-center lg:order-2 lg:h-full lg:min-h-0">
+        {/* Center Column: Eterna prompt guide + avatar */}
+        <div className="order-1 flex w-full flex-shrink-0 flex-col items-center justify-start lg:order-2 lg:h-full lg:min-h-0">
+          <EternaPromptRail isDark={isDark} language={language} />
           <HomeHero />
         </div>
 

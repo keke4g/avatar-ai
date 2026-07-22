@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowUpRight, MessageCircle, Sparkles } from "lucide-react";
+import { MessageCircle, Sparkles } from "lucide-react";
 
 interface EternaPromptRailProps {
   isDark: boolean;
   language: "es" | "en";
-  onSelect: (prompt: string) => void;
 }
 
 const PROMPTS = {
@@ -41,65 +40,49 @@ const PROMPTS = {
   ],
 } as const;
 
-export default function EternaPromptRail({ isDark, language, onSelect }: EternaPromptRailProps) {
+export default function EternaPromptRail({ isDark, language }: EternaPromptRailProps) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
   const reduceMotion = useReducedMotion();
   const prompts = PROMPTS[language];
   const activePrompt = prompts[activeIndex % prompts.length];
 
   useEffect(() => {
-    if (isPaused || reduceMotion) return;
     const interval = window.setInterval(() => {
       setActiveIndex((current) => (current + 1) % prompts.length);
-    }, 4200);
+    }, 3500);
     return () => window.clearInterval(interval);
-  }, [isPaused, prompts.length, reduceMotion]);
+  }, [prompts.length]);
 
   return (
-    <div className="mx-auto w-full max-w-[1120px] shrink-0 px-0.5 sm:px-2">
-      <button
-        type="button"
-        onClick={() => onSelect(activePrompt)}
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
-        onFocus={() => setIsPaused(true)}
-        onBlur={() => setIsPaused(false)}
-        aria-label={`${language === "es" ? "Probar petición" : "Try request"}: ${activePrompt}`}
-        className={`group relative flex h-[62px] w-full items-center overflow-hidden rounded-[23px] border px-3 text-left backdrop-blur-2xl transition-all duration-300 sm:h-14 sm:px-4 lg:px-5 ${
+    <div className="relative z-20 mx-auto w-full max-w-[340px] shrink-0 px-1 sm:max-w-[360px] lg:w-[300px] lg:max-w-none xl:w-[360px]">
+      <div
+        role="note"
+        aria-label={language === "es" ? "Ideas para hablar con Eterna" : "Ideas for talking to Eterna"}
+        className={`relative flex h-[66px] w-full items-center overflow-visible rounded-[22px] border px-3.5 text-left backdrop-blur-2xl sm:px-4 ${
           isDark
-            ? "border-white/10 bg-white/[0.055] text-white shadow-[0_16px_50px_rgba(0,0,0,0.34)] hover:border-white/20 hover:bg-white/[0.08]"
-            : "border-white/90 bg-white/82 text-zinc-950 shadow-[0_16px_45px_rgba(24,24,27,0.07)] ring-1 ring-zinc-200/50 hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-[0_20px_55px_rgba(84,76,255,0.12)]"
+            ? "border-white/10 bg-[#101017]/88 text-white shadow-[0_16px_42px_rgba(0,0,0,0.38)]"
+            : "border-white/95 bg-white/88 text-zinc-950 shadow-[0_14px_38px_rgba(24,24,27,0.09)] ring-1 ring-zinc-200/55"
         }`}
       >
         <span
           aria-hidden="true"
-          className={`absolute inset-y-0 left-0 w-28 opacity-70 blur-2xl transition-opacity group-hover:opacity-100 ${
+          className={`pointer-events-none absolute inset-y-0 left-0 w-24 rounded-l-[22px] opacity-70 blur-2xl ${
             isDark ? "bg-blue-500/15" : "bg-violet-300/25"
           }`}
         />
 
-        <span className={`relative mr-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl sm:mr-4 ${
+        <span className={`relative mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] ${
           isDark ? "bg-white/10 text-blue-300" : "bg-[#6C63FF]/9 text-[#6258F5]"
         }`}>
           <MessageCircle className="h-4 w-4" />
-          <Sparkles className="absolute -right-1 -top-1 h-2.5 w-2.5" />
+          <Sparkles className="absolute -right-1 -top-1 h-3 w-3" />
         </span>
 
-        <span className="relative hidden shrink-0 items-center gap-2 pr-4 sm:flex">
-          <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${
-            isDark ? "text-white/40" : "text-zinc-400"
+        <span className="relative min-w-0 flex-1">
+          <span className={`mb-1 block text-[8px] font-black uppercase tracking-[0.2em] ${
+            isDark ? "text-blue-200/55" : "text-[#6258F5]/70"
           }`}>
-            {language === "es" ? "Prueba con Eterna" : "Try asking Eterna"}
-          </span>
-          <span className={`h-5 w-px ${isDark ? "bg-white/10" : "bg-zinc-200"}`} />
-        </span>
-
-        <span className="relative min-w-0 flex-1 overflow-hidden">
-          <span className={`mb-0.5 block text-[8px] font-black uppercase tracking-[0.16em] sm:hidden ${
-            isDark ? "text-white/35" : "text-zinc-400"
-          }`}>
-            {language === "es" ? "Puedes decirle" : "Try saying"}
+            {language === "es" ? "Dile a Eterna" : "Say to Eterna"}
           </span>
           <AnimatePresence mode="wait" initial={false}>
             <motion.span
@@ -108,31 +91,48 @@ export default function EternaPromptRail({ isDark, language, onSelect }: EternaP
               animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               exit={reduceMotion ? undefined : { opacity: 0, y: -10, filter: "blur(3px)" }}
               transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-              className="block truncate text-[12px] font-semibold tracking-[-0.01em] sm:text-[13px] lg:text-sm"
-              aria-live="polite"
+              className="block truncate text-[11px] font-semibold leading-tight tracking-[-0.01em] sm:text-xs"
             >
               “{activePrompt}”
             </motion.span>
           </AnimatePresence>
         </span>
 
-        <span className={`relative ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-300 group-hover:translate-x-0.5 ${
-          isDark ? "border border-white/10 bg-white/[0.06] text-white/70" : "border border-zinc-200 bg-white text-zinc-700 shadow-sm"
-        }`}>
-          <ArrowUpRight className="h-3.5 w-3.5" />
+        <span aria-hidden="true" className="ml-2 flex h-5 shrink-0 items-center gap-[3px]">
+          {[0, 1, 2].map((bar) => (
+            <motion.span
+              key={bar}
+              className={`w-[2px] rounded-full ${isDark ? "bg-blue-300/65" : "bg-[#6258F5]/65"}`}
+              animate={reduceMotion ? { height: 6 } : { height: [5, 14 - bar * 2, 5] }}
+              transition={{ duration: 1.05, repeat: Infinity, delay: bar * 0.14, ease: "easeInOut" }}
+            />
+          ))}
         </span>
 
-        {!reduceMotion && !isPaused && (
+        {!reduceMotion && (
           <motion.span
             key={`progress-${language}-${activeIndex}`}
             aria-hidden="true"
-            className="absolute inset-x-5 bottom-0 h-px origin-left bg-gradient-to-r from-transparent via-[#6C63FF] to-transparent"
+            className="absolute inset-x-7 bottom-0 h-px origin-left bg-gradient-to-r from-transparent via-[#6C63FF] to-transparent"
             initial={{ scaleX: 0, opacity: 0.15 }}
             animate={{ scaleX: 1, opacity: 0.75 }}
-            transition={{ duration: 4.2, ease: "linear" }}
+            transition={{ duration: 3.5, ease: "linear" }}
           />
         )}
-      </button>
+
+        <span
+          aria-hidden="true"
+          className={`absolute -bottom-[7px] left-1/2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-b border-r ${
+            isDark ? "border-white/10 bg-[#101017]" : "border-zinc-200/70 bg-white"
+          }`}
+        />
+        <motion.span
+          aria-hidden="true"
+          className="absolute -bottom-[17px] left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-[#6C63FF] shadow-[0_0_12px_3px_rgba(108,99,255,0.38)]"
+          animate={reduceMotion ? undefined : { opacity: [0.35, 1, 0.35], scale: [0.8, 1.25, 0.8] }}
+          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </div>
     </div>
   );
 }
