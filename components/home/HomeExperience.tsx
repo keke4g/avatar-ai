@@ -175,7 +175,7 @@ export default function HomeExperience() {
         <div className="flex w-full flex-1 flex-col select-none lg:min-h-0 lg:grid lg:grid-cols-[240px_minmax(280px,1fr)_340px] lg:gap-8 lg:items-stretch xl:grid-cols-[260px_minmax(300px,1fr)_400px] xl:gap-12">
         
         {/* Left Column: Acciones recomendadas */}
-        <div className="order-2 mx-auto mt-10 flex w-full max-w-[340px] flex-col items-center self-start lg:order-1 lg:mt-0 lg:h-full lg:max-w-none lg:min-h-0 lg:items-start">
+        <div className="order-2 mx-auto mt-10 flex w-full max-w-[340px] flex-col items-center self-start lg:order-1 lg:mt-0 lg:h-full lg:max-w-none lg:min-h-0 lg:items-start lg:pt-[88px]">
           <h3 className={`text-[10px] font-bold tracking-[0.2em] uppercase mt-2 lg:mt-1 mb-5 lg:mb-3 select-none w-full text-center lg:text-left h-4 flex items-center transition-colors duration-300 ${
             isDark ? "text-white/40" : "text-zinc-500/80"
           }`}>
@@ -231,7 +231,7 @@ export default function HomeExperience() {
         </div>
 
         {/* Right Column: Conversación log (containing headers and buscador) */}
-        <div className="order-3 mx-auto mt-10 w-full max-w-[340px] self-start lg:order-3 lg:mx-0 lg:mt-0 lg:h-full lg:max-w-none lg:min-h-0">
+        <div className="order-3 mx-auto mt-10 w-full max-w-[340px] self-start lg:order-3 lg:mx-0 lg:mt-0 lg:h-full lg:max-w-none lg:min-h-0 lg:pt-[88px]">
           <Conversation searchInput={searchInput} setSearchInput={setSearchInput} isDark={isDark} />
         </div>
 
