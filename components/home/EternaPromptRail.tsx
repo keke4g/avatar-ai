@@ -58,7 +58,7 @@ export default function EternaPromptRail({ isDark, language }: EternaPromptRailP
       <div
         role="note"
         aria-label={language === "es" ? "Ideas para hablar con Eterna" : "Ideas for talking to Eterna"}
-        className={`relative flex h-[78px] w-full items-center overflow-visible rounded-[25px] border px-4 text-left backdrop-blur-2xl sm:px-5 ${
+        className={`relative flex h-[72px] w-full items-center overflow-visible rounded-[23px] border px-4 text-left backdrop-blur-2xl sm:h-16 sm:px-5 ${
           isDark
             ? "border-white/10 bg-[#101017]/88 text-white shadow-[0_16px_42px_rgba(0,0,0,0.38)]"
             : "border-white/95 bg-white/88 text-zinc-950 shadow-[0_14px_38px_rgba(24,24,27,0.09)] ring-1 ring-zinc-200/55"
@@ -66,19 +66,19 @@ export default function EternaPromptRail({ isDark, language }: EternaPromptRailP
       >
         <span
           aria-hidden="true"
-          className={`pointer-events-none absolute inset-y-0 left-0 w-28 rounded-l-[25px] opacity-70 blur-2xl ${
+          className={`pointer-events-none absolute inset-y-0 left-0 w-28 rounded-l-[23px] opacity-70 blur-2xl ${
             isDark ? "bg-blue-500/15" : "bg-violet-300/25"
           }`}
         />
 
-        <span className={`relative mr-3.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] ${
+        <span className={`relative mr-3.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] ${
           isDark ? "bg-white/10 text-blue-300" : "bg-[#6C63FF]/9 text-[#6258F5]"
         }`}>
           <MessageCircle className="h-[18px] w-[18px]" />
         </span>
 
         <span className="relative min-w-0 flex-1">
-          <span className={`mb-1.5 inline-flex rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] ${
+          <span className={`mb-1 inline-flex rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.16em] ${
             isDark
               ? "bg-blue-400/15 text-blue-200 ring-1 ring-blue-300/15"
               : "bg-[#655BFF] text-white shadow-[0_5px_14px_rgba(101,91,255,0.22)]"

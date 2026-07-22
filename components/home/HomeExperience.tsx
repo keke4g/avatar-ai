@@ -131,8 +131,8 @@ export default function HomeExperience() {
       }`}
       style={{
         "--navbar-height": `${navbarHeight}px`,
-        "--home-shell-height": `calc(100dvh - ${navbarHeight}px - 12px)`,
-        "--useful-height": `calc(100dvh - ${navbarHeight}px - 82px)`,
+        "--home-shell-height": `calc(100dvh - ${navbarHeight}px - 50px)`,
+        "--useful-height": "calc(var(--home-shell-height) - 72px)",
       } as React.CSSProperties}
     >
       {/* Radial dark/light premium background */}
@@ -168,7 +168,7 @@ export default function HomeExperience() {
       <main
         className="relative z-10 mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-4 sm:px-6 lg:h-[var(--home-shell-height)] lg:min-h-0 lg:flex-none lg:overflow-hidden lg:px-10 xl:px-12"
         style={{
-          marginTop: "calc(var(--navbar-height) + 12px)",
+          marginTop: "calc(var(--navbar-height) + 22px)",
         }}
       >
         {/* Main 3-Column Layout Grid */}
@@ -225,7 +225,7 @@ export default function HomeExperience() {
         </div>
 
         {/* Center Column: Eterna prompt guide + avatar */}
-        <div className="order-1 flex w-full flex-shrink-0 flex-col items-center justify-start lg:order-2 lg:h-full lg:min-h-0">
+        <div className="order-1 flex w-full flex-shrink-0 flex-col items-center justify-start gap-5 lg:order-2 lg:h-full lg:min-h-0 lg:gap-6">
           <EternaPromptRail isDark={isDark} language={language} />
           <HomeHero />
         </div>

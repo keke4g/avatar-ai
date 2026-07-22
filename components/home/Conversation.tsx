@@ -31,8 +31,8 @@ export default function Conversation({ searchInput, setSearchInput, isDark }: Co
   const hasHistory = chatHistory && chatHistory.length > 0;
   
   // Height dynamic configuration based on empty vs active state
-  const heightStyle = hasHistory ? "calc(var(--useful-height, 860px) - 60px)" : "420px";
-  const maxHeightStyle = hasHistory ? "660px" : "420px";
+  const heightStyle = hasHistory ? "calc(var(--useful-height, 860px) - 70px)" : "420px";
+  const maxHeightStyle = hasHistory ? "620px" : "420px";
 
   return (
     <div className="flex w-full select-none flex-col items-center lg:h-full lg:min-h-0 lg:items-start">
