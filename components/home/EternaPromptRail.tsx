@@ -12,30 +12,46 @@ interface EternaPromptRailProps {
 const PROMPTS = {
   es: [
     "Busco una casa de hasta 3 millones en Guadalajara",
-    "Quiero vender mi departamento",
-    "Muéstrame casas económicas en Mazatlán",
-    "Busco un departamento de 2 recámaras para comprar",
-    "Quiero rentar una casa en Culiacán",
-    "Llévame a publicar una propiedad",
-    "Muéstrame propiedades con potencial de inversión",
-    "Compara las mejores opciones para mi presupuesto",
+    "Quiero rentar un departamento en Guadalajara por 18 mil al mes",
+    "Busco comprar una casa en Mazatlán por hasta 4 millones",
+    "Quiero un departamento en Culiacán entre 2 y 3 millones",
+    "Busco rentar una casa en Mérida por máximo 20 mil al mes",
+    "Muéstrame departamentos en Monterrey de hasta 4 millones",
+    "Quiero una casa de 3 recámaras en Querétaro por 3.5 millones",
+    "Busco un departamento amueblado en CDMX por 25 mil al mes",
+    "Quiero rentar un departamento pet friendly por 15 mil al mes",
+    "Busco una casa con alberca en Mazatlán por hasta 5 millones",
+    "Muéstrame casas económicas para comprar en Guadalajara",
+    "Compara departamentos de 2 a 3 millones en Guadalajara",
+    "Quiero una casa de 3 habitaciones por menos de 4 millones",
+    "Busco rentar cerca de escuelas por máximo 22 mil al mes",
     "¿Cuánto pagaría al mes por una propiedad de 2 millones?",
-    "Ayúdame a encontrar una propiedad cerca de escuelas",
-    "Quiero una casa con alberca y 3 habitaciones",
+    "Muéstrame propiedades con potencial de inversión",
+    "Quiero vender mi departamento",
+    "Llévame a publicar una propiedad",
+    "Ayúdame a encontrar una propiedad cerca de hospitales",
     "Explícame qué necesito revisar antes de comprar",
   ],
   en: [
     "Find me a home under 3 million pesos in Guadalajara",
-    "I want to sell my apartment",
-    "Show me affordable homes in Mazatlán",
-    "I need a two-bedroom apartment to buy",
-    "I want to rent a house in Culiacán",
-    "Take me to publish a property",
+    "I want to rent an apartment in Guadalajara for 18,000 pesos a month",
+    "I want to buy a home in Mazatlán for up to 4 million pesos",
+    "Find me an apartment in Culiacán between 2 and 3 million pesos",
+    "I want to rent a home in Mérida for up to 20,000 pesos a month",
+    "Show me apartments in Monterrey under 4 million pesos",
+    "I want a three-bedroom home in Querétaro for 3.5 million pesos",
+    "Find me a furnished apartment in Mexico City for 25,000 pesos a month",
+    "I want a pet-friendly apartment for up to 15,000 pesos a month",
+    "Find me a home with a pool in Mazatlán for up to 5 million pesos",
+    "Show me affordable homes to buy in Guadalajara",
+    "Compare apartments from 2 to 3 million pesos in Guadalajara",
+    "I want a three-bedroom home for under 4 million pesos",
+    "I want to rent near schools for up to 22,000 pesos a month",
+    "What would I pay monthly for a 2 million peso property?",
     "Show me properties with investment potential",
-    "Compare the best options for my budget",
-    "What would I pay monthly for a 2 million peso home?",
-    "Help me find a property near schools",
-    "I want a three-bedroom house with a pool",
+    "I want to sell my apartment",
+    "Take me to publish a property",
+    "Help me find a property near hospitals",
     "Explain what I should check before buying",
   ],
 } as const;
@@ -85,18 +101,37 @@ export default function EternaPromptRail({ isDark, language }: EternaPromptRailP
           }`}>
             {language === "es" ? "Dile a Eterna" : "Say to Eterna"}
           </span>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.span
-              key={`${language}-${activeIndex}`}
-              initial={reduceMotion ? false : { opacity: 0, y: 12, filter: "blur(4px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              exit={reduceMotion ? undefined : { opacity: 0, y: -10, filter: "blur(3px)" }}
-              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-              className="block whitespace-normal text-[11px] font-semibold leading-[1.25] tracking-[-0.01em] sm:text-[13px]"
-            >
-              “{activePrompt}”
-            </motion.span>
-          </AnimatePresence>
+          <span className="relative block h-[29px] overflow-hidden">
+            <AnimatePresence mode="sync" initial={false}>
+              <motion.span
+                key={`${language}-${activeIndex}`}
+                initial={reduceMotion
+                  ? { opacity: 0 }
+                  : { opacity: 0, y: 16, filter: "blur(7px)", clipPath: "inset(100% 0 0 0)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)", clipPath: "inset(0% 0 0 0)" }}
+                exit={reduceMotion
+                  ? { opacity: 0 }
+                  : { opacity: 0, y: -14, filter: "blur(6px)", clipPath: "inset(0 0 100% 0)" }}
+                transition={reduceMotion
+                  ? { duration: 0.18, ease: "easeOut" }
+                  : { duration: 0.58, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute inset-x-0 top-0 block whitespace-normal text-[11px] font-semibold leading-[1.25] tracking-[-0.01em] sm:text-[13px]"
+              >
+                “{activePrompt}”
+              </motion.span>
+            </AnimatePresence>
+
+            {!reduceMotion && (
+              <motion.span
+                key={`glint-${language}-${activeIndex}`}
+                aria-hidden="true"
+                className="pointer-events-none absolute -inset-y-1 left-0 w-14 bg-gradient-to-r from-transparent via-[#8A82FF]/35 to-transparent blur-[2px]"
+                initial={{ x: "-180%", opacity: 0 }}
+                animate={{ x: "720%", opacity: [0, 0.75, 0] }}
+                transition={{ duration: 0.9, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+              />
+            )}
+          </span>
         </span>
 
         {!reduceMotion && (
