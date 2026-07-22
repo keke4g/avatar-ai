@@ -35,8 +35,8 @@ export default function Conversation({ searchInput, setSearchInput, isDark }: Co
   const maxHeightStyle = hasHistory ? "660px" : "420px";
 
   return (
-    <div className="w-full select-none flex flex-col items-center lg:items-start lg:w-[440px]">
-      <h3 className={`text-[10px] font-bold tracking-[0.2em] uppercase mt-2 lg:mt-4 mb-5 w-full text-center lg:text-left h-4 flex items-center transition-colors duration-300 ${
+    <div className="flex w-full select-none flex-col items-center lg:h-full lg:min-h-0 lg:items-start">
+      <h3 className={`text-[10px] font-bold tracking-[0.2em] uppercase mt-2 lg:mt-1 mb-5 lg:mb-3 w-full text-center lg:text-left h-4 flex items-center transition-colors duration-300 ${
         isDark ? "text-white/40" : "text-zinc-500/80"
       }`}>
         Conversación

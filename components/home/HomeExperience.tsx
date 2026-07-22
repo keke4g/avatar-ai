@@ -3,13 +3,16 @@ import React, { useState, useEffect } from "react";
 import Navbar from "../Navbar";
 import HomeHero from "./HomeHero";
 import Conversation from "./Conversation";
+import EternaPromptRail from "./EternaPromptRail";
 import { useLayoutContext } from "../../lib/context/LayoutContext";
 import { useLiveContext } from "../../lib/context/LiveContext";
+import { useTranslation } from "../../lib/context/LanguageContext";
 import { Home, Search, Building2, Landmark, Globe, MessageSquare, Sun, Moon } from "lucide-react";
 
 export default function HomeExperience() {
   const { setHideHeader, setHideFooter } = useLayoutContext();
   const { sendPrompt } = useLiveContext();
+  const { language } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [navbarHeight, setNavbarHeight] = useState(80);
   const [isDark, setIsDark] = useState(false);
@@ -121,14 +124,20 @@ export default function HomeExperience() {
     sendPrompt(text);
   };
 
+  const handlePromptSuggestion = (text: string) => {
+    setSearchInput(text);
+    sendPrompt(text);
+  };
+
   return (
     <div 
-      className={`relative w-full min-h-screen flex flex-col justify-start overflow-x-hidden pb-6 transition-colors duration-300 ${
+      className={`relative w-full min-h-dvh lg:h-dvh flex flex-col justify-start overflow-x-hidden lg:overflow-y-hidden pb-6 lg:pb-0 transition-colors duration-300 ${
         isDark ? "bg-[#030303] text-white" : "bg-[#fafafa] text-[#18181b]"
       }`}
       style={{
         "--navbar-height": `${navbarHeight}px`,
-        "--useful-height": `calc(100vh - ${navbarHeight}px - 48px)`,
+        "--home-shell-height": `calc(100dvh - ${navbarHeight}px - 12px)`,
+        "--useful-height": `calc(100dvh - ${navbarHeight}px - 82px)`,
       } as React.CSSProperties}
     >
       {/* Radial dark/light premium background */}
@@ -145,7 +154,7 @@ export default function HomeExperience() {
       <button
         type="button"
         onClick={toggleTheme}
-        className={`absolute top-24 right-6 lg:right-12 z-40 p-2.5 rounded-full border transition-all duration-300 shadow-premium cursor-pointer ${
+        className={`absolute top-24 right-6 z-40 hidden rounded-full border p-2.5 shadow-premium transition-all duration-300 xl:right-12 xl:flex ${
           isDark
             ? "bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20"
             : "bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50 hover:border-zinc-300"
@@ -161,17 +170,24 @@ export default function HomeExperience() {
         <Navbar />
       </div>
 
-      {/* Main 3-Column Layout Grid */}
-      <div 
-        className="relative z-10 w-full max-w-[1400px] mx-auto px-6 lg:px-12 flex-1 flex flex-col lg:grid lg:grid-cols-[280px_1fr_360px] xl:grid-cols-[280px_1fr_440px] lg:gap-12 xl:gap-24 lg:items-start select-none"
+      <main
+        className="relative z-10 mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-4 sm:px-6 lg:h-[var(--home-shell-height)] lg:min-h-0 lg:flex-none lg:overflow-hidden lg:px-10 xl:px-12"
         style={{
           marginTop: "calc(var(--navbar-height) + 12px)",
         }}
       >
+        <EternaPromptRail
+          isDark={isDark}
+          language={language}
+          onSelect={handlePromptSuggestion}
+        />
+
+        {/* Main 3-Column Layout Grid */}
+        <div className="mt-4 flex w-full flex-1 flex-col select-none lg:mt-3 lg:min-h-0 lg:grid lg:grid-cols-[240px_minmax(280px,1fr)_340px] lg:gap-8 lg:items-stretch xl:grid-cols-[260px_minmax(300px,1fr)_400px] xl:gap-12">
         
         {/* Left Column: Acciones recomendadas */}
-        <div className="w-full max-w-[340px] mx-auto lg:max-w-none order-2 lg:order-1 mt-10 lg:mt-0 flex flex-col items-center lg:items-start self-start">
-          <h3 className={`text-[10px] font-bold tracking-[0.2em] uppercase mt-2 lg:mt-4 mb-5 select-none w-full text-center lg:text-left h-4 flex items-center transition-colors duration-300 ${
+        <div className="order-2 mx-auto mt-10 flex w-full max-w-[340px] flex-col items-center self-start lg:order-1 lg:mt-0 lg:h-full lg:max-w-none lg:min-h-0 lg:items-start">
+          <h3 className={`text-[10px] font-bold tracking-[0.2em] uppercase mt-2 lg:mt-1 mb-5 lg:mb-3 select-none w-full text-center lg:text-left h-4 flex items-center transition-colors duration-300 ${
             isDark ? "text-white/40" : "text-zinc-500/80"
           }`}>
             Acciones recomendadas
@@ -179,7 +195,7 @@ export default function HomeExperience() {
           <div className={`p-[1.2px] rounded-[20px] transition-all duration-500 w-full ${
             highlightActions ? 'animate-rainbow-border shadow-[0_0_25px_rgba(59,130,246,0.15)] scale-[1.015]' : 'bg-transparent'
           }`}>
-            <div className={`flex flex-col gap-4 w-full rounded-[19px] p-1.5 transition-colors duration-500 ${
+            <div className={`flex flex-col gap-4 lg:gap-2.5 w-full rounded-[19px] p-1.5 lg:p-1 transition-colors duration-500 ${
               highlightActions 
                 ? (isDark ? 'bg-zinc-950/90' : 'bg-white/95') 
                 : 'bg-transparent'
@@ -191,7 +207,7 @@ export default function HomeExperience() {
                     key={act.text}
                     type="button"
                     onClick={() => handleCardClick(act.text)}
-                    className={`group relative w-full rounded-2xl p-3 cursor-pointer flex items-center gap-4 hover:-translate-y-[3px] transition-all duration-300 ${
+                    className={`group relative w-full rounded-2xl p-3 lg:px-3 lg:py-2.5 cursor-pointer flex items-center gap-4 lg:gap-3 hover:-translate-y-[3px] transition-all duration-300 ${
                       isDark
                         ? "bg-white/[0.02] border border-white/5 hover:border-blue-500/15 hover:bg-white/[0.05] hover:shadow-[0_0_15px_rgba(59,130,246,0.04)]"
                         : "bg-white border border-zinc-200/80 hover:border-blue-500/35 hover:bg-zinc-50/50 hover:shadow-[0_4px_20px_rgba(0,0,0,0.02)]"
@@ -220,16 +236,17 @@ export default function HomeExperience() {
         </div>
 
         {/* Center Column: Video only */}
-        <div className="w-full order-1 lg:order-2 flex flex-col items-center justify-center flex-shrink-0">
+        <div className="order-1 flex w-full flex-shrink-0 flex-col items-center justify-center lg:order-2 lg:h-full lg:min-h-0">
           <HomeHero />
         </div>
 
         {/* Right Column: Conversación log (containing headers and buscador) */}
-        <div className="w-full max-w-[340px] lg:max-w-[360px] xl:max-w-[440px] mx-auto lg:mx-0 order-3 lg:order-3 mt-10 lg:mt-0 self-start">
+        <div className="order-3 mx-auto mt-10 w-full max-w-[340px] self-start lg:order-3 lg:mx-0 lg:mt-0 lg:h-full lg:max-w-none lg:min-h-0">
           <Conversation searchInput={searchInput} setSearchInput={setSearchInput} isDark={isDark} />
         </div>
 
-      </div>
+        </div>
+      </main>
 
       {/* Styles for dynamic rainbow border animation on highlight */}
       <style jsx global>{`
