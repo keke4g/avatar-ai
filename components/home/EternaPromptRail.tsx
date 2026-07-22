@@ -65,7 +65,7 @@ export default function EternaPromptRail({ isDark, language }: EternaPromptRailP
   useEffect(() => {
     const interval = window.setInterval(() => {
       setActiveIndex((current) => (current + 1) % prompts.length);
-    }, 4000);
+    }, 5500);
     return () => window.clearInterval(interval);
   }, [prompts.length]);
 
@@ -94,10 +94,10 @@ export default function EternaPromptRail({ isDark, language }: EternaPromptRailP
         </span>
 
         <span className="relative min-w-0 flex-1">
-          <span className={`mb-1 inline-flex rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.16em] ${
+          <span className={`mb-1 inline-flex rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.18em] ${
             isDark
-              ? "bg-blue-400/15 text-blue-200 ring-1 ring-blue-300/15"
-              : "bg-[#655BFF] text-white shadow-[0_5px_14px_rgba(101,91,255,0.22)]"
+              ? "bg-white/[0.035] text-blue-200/45 ring-1 ring-white/[0.05]"
+              : "bg-[#655BFF]/[0.06] text-[#655BFF]/60 ring-1 ring-[#655BFF]/10"
           }`}>
             {language === "es" ? "Dile a Eterna" : "Say to Eterna"}
           </span>
@@ -141,7 +141,7 @@ export default function EternaPromptRail({ isDark, language }: EternaPromptRailP
             className="absolute inset-x-7 bottom-0 h-px origin-left bg-gradient-to-r from-transparent via-[#6C63FF] to-transparent"
             initial={{ scaleX: 0, opacity: 0.15 }}
             animate={{ scaleX: 1, opacity: 0.75 }}
-            transition={{ duration: 4, ease: "linear" }}
+            transition={{ duration: 5.5, ease: "linear" }}
           />
         )}
 
