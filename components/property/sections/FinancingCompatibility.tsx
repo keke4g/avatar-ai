@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Property } from '../../../lib/types';
 import { PropertyEligibilityEngine } from '../../../lib/services/PropertyEligibilityEngine';
+import { PropertySectionCard } from '../PropertySectionCard';
 
 interface FinancingCompatibilityProps {
   property: Property;
@@ -172,27 +173,23 @@ export const FinancingCompatibility: React.FC<FinancingCompatibilityProps> = ({
   };
 
   return (
-    <div className="border-b border-neutral-100 pb-8 flex flex-col gap-6 animate-in fade-in duration-300">
-      {/* Title & Subtitle block */}
-      <div>
-        <h3 className="text-base font-bold text-neutral-900 flex items-center gap-2">
-          <Award className="w-5 h-5 text-neutral-800 shrink-0" />
-          <span>{language === 'es' ? 'Financiamiento Compatible' : 'Compatible Financing'}</span>
-        </h3>
-        <p className="text-xs text-neutral-450 mt-1.5 leading-relaxed font-medium max-w-xl">
-          {language === 'es'
-            ? 'Eterna analizó automáticamente el expediente jurídico para determinar los métodos de adquisición compatibles.'
-            : 'Eterna automatically analyzed the legal dossier to determine eligible acquisition and financing methods.'}
-        </p>
-      </div>
-
+    <>
+      <PropertySectionCard
+        icon={Award}
+        eyebrow={language === 'es' ? 'Opciones de adquisición' : 'Acquisition options'}
+        title={language === 'es' ? 'Financiamiento compatible' : 'Compatible financing'}
+        description={language === 'es'
+          ? 'Eterna analizó el expediente jurídico para identificar los métodos de adquisición compatibles.'
+          : 'Eterna analyzed the legal dossier to identify compatible acquisition and financing methods.'}
+        className="animate-in fade-in duration-300"
+      >
       {/* Grid of Compatible Cards (Green status only) */}
       <motion.div 
         variants={containerVariants}
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, margin: '-50px' }}
-        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3"
       >
         {credits.compatibles.map((c) => {
           const details = getCreditDetails(c);
@@ -203,10 +200,10 @@ export const FinancingCompatibility: React.FC<FinancingCompatibilityProps> = ({
               key={c}
               variants={itemVariants}
               whileHover={{ y: -4, scale: 1.01, boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.03)' }}
-              className="p-5 bg-white/50 backdrop-blur-xs border border-neutral-100/80 rounded-2xl flex flex-col gap-3 transition-shadow duration-300 group"
+              className="group flex min-h-48 flex-col gap-3 rounded-2xl border border-neutral-200/80 bg-white p-5 transition-shadow duration-300"
             >
               <div className="flex items-center justify-between">
-                <div className="p-2.5 rounded-xl bg-neutral-50 text-neutral-600 group-hover:text-emerald-600 group-hover:bg-emerald-50/50 transition-colors shrink-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-neutral-950 text-white">
                   <Icon className="w-5 h-5" />
                 </div>
                 <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/40">
@@ -253,8 +250,9 @@ export const FinancingCompatibility: React.FC<FinancingCompatibilityProps> = ({
           {language === 'es'
             ? 'La aprobación final de cualquier crédito dependerá de la institución financiera y del perfil del comprador.'
             : 'Final approval of any credit will depend on the financial institution and the buyer\'s credit profile.'}
-        </span>
+          </span>
       </span>
+      </PropertySectionCard>
 
       {/* Sliding Glassmorphic Slide-over Drawer (Sheet) */}
       <AnimatePresence>
@@ -396,6 +394,6 @@ export const FinancingCompatibility: React.FC<FinancingCompatibilityProps> = ({
           </>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 };

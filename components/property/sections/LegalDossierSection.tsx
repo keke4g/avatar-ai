@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import { 
   FileText, 
   CheckCircle2, 
-  XCircle, 
   Home, 
   Map, 
   UserCheck, 
@@ -14,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Property } from '../../../lib/types';
 import { PropertyEligibilityEngine } from '../../../lib/services/PropertyEligibilityEngine';
+import { PropertySectionCard } from '../PropertySectionCard';
 
 interface LegalDossierSectionProps {
   property: Property;
@@ -118,55 +118,40 @@ export const LegalDossierSection: React.FC<LegalDossierSectionProps> = ({
   };
 
   return (
-    <div className="border-b border-neutral-100 pb-8 flex flex-col gap-6">
-      {/* Title Header with two levels */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h3 className="text-base font-bold text-neutral-900 flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${config.dotColor.split(' ')[0]} ring-4 ${config.dotColor.split(' ')[1]} shrink-0`} />
-            <span>{language === 'es' ? 'Expediente Jurídico' : 'Legal Dossier'}</span>
-          </h3>
-          <p className="text-xs text-neutral-450 mt-1 font-medium">
-            {language === 'es' ? 'Estado Legal:' : 'Legal Status:'} {legalStatus.label}
-          </p>
-        </div>
-        
+    <PropertySectionCard
+      icon={FileText}
+      eyebrow={language === 'es' ? 'Verificación documental' : 'Document verification'}
+      title={language === 'es' ? 'Expediente jurídico' : 'Legal dossier'}
+      description={`${language === 'es' ? 'Estado legal:' : 'Legal status:'} ${legalStatus.label}`}
+      action={(
         <span className={`self-start sm:self-center px-3.5 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider ${config.badgeClass} shadow-xs`}>
           {config.badgeText}
         </span>
-      </div>
-
+      )}
+    >
       {/* Grid of Independent Cards with Staggered animations */}
       <motion.div 
         variants={containerVariants}
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, margin: '-50px' }}
-        className="grid grid-cols-2 md:grid-cols-3 gap-4"
+        className="grid grid-cols-2 gap-3 md:grid-cols-3"
       >
         {dossierItems.map((item) => {
           const Icon = item.icon;
-          const isValid = item.status === 'valid';
 
           return (
             <motion.div
               key={item.id}
               variants={cardVariants}
               whileHover={{ y: -4, scale: 1.01, boxShadow: '0 10px 20px -5px rgba(0, 0, 0, 0.03)' }}
-              className="p-4 bg-white/50 backdrop-blur-xs border border-neutral-100/80 rounded-2xl flex flex-col gap-2 relative overflow-hidden transition-shadow duration-300"
+              className="relative flex min-h-32 flex-col overflow-hidden rounded-2xl border border-neutral-200/80 bg-white p-4 transition-shadow duration-300"
             >
-              <div className="flex items-center justify-between">
-                <div className="p-2 rounded-xl bg-neutral-50 text-neutral-500 shrink-0">
-                  <Icon className="w-4 h-4" />
-                </div>
-                {isValid ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-rose-500 shrink-0" />
-                )}
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neutral-950 text-white">
+                <Icon className="h-4 w-4" aria-hidden="true" />
               </div>
               
-              <div>
+              <div className="mt-auto pt-4">
                 <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider block">
                   {item.label}
                 </span>
@@ -181,7 +166,7 @@ export const LegalDossierSection: React.FC<LegalDossierSectionProps> = ({
 
       {/* Timeline Warning Card */}
       {((legalStatus.warnings && legalStatus.warnings.length > 0) || property.legalRestrictions) && (
-        <div className="relative mt-2 p-4 bg-amber-50/20 border border-amber-100/60 rounded-2xl flex gap-3.5 overflow-hidden transition-all hover:bg-amber-50/30">
+        <div className="relative mt-4 flex gap-3.5 overflow-hidden rounded-2xl border border-amber-100/60 bg-amber-50/20 p-4 transition-all hover:bg-amber-50/30">
           <div className="absolute top-0 bottom-0 left-0 w-1 bg-amber-400" />
           
           <div className="p-2 rounded-xl bg-amber-50 text-amber-600 shrink-0 h-fit">
@@ -207,6 +192,6 @@ export const LegalDossierSection: React.FC<LegalDossierSectionProps> = ({
           </div>
         </div>
       )}
-    </div>
+    </PropertySectionCard>
   );
 };

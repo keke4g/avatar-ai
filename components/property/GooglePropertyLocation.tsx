@@ -170,21 +170,26 @@ export default function GooglePropertyLocation({ property, places, loading, erro
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <a href={`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-xl border border-brand-gray-200 bg-brand-gray-50 px-4 py-2 text-xs font-bold text-brand-black shadow-xs transition hover:bg-brand-gray-100">
+        <a href={`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-xl bg-neutral-950 px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-neutral-800">
           <Compass className="h-3.5 w-3.5" /> {language === 'es' ? 'Cómo llegar' : 'Directions'}
         </a>
-        <a href={`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-xl border border-brand-gray-200 bg-brand-gray-50 px-4 py-2 text-xs font-bold text-brand-black shadow-xs transition hover:bg-brand-gray-100">
+        <a href={`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-4 py-2 text-xs font-bold text-neutral-900 shadow-xs transition hover:bg-neutral-50">
           <ExternalLink className="h-3.5 w-3.5" /> {language === 'es' ? 'Abrir en Google Maps' : 'Open in Google Maps'}
         </a>
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="mb-4 flex items-end justify-between gap-4">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-600">{language === 'es' ? 'Entorno verificado' : 'Verified surroundings'}</p>
-            <h4 className="mt-1 text-base font-black tracking-tight text-slate-950">{language === 'es' ? 'Lo que tienes cerca' : 'What is nearby'}</h4>
+      <div className="rounded-[22px] border border-neutral-200/80 bg-white p-4 sm:p-5">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neutral-950 text-white">
+              <Compass className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-[0.17em] text-neutral-400">{language === 'es' ? 'Entorno verificado' : 'Verified surroundings'}</p>
+              <h4 className="mt-0.5 text-sm font-black tracking-tight text-neutral-950">{language === 'es' ? 'Lo que tienes cerca' : 'What is nearby'}</h4>
+            </div>
           </div>
-          <span className="text-[9px] font-bold text-slate-400">Google Places</span>
+          <span className="shrink-0 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-wider text-neutral-400">Google Places</span>
         </div>
 
         {loading && (
@@ -199,8 +204,8 @@ export default function GooglePropertyLocation({ property, places, loading, erro
               const Icon = meta.icon;
               const duration = formatDuration(place.durationSeconds, language);
               return (
-                <a key={place.id} href={place.googleMapsUri || `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`} target="_blank" rel="noopener noreferrer" className="group flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3.5 transition hover:-translate-y-0.5 hover:border-violet-200 hover:bg-white hover:shadow-md">
-                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${meta.bg}`}><Icon className="h-4.5 w-4.5" /></span>
+                <a key={place.id} href={place.googleMapsUri || `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`} target="_blank" rel="noopener noreferrer" className="group flex min-w-0 items-center gap-3 rounded-2xl border border-neutral-200/80 bg-neutral-50/55 p-3.5 transition hover:-translate-y-0.5 hover:border-neutral-300 hover:bg-white hover:shadow-md">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-950 text-white"><Icon className="h-4.5 w-4.5" /></span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[9px] font-black uppercase tracking-wider text-slate-400">{NEARBY_CATEGORY_LABELS[place.category][language]}</span>
                     <span className="mt-0.5 block truncate text-xs font-extrabold text-slate-900">{place.name}</span>
@@ -208,7 +213,7 @@ export default function GooglePropertyLocation({ property, places, loading, erro
                       {duration && <><Clock3 className="h-3 w-3" />{duration}<span>·</span></>}{formatDistance(place.distanceMeters)}
                     </span>
                   </span>
-                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-slate-300 transition group-hover:text-violet-600" />
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-slate-300 transition group-hover:text-neutral-950" />
                 </a>
               );
             })}

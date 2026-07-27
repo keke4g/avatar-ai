@@ -24,6 +24,7 @@ import { EternaMarketAnalysis } from '../../../components/property/sections/Eter
 import { getEmbeddableMediaUrl, getVimeoEmbedUrl, getYouTubeEmbedUrl } from '../../../lib/mediaEmbeds';
 import GooglePropertyLocation from '../../../components/property/GooglePropertyLocation';
 import InternalAdvisorMarketplacePanel from '../../../components/property/InternalAdvisorMarketplacePanel';
+import { PropertySectionCard } from '../../../components/property/PropertySectionCard';
 import { useNearbyPlaces } from '../../../hooks/useNearbyPlaces';
 import {
   calculateMortgage,
@@ -1030,7 +1031,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
       <div className="flex flex-col lg:flex-row gap-12 items-start">
         
         {/* Left Column: Specifications & Descriptions */}
-        <div className="flex-1 flex flex-col gap-8 w-full">
+        <div className="flex-1 flex w-full flex-col gap-5">
           
           {/* Price display at the top of Left Column */}
           {(() => {
@@ -1140,19 +1141,15 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             ];
 
             return (
-              <div className="grid grid-cols-2 gap-4 border-b border-brand-gray-200/80 pb-6 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {specs.map(({ key, Icon, badge, label, value }) => (
                   <article
                     key={key}
-                    className="group relative flex min-h-[128px] min-w-0 flex-col overflow-hidden rounded-2xl border border-neutral-100/80 bg-white/50 p-4 backdrop-blur-xs transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-0.5 hover:border-neutral-200 hover:shadow-[0_10px_20px_-5px_rgba(0,0,0,0.03)]"
+                    className="group relative flex min-h-[138px] min-w-0 flex-col overflow-hidden rounded-[22px] border border-neutral-200/75 bg-white p-4 shadow-[0_16px_35px_-32px_rgba(15,23,42,0.65)] transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-[0_20px_38px_-28px_rgba(15,23,42,0.4)]"
                   >
                     <div className="flex items-start">
-                      <span className={`relative flex shrink-0 items-center justify-center rounded-xl ${
-                        badge
-                          ? 'h-10 w-10 bg-neutral-950 text-white shadow-[0_8px_18px_-12px_rgba(0,0,0,0.9)]'
-                          : 'h-9 w-9 bg-neutral-50 text-neutral-500'
-                      }`}>
-                        <Icon className={badge ? 'h-[18px] w-[18px]' : 'h-4 w-4'} aria-hidden="true" />
+                      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-neutral-950 text-white shadow-[0_10px_22px_-14px_rgba(0,0,0,0.95)]">
+                        <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
                         {badge && (
                           <span className="absolute -bottom-1.5 -right-2 flex h-5 min-w-5 items-center justify-center rounded-md border-2 border-white bg-amber-400 px-1 text-[10px] font-black leading-none text-neutral-950 shadow-sm">
                             {badge}
@@ -1161,7 +1158,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                       </span>
                     </div>
                     <div className="mt-auto pt-3">
-                      <span className="block text-[10px] font-bold uppercase leading-tight tracking-wider text-neutral-400">
+                      <span className="block text-[10px] font-black uppercase leading-tight tracking-[0.09em] text-neutral-400">
                         {label}
                       </span>
                       <strong className="mt-1 block text-sm font-black leading-snug tracking-tight text-neutral-900 sm:text-base">
@@ -1175,35 +1172,43 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           })()}
 
           {/* 1. Descripción */}
-          <div className="border-b border-brand-gray-200/80 pb-6">
-            <h3 className="text-base font-bold text-brand-black mb-3">{t('details.aboutSpace')}</h3>
+          <PropertySectionCard
+            icon={FileText}
+            eyebrow={language === 'es' ? 'Presentación' : 'Overview'}
+            title={t('details.aboutSpace')}
+          >
             <p className="text-sm text-brand-gray-500 leading-relaxed whitespace-pre-line font-medium">
               {t(`properties.${property.id}.description`).startsWith('properties.') ? property.description : t(`properties.${property.id}.description`)}
             </p>
-          </div>
+          </PropertySectionCard>
 
           {/* 3. Avalúo e Indicadores de Plusvalía */}
           {(property.appraisalAmount || property.appreciationLevel) && (
-            <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
-              <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-brand-accent" />
-                <span>{language === 'es' ? 'Valuación y Plusvalía' : 'Valuation & Appreciation'}</span>
-              </h3>
-
+            <PropertySectionCard
+              icon={TrendingUp}
+              eyebrow={language === 'es' ? 'Valor de referencia' : 'Reference value'}
+              title={language === 'es' ? 'Valuación y plusvalía' : 'Valuation & appreciation'}
+              description={language === 'es'
+                ? 'Datos orientativos para entender el valor actual y el comportamiento estimado de la zona.'
+                : 'Indicative data to understand current value and the area’s estimated performance.'}
+            >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {property.appraisalAmount && (
-                  <div className="p-4 rounded-2xl border border-brand-gray-200 bg-white flex flex-col gap-1 shadow-xs">
+                  <div className="flex min-h-36 flex-col rounded-2xl border border-neutral-200/80 bg-white p-4">
+                    <span className="mb-5 flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-950 text-white">
+                      <Award aria-hidden="true" className="h-4 w-4" />
+                    </span>
                     <span className="text-[10px] font-black uppercase text-brand-gray-400 tracking-wider">
                       {language === 'es' ? 'Certificación de Avalúo' : 'Appraisal Certificate'}
                     </span>
-                    <span className="text-xl font-black text-brand-black">
+                    <span className="mt-1 text-xl font-black tracking-tight text-brand-black">
                       ${property.appraisalAmount.toLocaleString()} MXN
                     </span>
-                    <span className="text-[10px] text-brand-gray-500 font-semibold mt-1">
+                    <span className="mt-auto pt-3 text-[10px] font-semibold text-brand-gray-500">
                       Valuador: {property.appraisalExpert || 'N/A'}
                     </span>
                     <span className="text-[10px] text-brand-gray-400 font-semibold">
-                      | Fecha: {property.appraisalDate || 'N/A'} • Vigencia: {property.appraisalValidity || 'N/A'}
+                      Fecha: {property.appraisalDate || 'N/A'} · Vigencia: {property.appraisalValidity || 'N/A'}
                     </span>
                   </div>
                 )}
@@ -1211,44 +1216,51 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 {property.appreciationLevel && (() => {
                   const details = PropertyEligibilityEngine.getInvestmentDetails(property);
                   return (
-                    <div className={`p-4 rounded-2xl border ${details.color} flex flex-col gap-1 shadow-xs`}>
-                      <span className="text-[10px] font-black uppercase tracking-wider opacity-75">
+                    <div className="flex min-h-36 flex-col rounded-2xl border border-neutral-200/80 bg-white p-4">
+                      <span className="mb-5 flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-950 text-white">
+                        <TrendingUp aria-hidden="true" className="h-4 w-4" />
+                      </span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-brand-gray-400">
                         {language === 'es' ? 'Plusvalía Estimada (Zona)' : 'Estimated Appreciation'}
                       </span>
-                      <span className="text-base font-extrabold flex items-center gap-1.5 mt-0.5">
-                        <TrendingUp className="w-4 h-4 shrink-0" />
+                      <span className="mt-1 flex items-center gap-1.5 text-base font-extrabold text-brand-black">
                         <span>{details.label}</span>
                       </span>
-                      <span className="text-[10px] font-semibold mt-1 opacity-90">
+                      <span className="mt-auto pt-3 text-[10px] font-semibold text-brand-gray-500">
                         {language === 'es' ? `Crecimiento promedio: ${details.rate}` : `Average growth: ${details.rate}`}
                       </span>
                     </div>
                   );
                 })()}
               </div>
-            </div>
+            </PropertySectionCard>
           )}
 
 
 
           {/* 5. Amenidades */}
           {allAmenities.length > 0 && (
-            <div className="border-b border-brand-gray-200/80 pb-6">
-              <h3 className="text-base font-bold text-brand-black mb-4">{t('details.whatOffers')}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <PropertySectionCard
+              icon={Compass}
+              eyebrow={language === 'es' ? 'Comodidades' : 'Amenities'}
+              title={t('details.whatOffers')}
+            >
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {allAmenities.map((amenity) => {
                   const Icon = AMENITY_ICONS[amenity] || Compass;
                   const translatedAmenity = t(`amenities.${amenity}`);
                   const displayAmenity = translatedAmenity.startsWith('amenities.') ? amenity : translatedAmenity;
                   return (
-                    <div key={amenity} className="flex items-center gap-3 text-sm text-brand-gray-500 font-semibold">
-                      <Icon className="w-4 h-4 text-brand-black shrink-0" />
-                      <span>{displayAmenity}</span>
+                    <div key={amenity} className="flex min-h-14 items-center gap-3 rounded-2xl border border-neutral-200/75 bg-white px-3.5 py-3 text-sm font-semibold text-brand-gray-600">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-neutral-950 text-white">
+                        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                      </span>
+                      <span className="leading-tight">{displayAmenity}</span>
                     </div>
                   );
                 })}
               </div>
-            </div>
+            </PropertySectionCard>
           )}
 
           {/* Technical details, services and security in one progressive disclosure. */}
@@ -1289,15 +1301,17 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             const detailCount = groups.reduce((total, group) => total + group.rows.length, 0);
 
             return (
-              <div className="border-b border-brand-gray-200/80 pb-6">
-                <details className="group overflow-hidden rounded-3xl border border-brand-gray-200/80 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-                  <summary className="flex min-h-[76px] cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:content-none sm:px-6 [&::-webkit-details-marker]:hidden">
+                <details className="group overflow-hidden rounded-[28px] border border-neutral-200/80 bg-white shadow-[0_22px_55px_-42px_rgba(15,23,42,0.55)]">
+                  <summary className="flex min-h-[88px] cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:content-none sm:px-6 [&::-webkit-details-marker]:hidden">
                     <span className="flex min-w-0 items-center gap-3.5">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-gray-100 text-brand-black">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-neutral-950 text-white shadow-[0_12px_24px_-16px_rgba(0,0,0,0.95)]">
                         <Building className="h-[18px] w-[18px]" aria-hidden="true" />
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-sm font-black text-brand-black sm:text-base">
+                        <span className="block text-[9px] font-black uppercase tracking-[0.17em] text-neutral-400">
+                          {language === 'es' ? 'Información del inmueble' : 'Property information'}
+                        </span>
+                        <span className="mt-1 block text-sm font-black tracking-[-0.025em] text-brand-black sm:text-lg">
                           {language === 'es' ? 'Detalles técnicos y servicios' : 'Technical details and services'}
                         </span>
                         <span className="mt-0.5 block text-[11px] font-semibold text-brand-gray-500">
@@ -1312,7 +1326,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     </span>
                   </summary>
 
-                  <div className="border-t border-brand-gray-200/80 bg-brand-gray-50/45 px-5 py-5 sm:px-6 sm:py-6">
+                  <div className="border-t border-neutral-200/70 bg-neutral-50/35 px-5 py-5 sm:px-6 sm:py-6">
                     <div className="space-y-7">
                       {groups.map(({ key, Icon, title, rows }) => (
                         <section key={key} aria-labelledby={`property-${key}-heading`}>
@@ -1333,7 +1347,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     </div>
                   </div>
                 </details>
-              </div>
             );
           })()}
 
@@ -1359,12 +1372,15 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             const currentTab = availableTabs.includes(activeMediaTab) ? activeMediaTab : (availableTabs[0] || '');
 
             return (
-              <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
-                <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
-                  <Compass className="w-5 h-5 text-brand-accent" />
-                  <span>{language === 'es' ? 'Multimedia y Recorridos' : 'Multimedia & Tours'}</span>
-                </h3>
-
+              <PropertySectionCard
+                icon={Play}
+                eyebrow={language === 'es' ? 'Contenido multimedia' : 'Media content'}
+                title={language === 'es' ? 'Multimedia y recorridos' : 'Multimedia & tours'}
+                description={language === 'es'
+                  ? 'Explora videos, recorridos virtuales, planos y documentos de la propiedad.'
+                  : 'Explore videos, virtual tours, floor plans, and property documents.'}
+                contentClassName="p-4 sm:p-5"
+              >
                 {/* Tab Header */}
                 <div className="grid grid-cols-2 gap-1 rounded-2xl border border-brand-gray-100 bg-brand-gray-100 p-1 sm:flex sm:overflow-x-auto">
                   {videos.length > 0 && (
@@ -1374,36 +1390,40 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                         setActiveMediaTab('video');
                         setActiveVideoIndex(0);
                       }}
-                      className={`min-h-11 rounded-xl px-2 py-2 text-center text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap sm:flex-1 sm:px-4 sm:text-xs ${currentTab === 'video' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-2 py-2 text-center text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap sm:flex-1 sm:px-4 sm:text-xs ${currentTab === 'video' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
                     >
-                      📹 {language === 'es' ? 'Videos' : 'Videos'} ({videos.length})
+                      <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>{language === 'es' ? 'Videos' : 'Videos'} ({videos.length})</span>
                     </button>
                   )}
                   {virtualTours.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setActiveMediaTab('virtual')}
-                      className={`min-h-11 rounded-xl px-2 py-2 text-center text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap sm:flex-1 sm:px-4 sm:text-xs ${currentTab === 'virtual' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-2 py-2 text-center text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap sm:flex-1 sm:px-4 sm:text-xs ${currentTab === 'virtual' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
                     >
-                      🕶️ {language === 'es' ? 'Tour 3D / VR' : '3D / VR Tour'} ({virtualTours.length})
+                      <Compass className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>{language === 'es' ? 'Tour 3D / VR' : '3D / VR Tour'} ({virtualTours.length})</span>
                     </button>
                   )}
                   {floorplans.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setActiveMediaTab('floorplan')}
-                      className={`min-h-11 rounded-xl px-2 py-2 text-center text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap sm:flex-1 sm:px-4 sm:text-xs ${currentTab === 'floorplan' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-2 py-2 text-center text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap sm:flex-1 sm:px-4 sm:text-xs ${currentTab === 'floorplan' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
                     >
-                      📐 {language === 'es' ? 'Planos' : 'Floor Plans'} ({floorplans.length})
+                      <Building className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>{language === 'es' ? 'Planos' : 'Floor Plans'} ({floorplans.length})</span>
                     </button>
                   )}
                   {documents.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setActiveMediaTab('document')}
-                      className={`min-h-11 rounded-xl px-2 py-2 text-center text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap sm:flex-1 sm:px-4 sm:text-xs ${currentTab === 'document' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
+                      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-2 py-2 text-center text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap sm:flex-1 sm:px-4 sm:text-xs ${currentTab === 'document' ? 'bg-white text-brand-black shadow-sm font-black' : 'text-brand-gray-500 hover:text-brand-black'}`}
                     >
-                      📄 {language === 'es' ? 'Documentación' : 'Documents'} ({documents.length})
+                      <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>{language === 'es' ? 'Documentación' : 'Documents'} ({documents.length})</span>
                     </button>
                   )}
                 </div>
@@ -1525,8 +1545,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                           className="bg-brand-gray-50 border border-brand-gray-200/60 p-4 rounded-3xl shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-4 group h-fit"
                         >
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 font-bold shrink-0">
-                              📄
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-neutral-950 text-white">
+                              <FileText className="h-5 w-5" aria-hidden="true" />
                             </div>
                             <div className="min-w-0">
                               <h4 className="text-xs font-bold text-brand-black truncate group-hover:text-brand-accent transition-colors">
@@ -1550,21 +1570,21 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     </div>
                   )}
                 </div>
-              </div>
+              </PropertySectionCard>
             );
           })()}
 
           {/* 8. Ubicación y Mapa */}
           {property.latitude !== null && property.longitude !== null && (
-            <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4">
-              <h3 className="text-base font-bold text-brand-black">{language === 'es' ? 'Ubicación y Entorno' : 'Location & Neighborhood'}</h3>
-              {property.formattedAddress && (
-                <p className="text-xs text-brand-gray-500 font-semibold flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-brand-gray-400 shrink-0" />
-                  <span>{property.formattedAddress}</span>
-                </p>
-              )}
-              
+            <PropertySectionCard
+              icon={MapPin}
+              eyebrow={language === 'es' ? 'Ubicación' : 'Location'}
+              title={language === 'es' ? 'Ubicación y entorno' : 'Location & neighborhood'}
+              description={property.formattedAddress || (language === 'es'
+                ? 'Consulta la ubicación y los puntos de interés cercanos.'
+                : 'View the location and nearby points of interest.')}
+              contentClassName="p-4 sm:p-5"
+            >
               <GooglePropertyLocation
                 property={property}
                 places={nearby.data?.places || []}
@@ -1572,7 +1592,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 error={nearby.error}
                 language={language === 'es' ? 'es' : 'en'}
               />
-            </div>
+            </PropertySectionCard>
           )}
 
           {/* Responsable Comercial Card (Premium design) */}
@@ -1613,10 +1633,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               : `AuraSwap property inquiry: ${property.title}`;
 
             return (
-              <section className="relative overflow-hidden border-y border-brand-gray-200/80 bg-gradient-to-br from-brand-gray-50/80 via-white to-brand-accent/[0.035] px-5 py-7 sm:px-7 sm:py-8">
-                <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-brand-accent/[0.055] blur-3xl pointer-events-none" />
-
-                <div className="relative grid gap-7 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-center">
+              <section className="overflow-hidden rounded-[28px] border border-neutral-200/80 bg-white px-5 py-6 shadow-[0_22px_55px_-42px_rgba(15,23,42,0.55)] sm:px-6 sm:py-7">
+                <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-center">
                   <div className="contents">
                     <div className="flex items-center gap-4 sm:gap-5">
                       <div className="relative shrink-0">
@@ -1635,7 +1653,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                       </div>
 
                       <div className="min-w-0">
-                        <span className="inline-flex rounded-full bg-brand-accent/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.16em] text-brand-accent">
+                        <span className="inline-flex rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.16em] text-neutral-600">
                           {label}
                         </span>
                         <h4 className="mt-2 truncate text-2xl font-black leading-none text-brand-black">{broker.name}</h4>
@@ -1657,7 +1675,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     </div>
                   </div>
 
-                  <div className="rounded-[22px] border border-brand-gray-200/80 bg-white/90 p-3 shadow-[0_12px_30px_rgba(15,23,42,0.07)] backdrop-blur-sm">
+                  <div className="rounded-[22px] border border-neutral-200/80 bg-neutral-50/55 p-3">
                   {broker.whatsapp && (
                     <a
                       href={`https://wa.me/${broker.whatsapp}?text=${encodeURIComponent(whatsappMessage)}`}
@@ -1727,15 +1745,20 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           <InternalAdvisorMarketplacePanel property={property} language={language} />
 
           {((selectedMode === 'MONTHLY_RENT' || selectedMode === 'SHORT_RENT') || selectedMode === 'SWAP') && (
-            <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4 animate-in fade-in duration-300">
+            <PropertySectionCard
+              icon={selectedMode === 'SWAP' ? RefreshCw : FileCheck}
+              eyebrow={language === 'es' ? 'Condiciones comerciales' : 'Commercial terms'}
+              title={selectedMode === 'SWAP'
+                ? (language === 'es' ? 'Formas de intercambio aceptadas' : 'Accepted swap framework')
+                : (language === 'es' ? 'Condiciones de contratación' : 'Lease terms & conditions')}
+              description={selectedMode === 'SWAP'
+                ? (language === 'es' ? 'Revisa las modalidades y preferencias declaradas para este intercambio.' : 'Review the declared modes and preferences for this exchange.')
+                : (language === 'es' ? 'Consulta los requisitos principales antes de solicitar esta propiedad.' : 'Review the main requirements before requesting this property.')}
+              className="animate-in fade-in duration-300"
+            >
               {/* RENT mode: Conditions of lease */}
               {(selectedMode === 'MONTHLY_RENT' || selectedMode === 'SHORT_RENT') && activeRentOffering && (
                 <>
-                  <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
-                    <FileCheck className="w-5 h-5 text-brand-accent" />
-                    <span>{language === 'es' ? 'Condiciones de Contratación' : 'Lease Terms & Conditions'}</span>
-                  </h3>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
                       <span className="text-brand-gray-550 font-bold">{language === 'es' ? 'Depósito requerido:' : 'Security deposit:'}</span>
@@ -1792,11 +1815,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               {/* SWAP mode: Forms of exchange accepted */}
               {selectedMode === 'SWAP' && (
                 <>
-                  <h3 className="text-base font-bold text-brand-black flex items-center gap-2">
-                    <RefreshCw className="w-5 h-5 text-brand-accent" />
-                    <span>{language === 'es' ? 'Formas de Intercambio Aceptadas' : 'Accepted Swap Framework'}</span>
-                  </h3>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     <div className="p-3 bg-brand-gray-50 border border-brand-gray-300 rounded-xl text-xs font-black text-brand-black flex items-center justify-between">
                       <span className="text-brand-gray-555 font-bold">{language === 'es' ? 'Intercambio directo:' : 'Direct swap:'}</span>
@@ -1855,7 +1873,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   )}
                 </>
               )}
-            </div>
+            </PropertySectionCard>
           )}
 
 

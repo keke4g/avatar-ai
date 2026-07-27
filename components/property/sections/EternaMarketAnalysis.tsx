@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { Clock3, Gauge, TrendingUp } from 'lucide-react';
 import { Property } from '../../../lib/types';
+import { PropertySectionCard } from '../PropertySectionCard';
 
 interface EternaMarketAnalysisProps {
   property: Property;
@@ -50,28 +51,20 @@ export function EternaMarketAnalysis({
   ];
 
   return (
-    <section className="mb-6 overflow-hidden rounded-3xl border border-brand-gray-200/80 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.045)]" aria-labelledby="market-analysis-heading">
-      <div className="flex flex-col gap-2 border-b border-brand-gray-200/80 px-5 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-6">
-        <div>
-          <span className="text-[9px] font-black uppercase tracking-[0.18em] text-brand-accent">
-            {language === 'es' ? 'Inteligencia inmobiliaria' : 'Real estate intelligence'}
-          </span>
-          <h3 id="market-analysis-heading" className="mt-1 text-lg font-black tracking-tight text-brand-black">
-            {language === 'es' ? 'Indicadores comerciales estimados' : 'Estimated commercial indicators'}
-          </h3>
-        </div>
-        <p className="max-w-sm text-[10px] font-semibold leading-relaxed text-brand-gray-500 sm:text-right">
-          {language === 'es'
-            ? 'Estimaciones orientativas de Eterna; confirma las condiciones actuales con el responsable.'
-            : 'Indicative Eterna estimates; confirm current conditions with the representative.'}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3 sm:p-5">
+    <PropertySectionCard
+      icon={TrendingUp}
+      eyebrow={language === 'es' ? 'Inteligencia inmobiliaria' : 'Real estate intelligence'}
+      title={language === 'es' ? 'Indicadores comerciales estimados' : 'Estimated commercial indicators'}
+      description={language === 'es'
+        ? 'Estimaciones orientativas de Eterna; confirma las condiciones actuales con el responsable.'
+        : 'Indicative Eterna estimates; confirm current conditions with the representative.'}
+      headingId="market-analysis-heading"
+    >
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {metrics.map(({ key, Icon, label, value, detail }) => (
-          <article key={key} className="flex min-h-[150px] flex-col rounded-2xl border border-brand-gray-200/80 bg-brand-gray-50/55 p-4">
+          <article key={key} className="flex min-h-[150px] flex-col rounded-2xl border border-neutral-200/80 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-brand-black shadow-xs ring-1 ring-brand-gray-200/70">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-950 text-white">
                 <Icon className="h-4 w-4" aria-hidden="true" />
               </span>
               <span className="text-right text-[9px] font-black uppercase tracking-[0.11em] text-brand-gray-500">
@@ -99,6 +92,6 @@ export function EternaMarketAnalysis({
           </article>
         ))}
       </div>
-    </section>
+    </PropertySectionCard>
   );
 }
