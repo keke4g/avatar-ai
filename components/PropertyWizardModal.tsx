@@ -15,6 +15,10 @@ import { useSwap } from '../lib/context/SwapContext';
 import { formatCount } from '../lib/textHelpers';
 import GoogleAddressAutocomplete from './maps/GoogleAddressAutocomplete';
 import type { GoogleAddressResult } from '../lib/maps/types';
+import {
+  normalizeForMatch,
+  type PropertyListingImportResult,
+} from '../lib/propertyImport/propertyListingImport';
 
 
 interface PropertyWizardModalProps {
@@ -628,6 +632,19 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
   const [salePrice, setSalePrice] = useState(450000);
   const [saleCurrency, setSaleCurrency] = useState('USD');
   const [saleAcceptsOffers, setSaleAcceptsOffers] = useState(true);
+  const [acceptsBankCredit, setAcceptsBankCredit] = useState(true);
+  const [acceptsInfonavit, setAcceptsInfonavit] = useState(true);
+  const [acceptsFovissste, setAcceptsFovissste] = useState(true);
+  const [acceptsCash, setAcceptsCash] = useState(true);
+  const [developerFinancing, setDeveloperFinancing] = useState(false);
+
+  // Optional quick import from an existing WhatsApp/Facebook/listing text.
+  const [listingSourceText, setListingSourceText] = useState('');
+  const [isImportingListing, setIsImportingListing] = useState(false);
+  const [listingImportError, setListingImportError] = useState('');
+  const [listingImportSummary, setListingImportSummary] = useState<string[]>([]);
+  const [listingImportProvider, setListingImportProvider] = useState('');
+  const [isImportPanelExpanded, setIsImportPanelExpanded] = useState(true);
 
   // AI Enhancer state
   const [isImprovingTitle, setIsImprovingTitle] = useState(false);
@@ -775,6 +792,156 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     trackMetric('ai_description_option_selected', { selectedText: opt });
   };
 
+  const applyImportedListing = (result: PropertyListingImportResult) => {
+    if (result.title) setTitle(result.title);
+    if (result.shortDescription) {
+      setShortDescription(result.shortDescription);
+      setDescription(result.shortDescription);
+    }
+    if (result.propertyType !== 'Desconocido') setType(result.propertyType);
+    if (result.developmentName) setDevelopmentName(result.developmentName);
+
+    if (result.operation !== 'UNKNOWN') {
+      const importedMode = result.operation === 'SHORT_RENT'
+        ? 'MONTHLY_RENT'
+        : result.operation;
+      setSelectedModes([importedMode]);
+      setActiveConfigTab(importedMode);
+    }
+
+    if (result.priceAmount > 0) {
+      if (result.operation === 'MONTHLY_RENT' || result.operation === 'SHORT_RENT') {
+        setMonthlyPrice(result.priceAmount);
+      } else {
+        setSalePrice(result.priceAmount);
+      }
+    }
+    if (result.currency !== 'UNKNOWN') setSaleCurrency(result.currency);
+
+    if (result.bedrooms > 0) setBedrooms(result.bedrooms);
+    if (result.fullBathrooms > 0) setBathrooms(result.fullBathrooms);
+    if (result.halfBathrooms > 0) setHalfBathrooms(result.halfBathrooms);
+    if (result.levels > 0) setLevelsCount(result.levels);
+    if (result.parkingSpaces > 0) setParkingSpaces(result.parkingSpaces);
+    if (result.surfaceTotal > 0) setSurfaceTotal(result.surfaceTotal);
+    if (result.surfaceBuilt > 0) setSurfaceBuilt(result.surfaceBuilt);
+    if (result.surfaceFront > 0) setSurfaceFront(result.surfaceFront);
+    if (result.surfaceDepth > 0) setSurfaceDepth(result.surfaceDepth);
+
+    if (result.city) {
+      setCity(result.city);
+      setLocation(result.city);
+    }
+    if (result.state) setStateName(result.state);
+    if (result.country) setCountry(result.country);
+    if (result.neighborhood) setNeighborhood(result.neighborhood);
+    if (result.addressHint) setLocationReference(result.addressHint);
+
+    if (result.legalDebtFreeMentioned) {
+      setLegalDebtFree(result.legalDebtFree);
+      setLegalIsMortgaged(!result.legalDebtFree);
+    }
+
+    if (result.financingMentioned) {
+      setAcceptsBankCredit(result.financing.bankCredit);
+      setAcceptsInfonavit(result.financing.infonavit);
+      setAcceptsFovissste(result.financing.fovissste);
+      setAcceptsCash(result.financing.cash);
+      setDeveloperFinancing(result.financing.developer);
+    }
+
+    const amenityByNormalizedName = new Map(
+      AMENITY_OPTIONS.map((amenity) => [normalizeForMatch(amenity), amenity]),
+    );
+    const importedPreset: string[] = [];
+    const importedCustom: string[] = [];
+    [...result.presetAmenities, ...result.customAmenities].forEach((amenity) => {
+      const canonical = amenityByNormalizedName.get(normalizeForMatch(amenity));
+      if (canonical) {
+        if (!importedPreset.includes(canonical)) importedPreset.push(canonical);
+        return;
+      }
+      if (
+        amenity
+        && !importedCustom.some((item) => normalizeForMatch(item) === normalizeForMatch(amenity))
+      ) {
+        importedCustom.push(amenity);
+      }
+    });
+    setSelectedAmenities((previous) => Array.from(new Set([...previous, ...importedPreset])));
+    setCustomAmenities((previous) => {
+      const next = [...previous];
+      importedCustom.forEach((amenity) => {
+        if (!next.some((item) => normalizeForMatch(item) === normalizeForMatch(amenity))) {
+          next.push(amenity);
+        }
+      });
+      return next;
+    });
+
+    const summary = result.detectedFacts.filter((fact) => !/\bprecio\b/i.test(fact));
+    if (result.priceAmount > 0) {
+      summary.unshift(
+        `$${result.priceAmount.toLocaleString('es-MX')} ${result.currency === 'UNKNOWN' ? 'MXN' : result.currency}`,
+      );
+    }
+    if (importedPreset.length + importedCustom.length > 0) {
+      summary.push(`${importedPreset.length + importedCustom.length} amenidades`);
+    }
+    setListingImportSummary(Array.from(new Set(summary)).slice(0, 8));
+    setFieldErrors((previous) => ({
+      ...previous,
+      title: '',
+      description: '',
+      selectedModes: '',
+      salePrice: '',
+    }));
+  };
+
+  const handleImportListing = async () => {
+    const cleanSource = listingSourceText.trim();
+    if (cleanSource.length < 20 || isImportingListing) return;
+
+    setIsImportingListing(true);
+    setListingImportError('');
+    setListingImportSummary([]);
+    trackMetric('property_listing_import_started', { characterCount: cleanSource.length });
+
+    try {
+      const response = await fetch('/api/property/import-listing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: cleanSource }),
+      });
+      const payload = await response.json() as {
+        result?: PropertyListingImportResult;
+        provider?: string;
+        error?: string;
+      };
+      if (!response.ok || !payload.result) {
+        throw new Error(payload.error || 'No fue posible analizar el anuncio.');
+      }
+
+      applyImportedListing(payload.result);
+      setListingImportProvider(payload.provider || 'gemini');
+      setIsImportPanelExpanded(false);
+      trackMetric('property_listing_import_completed', {
+        provider: payload.provider || 'gemini',
+        detectedFacts: payload.result.detectedFacts.length,
+        amenities: payload.result.presetAmenities.length + payload.result.customAmenities.length,
+      });
+      showToast('Anuncio analizado. Revisa los datos precargados paso a paso.', 'success');
+    } catch (error: unknown) {
+      const message = error instanceof Error
+        ? error.message
+        : 'No fue posible analizar el anuncio.';
+      setListingImportError(message);
+      trackMetric('property_listing_import_failed', { message });
+    } finally {
+      setIsImportingListing(false);
+    }
+  };
+
   // Populate data when editing
   useEffect(() => {
     setLocalDeleteConfirm(false);
@@ -854,6 +1021,11 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
         setSalePrice(saleOff.priceAmount || 450000);
         setSaleCurrency(saleOff.currency || 'USD');
         setSaleAcceptsOffers(saleOff.acceptsOffers !== false);
+        setAcceptsBankCredit(saleOff.acceptsBankCredit !== false);
+        setAcceptsInfonavit(saleOff.acceptsInfonavit !== false);
+        setAcceptsFovissste(saleOff.acceptsFovissste !== false);
+        setAcceptsCash(saleOff.acceptsCash !== false);
+        setDeveloperFinancing(saleOff.developerFinancing === true);
       }
       
       // Venta Extra
@@ -897,6 +1069,11 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setSwapPriority(initialData.metadata?.swapPriority || 'Media');
 
       setPublisherType((initialData.metadata?.publisherType as any) || 'owner');
+      setListingSourceText('');
+      setListingImportSummary([]);
+      setListingImportProvider('');
+      setListingImportError('');
+      setIsImportPanelExpanded(false);
       setStep(1); // Skip Step 0 when editing
     } else {
       // Reset to defaults
@@ -948,6 +1125,8 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setSwapMinValue('');
       setSwapMaxValue('');
       setType('Departamento');
+      setDevelopmentName('');
+      setShortDescription('');
       setLocation('');
       setCountry('');
       setAddress('');
@@ -970,6 +1149,19 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setVideoPlaceholder('');
       setVideoUrl('');
       setVirtualTourPlaceholder('');
+      setSalePrice(450000);
+      setSaleCurrency('USD');
+      setSaleAcceptsOffers(true);
+      setAcceptsBankCredit(true);
+      setAcceptsInfonavit(true);
+      setAcceptsFovissste(true);
+      setAcceptsCash(true);
+      setDeveloperFinancing(false);
+      setListingSourceText('');
+      setListingImportSummary([]);
+      setListingImportProvider('');
+      setListingImportError('');
+      setIsImportPanelExpanded(true);
     }
   }, [initialData, isOpen]);
 
@@ -983,7 +1175,9 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       selectedModes,
       title,
       shortDescription,
+      description,
       type,
+      developmentName,
       location,
       country,
       address,
@@ -1003,7 +1197,13 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       bedrooms,
       bathrooms,
       halfBathrooms,
+      parkingSpaces,
+      levelsCount,
       maxGuests,
+      surfaceTotal,
+      surfaceBuilt,
+      surfaceFront,
+      surfaceDepth,
       selectedAmenities,
       customAmenities,
       images,
@@ -1017,6 +1217,11 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       salePrice,
       saleCurrency,
       saleAcceptsOffers,
+      acceptsBankCredit,
+      acceptsInfonavit,
+      acceptsFovissste,
+      acceptsCash,
+      developerFinancing,
       monthlyPrice,
       monthlyDeposit,
       monthlyContract,
@@ -1068,7 +1273,11 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       appraisalExpert,
       appraisalValidity,
       appreciationLevel,
-      commercialStatus
+      commercialStatus,
+      listingSourceText,
+      listingImportSummary,
+      listingImportProvider,
+      isImportPanelExpanded,
     };
 
     console.log('[GeoTrace] [Fase C] Guardando borrador en localStorage con coordenadas:', { latitude: draftData.latitude, longitude: draftData.longitude });
@@ -1080,7 +1289,9 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     selectedModes,
     title,
     shortDescription,
+    description,
     type,
+    developmentName,
     location,
     country,
     address,
@@ -1100,7 +1311,13 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     bedrooms,
     bathrooms,
     halfBathrooms,
+    parkingSpaces,
+    levelsCount,
     maxGuests,
+    surfaceTotal,
+    surfaceBuilt,
+    surfaceFront,
+    surfaceDepth,
     selectedAmenities,
     customAmenities,
     images,
@@ -1113,6 +1330,11 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     salePrice,
     saleCurrency,
     saleAcceptsOffers,
+    acceptsBankCredit,
+    acceptsInfonavit,
+    acceptsFovissste,
+    acceptsCash,
+    developerFinancing,
     monthlyPrice,
     monthlyDeposit,
     monthlyContract,
@@ -1162,7 +1384,11 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     appraisalExpert,
     appraisalValidity,
     appreciationLevel,
-    commercialStatus
+    commercialStatus,
+    listingSourceText,
+    listingImportSummary,
+    listingImportProvider,
+    isImportPanelExpanded,
   ]);
 
   // Load draft check on modal mount or open
@@ -1178,8 +1404,12 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
             if (parsed.publisherType) setPublisherType(parsed.publisherType);
             if (parsed.selectedModes) setSelectedModes(parsed.selectedModes);
             if (parsed.title) setTitle(parsed.title);
-            if (parsed.shortDescription) setShortDescription(parsed.shortDescription);
+            if (parsed.shortDescription) {
+              setShortDescription(parsed.shortDescription);
+              setDescription(parsed.description || parsed.shortDescription);
+            }
             if (parsed.type) setType(parsed.type);
+            if (parsed.developmentName) setDevelopmentName(parsed.developmentName);
             if (parsed.location) setLocation(parsed.location);
             if (parsed.country) setCountry(parsed.country);
             if (parsed.address) setAddress(parsed.address);
@@ -1199,7 +1429,13 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
             if (parsed.bedrooms) setBedrooms(parsed.bedrooms);
             if (parsed.bathrooms) setBathrooms(parsed.bathrooms);
             if (parsed.halfBathrooms) setHalfBathrooms(parsed.halfBathrooms);
+            if (parsed.parkingSpaces !== undefined) setParkingSpaces(parsed.parkingSpaces);
+            if (parsed.levelsCount !== undefined) setLevelsCount(parsed.levelsCount);
             if (parsed.maxGuests) setMaxGuests(parsed.maxGuests);
+            if (parsed.surfaceTotal !== undefined) setSurfaceTotal(parsed.surfaceTotal);
+            if (parsed.surfaceBuilt !== undefined) setSurfaceBuilt(parsed.surfaceBuilt);
+            if (parsed.surfaceFront !== undefined) setSurfaceFront(parsed.surfaceFront);
+            if (parsed.surfaceDepth !== undefined) setSurfaceDepth(parsed.surfaceDepth);
             if (parsed.selectedAmenities) setSelectedAmenities(parsed.selectedAmenities);
             if (parsed.customAmenities) setCustomAmenities(parsed.customAmenities);
             if (parsed.images) setImages(parsed.images);
@@ -1212,6 +1448,11 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
             if (parsed.salePrice) setSalePrice(parsed.salePrice);
             if (parsed.saleCurrency) setSaleCurrency(parsed.saleCurrency);
             if (parsed.saleAcceptsOffers !== undefined) setSaleAcceptsOffers(parsed.saleAcceptsOffers);
+            if (parsed.acceptsBankCredit !== undefined) setAcceptsBankCredit(parsed.acceptsBankCredit);
+            if (parsed.acceptsInfonavit !== undefined) setAcceptsInfonavit(parsed.acceptsInfonavit);
+            if (parsed.acceptsFovissste !== undefined) setAcceptsFovissste(parsed.acceptsFovissste);
+            if (parsed.acceptsCash !== undefined) setAcceptsCash(parsed.acceptsCash);
+            if (parsed.developerFinancing !== undefined) setDeveloperFinancing(parsed.developerFinancing);
             if (parsed.monthlyPrice) setMonthlyPrice(parsed.monthlyPrice);
             if (parsed.monthlyDeposit) setMonthlyDeposit(parsed.monthlyDeposit);
             if (parsed.monthlyContract !== undefined) setMonthlyContract(parsed.monthlyContract);
@@ -1263,6 +1504,10 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
             if (parsed.appraisalValidity) setAppraisalValidity(parsed.appraisalValidity);
             if (parsed.appreciationLevel) setAppreciationLevel(parsed.appreciationLevel);
             if (parsed.commercialStatus) setCommercialStatus(parsed.commercialStatus);
+            if (parsed.listingSourceText) setListingSourceText(parsed.listingSourceText);
+            if (parsed.listingImportSummary) setListingImportSummary(parsed.listingImportSummary);
+            if (parsed.listingImportProvider) setListingImportProvider(parsed.listingImportProvider);
+            if (parsed.isImportPanelExpanded !== undefined) setIsImportPanelExpanded(parsed.isImportPanelExpanded);
             
             showToast(
               language === 'es' 
@@ -1645,9 +1890,11 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
           ...baseOffering,
           priceAmount: salePrice,
           currency: saleCurrency,
-          acceptsBankCredit: true,
-          acceptsInfonavit: true,
-          acceptsFovissste: true,
+          acceptsBankCredit,
+          acceptsInfonavit,
+          acceptsFovissste,
+          acceptsCash,
+          developerFinancing,
           acceptsOffers: saleAcceptsOffers
         };
       }
@@ -2244,8 +2491,128 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                         <Info className="w-4 h-4" />
                         <span>Paso 1: Información Básica</span>
                       </h4>
-                      <p className="text-xs text-brand-gray-500 mt-0.5">Ingresa los datos descriptivos generales del alojamiento. El resumen completo de IA se generará automáticamente.</p>
+                      <p className="text-xs text-brand-gray-500 mt-0.5">Pega un anuncio existente para ahorrar tiempo o captura cada dato manualmente.</p>
                     </div>
+
+                    {!initialData && (
+                      <section
+                        aria-label="Carga rápida desde un anuncio"
+                        className={`overflow-hidden rounded-2xl border transition-all ${
+                          listingImportSummary.length > 0
+                            ? 'border-emerald-200 bg-emerald-50/45'
+                            : 'border-brand-accent/20 bg-gradient-to-br from-brand-accent/[0.07] via-white to-white'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setIsImportPanelExpanded((previous) => !previous)}
+                          className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+                          aria-expanded={isImportPanelExpanded}
+                        >
+                          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                            listingImportSummary.length > 0
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-brand-black text-white'
+                          }`}>
+                            {listingImportSummary.length > 0
+                              ? <Check className="h-4 w-4" />
+                              : <FileText className="h-4 w-4" />}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-black text-brand-black">
+                                {listingImportSummary.length > 0
+                                  ? 'Datos precargados desde tu anuncio'
+                                  : 'Carga rápida desde un anuncio'}
+                              </span>
+                              <span className="rounded-full border border-brand-gray-200 bg-white px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-brand-gray-500">
+                                Opcional
+                              </span>
+                            </span>
+                            <span className="mt-0.5 block text-[10px] font-medium leading-relaxed text-brand-gray-500">
+                              {listingImportSummary.length > 0
+                                ? 'Revisa y corrige cada campo normalmente en los siguientes pasos.'
+                                : 'Pega el texto de WhatsApp, Facebook o tu ficha comercial.'}
+                            </span>
+                          </span>
+                          {isImportPanelExpanded
+                            ? <ChevronUp className="h-4 w-4 shrink-0 text-brand-gray-400" />
+                            : <ChevronDown className="h-4 w-4 shrink-0 text-brand-gray-400" />}
+                        </button>
+
+                        <AnimatePresence initial={false}>
+                          {isImportPanelExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                              className="overflow-hidden"
+                            >
+                              <div className="border-t border-brand-gray-200/70 px-4 pb-4 pt-3">
+                                <label htmlFor="listing-source-text" className="sr-only">
+                                  Texto del anuncio existente
+                                </label>
+                                <textarea
+                                  id="listing-source-text"
+                                  rows={6}
+                                  maxLength={12000}
+                                  value={listingSourceText}
+                                  onChange={(event) => {
+                                    setListingSourceText(event.target.value);
+                                    setListingImportError('');
+                                  }}
+                                  placeholder={'Ej. En venta, casa con 4 recámaras, 2.5 baños, 144 m² de terreno...'}
+                                  className="w-full resize-none rounded-xl border border-brand-gray-200 bg-white p-3 text-xs font-semibold leading-relaxed text-brand-black outline-none transition placeholder:text-brand-gray-400 focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/10"
+                                />
+
+                                {listingImportError && (
+                                  <p className="mt-2 flex items-start gap-1.5 text-[10px] font-bold leading-relaxed text-brand-rose">
+                                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                                    <span>{listingImportError}</span>
+                                  </p>
+                                )}
+
+                                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                  <span className="text-[9px] font-bold text-brand-gray-400">
+                                    {listingSourceText.length.toLocaleString('es-MX')} / 12,000 caracteres
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={handleImportListing}
+                                    disabled={listingSourceText.trim().length < 20 || isImportingListing}
+                                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-brand-black px-4 py-2.5 text-[10px] font-black text-white shadow-sm transition hover:bg-brand-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+                                  >
+                                    {isImportingListing
+                                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      : <Sparkles className="h-3.5 w-3.5 text-brand-accent" />}
+                                    <span>{isImportingListing ? 'Analizando anuncio…' : 'Analizar y completar campos'}</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        {listingImportSummary.length > 0 && !isImportPanelExpanded && (
+                          <div className="flex flex-wrap gap-1.5 border-t border-emerald-200/80 px-4 py-3">
+                            {listingImportSummary.map((fact) => (
+                              <span
+                                key={fact}
+                                className="rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-[9px] font-bold text-emerald-800"
+                              >
+                                {fact}
+                              </span>
+                            ))}
+                            {listingImportProvider === 'local_fallback' && (
+                              <span className="w-full pt-1 text-[9px] font-medium text-brand-gray-500">
+                                Análisis rápido completado. Verifica los datos antes de publicar.
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </section>
+                    )}
 
                     <div className="flex flex-col gap-3">
                       <div className="flex flex-col gap-1.5">
@@ -3231,6 +3598,70 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                             ]}
                             scrollContainerRef={scrollAreaRef}
                           />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-wider text-brand-gray-500">
+                            Formas de pago aceptadas
+                          </span>
+                          <p className="mt-0.5 text-[9px] font-medium text-brand-gray-400">
+                            Si importaste un anuncio, aquí verás los créditos detectados.
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                          {[
+                            {
+                              id: 'acceptsBankCredit',
+                              label: 'Crédito bancario',
+                              checked: acceptsBankCredit,
+                              setChecked: setAcceptsBankCredit,
+                            },
+                            {
+                              id: 'acceptsInfonavit',
+                              label: 'Infonavit',
+                              checked: acceptsInfonavit,
+                              setChecked: setAcceptsInfonavit,
+                            },
+                            {
+                              id: 'acceptsFovissste',
+                              label: 'Fovissste',
+                              checked: acceptsFovissste,
+                              setChecked: setAcceptsFovissste,
+                            },
+                            {
+                              id: 'acceptsCash',
+                              label: 'Contado',
+                              checked: acceptsCash,
+                              setChecked: setAcceptsCash,
+                            },
+                            {
+                              id: 'developerFinancing',
+                              label: 'Financiamiento directo',
+                              checked: developerFinancing,
+                              setChecked: setDeveloperFinancing,
+                            },
+                          ].map((method) => (
+                            <label
+                              key={method.id}
+                              htmlFor={method.id}
+                              className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 text-[10px] font-bold transition ${
+                                method.checked
+                                  ? 'border-brand-accent/35 bg-brand-accent/[0.06] text-brand-black'
+                                  : 'border-brand-gray-200 bg-white text-brand-gray-500'
+                              }`}
+                            >
+                              <input
+                                id={method.id}
+                                type="checkbox"
+                                checked={method.checked}
+                                onChange={(event) => method.setChecked(event.target.checked)}
+                                className="h-3.5 w-3.5 shrink-0 accent-brand-accent"
+                              />
+                              <span>{method.label}</span>
+                            </label>
+                          ))}
                         </div>
                       </div>
 

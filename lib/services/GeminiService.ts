@@ -20,6 +20,11 @@ import {
   PageAgentResponse,
   parsePageAgentResponse,
 } from '../eterna/pageAgent';
+import {
+  parsePropertyListingImport,
+  PROPERTY_LISTING_IMPORT_SCHEMA,
+  PropertyListingImportResult,
+} from '../propertyImport/propertyListingImport';
 
 let geminiClient: GoogleGenAI | null = null;
 
@@ -264,7 +269,70 @@ FORMATO DE DECISIÓN:
 - Cuando no sea búsqueda, devuelve search con intent="general", valores vacíos/cero/unknown, missingField="none" y readyToSearch=false.
 `;
 
+const PROPERTY_LISTING_IMPORT_INSTRUCTION = `
+MODO ACTIVO: EXTRACCIÓN ESTRUCTURADA DE UN ANUNCIO INMOBILIARIO MEXICANO.
+
+Convierte el texto informal proporcionado por el usuario en datos editables para un formulario. El texto puede provenir de WhatsApp, Facebook, una ficha comercial o dictado y puede contener errores ortográficos.
+
+REGLAS CRÍTICAS:
+1. Extrae únicamente hechos escritos o inequívocamente expresados. No inventes ubicación, superficies, documentos, amenidades, precio, financiamiento ni características.
+2. Corrige ortografía, acentos y capitalización en title, shortDescription y amenidades. Devuelve texto plano, sin Markdown, asteriscos, emojis, etiquetas ni saltos de formato.
+3. El título debe ser profesional, específico y de máximo 80 caracteres. Elimina marcas, teléfonos, llamadas comerciales y precios repetidos.
+4. shortDescription debe tener entre 45 y 120 palabras cuando el texto contenga información suficiente. Resume distribución, superficies y atributos confirmados; no uses superlativos vacíos ni inventes ventajas.
+5. Separa baños completos y medios baños. "2.5 baños" significa fullBathrooms=2 y halfBathrooms=1. Un "medio baño" mencionado en la distribución también cuenta, pero no lo dupliques si ya estaba incluido en el total.
+6. Convierte "terreno 8 x 18 (144 m²)" en surfaceFront=8, surfaceDepth=18 y surfaceTotal=144. La construcción va en surfaceBuilt.
+7. En anuncios mexicanos, un precio con "$" sin moneda explícita se interpreta como MXN. Usa USD solamente si el texto dice USD o dólares.
+8. propertyType y operation deben reflejar el anuncio. Si no se pueden determinar, usa Desconocido o UNKNOWN.
+9. Para legalDebtFree y financiamiento, marca el campo Mentioned solamente cuando el texto lo afirme. Si financingMentioned=true, cada método booleano debe indicar si aparece aceptado en el anuncio.
+10. presetAmenities solo puede usar nombres de esta lista, exactamente escritos:
+Cocina integral, Cocina equipada, Cocina con isla, Desayunador, Sala doble altura, Family Room, Sala TV, Biblioteca, Oficina, Estudio, Cuarto de servicio, Cuarto de lavado, Vestidor, Bodega, Bar, Cava, Jacuzzi, Sauna, Alberca, Terraza, Roof Garden, Jardín, Patio, Balcón, Asador, Huerto, Cancha, Domótica, Alexa, Cerradura inteligente, Paneles solares, Cargador vehículo eléctrico, Internet fibra óptica.
+11. Cuando una amenidad confirmada no exista en esa lista, agrégala a customAmenities con redacción breve y ortografía corregida. Conserva cantidades útiles: "5 minisplits". Ejemplos: Pasillo lateral, Bardas perimetrales, Portón laminado abatible, Clósets.
+12. No conviertas simples habitaciones o superficies en amenidades. No incluyas duplicados semánticos entre presetAmenities y customAmenities.
+13. detectedFacts contiene resúmenes breves de los datos más importantes realmente detectados. warnings solo señala contradicciones o ambigüedades reales; no penalices datos ausentes.
+14. Los valores numéricos desconocidos deben ser 0 y los textos desconocidos deben ser cadenas vacías.
+`;
+
 export class GeminiService {
+  static async extractPropertyListing(params: {
+    sourceText: string;
+  }): Promise<GeminiModelResult<PropertyListingImportResult>> {
+    const generation = await generateContentWithResilience({
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `Analiza y estructura este anuncio inmobiliario:\n\n${params.sourceText}`,
+        }],
+      }],
+      config: {
+        systemInstruction: PROPERTY_LISTING_IMPORT_INSTRUCTION,
+        temperature: 0.1,
+        maxOutputTokens: 1_600,
+        thinkingConfig: { thinkingBudget: 0 },
+        responseMimeType: 'application/json',
+        responseJsonSchema: PROPERTY_LISTING_IMPORT_SCHEMA,
+      },
+    }, 9_000);
+
+    const responseText = generation.result.text?.trim();
+    if (!responseText) {
+      throw new Error('Gemini devolvió una importación inmobiliaria vacía.');
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(responseText);
+    } catch {
+      throw new Error('Gemini devolvió una importación inmobiliaria no válida.');
+    }
+
+    const validated = parsePropertyListingImport(parsed);
+    if (!validated) {
+      throw new Error('La importación inmobiliaria no cumple el contrato esperado.');
+    }
+
+    return { result: validated, model: generation.model };
+  }
+
   static async generatePageAgentResponse(params: {
     message: string;
     conversationHistory?: ConversationMessage[];
