@@ -55,7 +55,7 @@ export default function GooglePropertyLocation({ property, places, loading, erro
     const grouped = new Map<NearbyPlaceCategory, NearbyPlace[]>();
     places.forEach((place) => grouped.set(place.category, [...(grouped.get(place.category) || []), place]));
     return (Object.keys(CATEGORY_META) as NearbyPlaceCategory[]).flatMap((category) =>
-      (grouped.get(category) || []).sort((a, b) => a.distanceMeters - b.distanceMeters).slice(0, 2),
+      (grouped.get(category) || []).sort((a, b) => a.distanceMeters - b.distanceMeters).slice(0, 1),
     );
   }, [places]);
 
@@ -97,12 +97,14 @@ export default function GooglePropertyLocation({ property, places, loading, erro
       title: property.title,
       zIndex: 100,
       icon: {
-        path: google.maps.SymbolPath.CIRCLE,
+        path: 'M 0 -17 L 17 -3 L 13 -3 L 13 15 L 4 15 L 4 5 L -4 5 L -4 15 L -13 15 L -13 -3 L -17 -3 Z',
         fillColor: '#09090b',
         fillOpacity: 1,
         strokeColor: '#ffffff',
-        strokeWeight: 4,
-        scale: 10,
+        strokeWeight: 2.5,
+        strokeOpacity: 1,
+        scale: 1.05,
+        anchor: new google.maps.Point(0, 15),
       },
     });
     markersRef.current.push(propertyMarker);

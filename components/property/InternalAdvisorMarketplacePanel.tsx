@@ -9,8 +9,10 @@ import {
   LockKeyhole,
   MapPin,
   Percent,
+  RefreshCw,
 } from 'lucide-react';
 import { useSwap } from '../../lib/context/SwapContext';
+import { supabase } from '../../lib/supabaseClient';
 import {
   getInternalPropertyMarketplaceDossier,
   InternalPropertyMarketplaceDossier,
@@ -30,6 +32,10 @@ interface MarketplaceField {
 }
 
 const STAFF_ROLES = new Set(['ADMIN', 'INTERNAL_ADVISOR']);
+
+const normalizeRole = (role?: string | null): string => (
+  role || ''
+).trim().toUpperCase().replace(/[\s-]+/g, '_');
 
 const dedupeAddressParts = (address: string): string => {
   const seen = new Set<string>();
@@ -73,32 +79,64 @@ export default function InternalAdvisorMarketplacePanel({
 }: InternalAdvisorMarketplacePanelProps) {
   const { currentUser } = useSwap();
   const [dossier, setDossier] = useState<InternalPropertyMarketplaceDossier | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const isSpanish = language === 'es';
-  const isStaff = Boolean(currentUser?.role && STAFF_ROLES.has(currentUser.role));
+  const isStaff = STAFF_ROLES.has(normalizeRole(currentUser?.role));
 
   useEffect(() => {
     let cancelled = false;
+    let retryTimer: number | null = null;
 
     if (!isStaff) {
       setDossier(null);
+      setLoadFailed(false);
       return;
     }
 
-    setLoading(true);
-    getInternalPropertyMarketplaceDossier(property.id)
-      .then((result) => {
-        if (!cancelled) setDossier(result);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    const loadDossier = async (attempt = 0) => {
+      if (!cancelled) {
+        setLoading(true);
+        setLoadFailed(false);
+      }
+
+      const result = await getInternalPropertyMarketplaceDossier(property.id);
+      if (cancelled) return;
+
+      if (result) {
+        setDossier(result);
+        setLoading(false);
+        return;
+      }
+
+      if (attempt < 2) {
+        retryTimer = window.setTimeout(() => {
+          void loadDossier(attempt + 1);
+        }, 550 * (attempt + 1));
+        return;
+      }
+
+      setDossier(null);
+      setLoadFailed(true);
+      setLoading(false);
+    };
+
+    void loadDossier();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user?.id === currentUser?.id) {
+        void loadDossier();
+      }
+    });
 
     return () => {
       cancelled = true;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      authListener.subscription.unsubscribe();
     };
-  }, [isStaff, property.id]);
+  }, [currentUser?.id, isStaff, property.id, reloadToken]);
 
   const fields = useMemo<MarketplaceField[]>(() => {
     if (!dossier) return [];
@@ -201,7 +239,39 @@ export default function InternalAdvisorMarketplacePanel({
     );
   }
 
-  if (!dossier) return null;
+  if (!dossier || loadFailed) {
+    return (
+      <section
+        data-eterna-section="internal-marketplace"
+        className="overflow-hidden rounded-[28px] border border-slate-800 bg-slate-950 p-5 text-white shadow-[0_24px_60px_-38px_rgba(15,23,42,0.7)] sm:p-6"
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/25 bg-violet-400/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-violet-200">
+              <LockKeyhole className="h-3 w-3" aria-hidden="true" />
+              {isSpanish ? 'Solo equipo interno' : 'Internal staff only'}
+            </span>
+            <h3 className="mt-3 text-lg font-black tracking-[-0.03em]">
+              {isSpanish ? 'Herramientas internas no sincronizadas' : 'Internal tools are not synchronized'}
+            </h3>
+            <p className="mt-1 max-w-xl text-xs font-medium leading-relaxed text-slate-400">
+              {isSpanish
+                ? 'Tu perfil sí tiene acceso. Reintenta cuando la sesión segura de Supabase termine de restaurarse.'
+                : 'Your profile has access. Retry after the secure Supabase session finishes restoring.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReloadToken((value) => value + 1)}
+            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-white px-4 text-xs font-black text-slate-950 transition hover:bg-violet-100 active:scale-[0.98]"
+          >
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+            {isSpanish ? 'Reintentar' : 'Retry'}
+          </button>
+        </div>
+      </section>
+    );
+  }
 
   const priceLabel = dossier.capturedPriceAmount === null
     ? (isSpanish ? 'No definido' : 'Not set')

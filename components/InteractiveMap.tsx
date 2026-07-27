@@ -3,7 +3,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Compass, Info, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight, Compass, Info, ShieldCheck } from 'lucide-react';
 import { Property } from '../lib/types';
 import { useTranslation } from '../lib/context/LanguageContext';
 import { hasValidCoordinates } from '../lib/searchFilters';
@@ -32,15 +32,60 @@ function operationLabel(property: Property, language: string) {
   return language === 'es' ? 'Intercambio' : 'Swap';
 }
 
+function propertyMarkerPrice(property: Property): string {
+  const activeOfferings = (property.offerings || []).filter((offering) => offering.status === 'ACTIVE');
+  const preferredOffering = activeOfferings.find((offering) => (
+    property.primaryOperation === 'SALE'
+      ? offering.mode === 'SALE'
+      : property.primaryOperation === 'RENT'
+        ? offering.mode === 'MONTHLY_RENT' || offering.mode === 'SHORT_RENT'
+        : offering.mode === 'SWAP'
+  )) || activeOfferings.find((offering) => offering.mode === 'SALE')
+    || activeOfferings.find((offering) => offering.mode === 'MONTHLY_RENT')
+    || activeOfferings.find((offering) => offering.mode === 'SHORT_RENT')
+    || activeOfferings.find((offering) => offering.mode === 'SWAP');
+
+  const amount = Number(preferredOffering?.priceAmount || preferredOffering?.swapEstimatedValue || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return 'Consultar';
+  if (amount >= 1_000_000) {
+    const millions = amount / 1_000_000;
+    return `${new Intl.NumberFormat('es-MX', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: millions < 10 && !Number.isInteger(millions) ? 1 : 0,
+    }).format(millions)}M`;
+  }
+  if (amount >= 1_000) return `${Math.round(amount / 1_000)}K`;
+  return new Intl.NumberFormat('es-MX', { maximumFractionDigits: 0 }).format(amount);
+}
+
+function markerIcon(google: any, highlighted: boolean, label: string) {
+  const halfWidth = Math.max(26, Math.min(40, 13 + (label.length * 5)));
+  return {
+    path: `M ${-halfWidth} -15 H ${halfWidth} Q ${halfWidth + 6} -15 ${halfWidth + 6} -9 V 7 Q ${halfWidth + 6} 13 ${halfWidth} 13 H 6 L 0 20 L -6 13 H ${-halfWidth} Q ${-halfWidth - 6} 13 ${-halfWidth - 6} 7 V -9 Q ${-halfWidth - 6} -15 ${-halfWidth} -15 Z`,
+    fillColor: highlighted ? '#09090b' : '#ffffff',
+    fillOpacity: 1,
+    strokeColor: highlighted ? '#09090b' : '#d4d4d8',
+    strokeWeight: highlighted ? 1.5 : 1,
+    scale: highlighted ? 1.04 : 1,
+    labelOrigin: new google.maps.Point(0, -1),
+    anchor: new google.maps.Point(0, 20),
+  };
+}
+
 export default function InteractiveMap({ properties, hoveredPropertyId, onHoverProperty, mobileShowMap }: InteractiveMapProps) {
   const { t, language } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<Record<string, any>>({});
+  const hoverHandlerRef = useRef(onHoverProperty);
   const [mapsApi, setMapsApi] = useState<any>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState('');
   const mappableProperties = useMemo(() => properties.filter(hasValidCoordinates), [properties]);
+
+  useEffect(() => {
+    hoverHandlerRef.current = onHoverProperty;
+  }, [onHoverProperty]);
 
   useEffect(() => {
     loadGoogleMaps()
@@ -78,34 +123,25 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
 
     mappableProperties.forEach((property) => {
       const position = { lat: Number(property.latitude), lng: Number(property.longitude) };
-      const highlighted = property.id === selectedId || property.id === hoveredPropertyId;
+      const priceLabel = propertyMarkerPrice(property);
       const marker = new google.maps.Marker({
         map: mapRef.current,
         position,
         title: property.title,
-        zIndex: highlighted ? 20 : 1,
+        zIndex: 1,
         label: {
-          text: operationLabel(property, language),
-          color: highlighted ? '#ffffff' : '#5b5cf0',
-          fontSize: '10px',
-          fontWeight: '800',
+          text: priceLabel,
+          color: '#18181b',
+          fontSize: '11px',
+          fontWeight: '900',
         },
-        icon: {
-          path: 'M -34 -15 H 34 Q 40 -15 40 -9 V 9 Q 40 15 34 15 H -34 Q -40 15 -40 9 V -9 Q -40 -15 -34 -15 Z',
-          fillColor: highlighted ? '#09090b' : '#ffffff',
-          fillOpacity: 1,
-          strokeColor: highlighted ? '#09090b' : '#d4d4d8',
-          strokeWeight: 1,
-          scale: highlighted ? 1.06 : 1,
-          labelOrigin: new google.maps.Point(0, 0),
-          anchor: new google.maps.Point(0, 15),
-        },
+        icon: markerIcon(google, false, priceLabel),
       });
       marker.addListener('mouseover', () => {
         setSelectedId(property.id);
-        onHoverProperty?.(property.id);
+        hoverHandlerRef.current?.(property.id);
       });
-      marker.addListener('mouseout', () => onHoverProperty?.(null));
+      marker.addListener('mouseout', () => hoverHandlerRef.current?.(null));
       marker.addListener('click', () => {
         setSelectedId(property.id);
         mapRef.current.panTo(position);
@@ -121,7 +157,26 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
         if ((mapRef.current.getZoom() || 0) > 14) mapRef.current.setZoom(14);
       });
     }
-  }, [mapsApi, mappableProperties, selectedId, hoveredPropertyId, onHoverProperty, language]);
+  }, [mapsApi, mappableProperties]);
+
+  useEffect(() => {
+    if (!mapsApi) return;
+    const google = mapsApi.namespace;
+    Object.entries(markersRef.current).forEach(([propertyId, marker]) => {
+      const property = mappableProperties.find((item) => item.id === propertyId);
+      if (!property) return;
+      const highlighted = propertyId === selectedId || propertyId === hoveredPropertyId;
+      const priceLabel = propertyMarkerPrice(property);
+      marker.setZIndex(highlighted ? 20 : 1);
+      marker.setLabel({
+        text: priceLabel,
+        color: highlighted ? '#ffffff' : '#18181b',
+        fontSize: highlighted ? '12px' : '11px',
+        fontWeight: '900',
+      });
+      marker.setIcon(markerIcon(google, highlighted, priceLabel));
+    });
+  }, [hoveredPropertyId, mapsApi, mappableProperties, selectedId]);
 
   useEffect(() => {
     if (!mapRef.current || !hoveredPropertyId) return;
@@ -168,8 +223,8 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
 
       <div className="relative z-10 mt-auto w-full p-4">
         {selectedProperty ? (
-          <div className="pointer-events-auto flex w-full gap-3 rounded-2xl border border-brand-gray-200/50 bg-white p-3 shadow-floating">
-            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-brand-gray-100">
+          <div className="pointer-events-auto flex w-full gap-3 rounded-[22px] border border-white/70 bg-white/95 p-3 shadow-[0_22px_55px_-26px_rgba(15,23,42,0.55)] backdrop-blur-xl">
+            <div className="h-[86px] w-[86px] shrink-0 overflow-hidden rounded-2xl bg-brand-gray-100">
               <img src={selectedProperty.images[0]} alt={selectedProperty.title} className="h-full w-full object-cover" />
             </div>
             <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
@@ -178,12 +233,18 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
                   <span className="rounded-md bg-brand-accent/5 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-brand-accent">{operationLabel(selectedProperty, language)}</span>
                   {selectedProperty.hostVerified && <ShieldCheck className="h-3.5 w-3.5 text-brand-accent" />}
                 </div>
-                <h4 className="truncate text-xs font-bold text-brand-black">{selectedProperty.location}</h4>
+                <h4 className="truncate text-sm font-black tracking-tight text-brand-black">{selectedProperty.location}</h4>
                 <p className="truncate text-[10px] font-semibold text-brand-gray-500">{t(`properties.${selectedProperty.id}.title`).startsWith('properties.') ? selectedProperty.title : t(`properties.${selectedProperty.id}.title`)}</p>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="truncate text-[10px] font-bold uppercase tracking-wider text-brand-gray-500">{language === 'es' ? formatCount(selectedProperty.bedrooms || 0, 'habitación', 'habitaciones', 'feminine') : `${selectedProperty.bedrooms || 0} bedrooms`}</span>
-                <Link href={`/property/${selectedProperty.id}`} className="shrink-0 text-[10px] font-black uppercase tracking-wider text-brand-accent hover:underline">{language === 'es' ? 'Ver detalles →' : 'View details →'}</Link>
+                <Link
+                  href={`/property/${selectedProperty.id}`}
+                  className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-neutral-950 px-3.5 text-[9px] font-black uppercase tracking-[0.08em] text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-neutral-800"
+                >
+                  {language === 'es' ? 'Ver propiedad' : 'View property'}
+                  <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" />
+                </Link>
               </div>
             </div>
           </div>

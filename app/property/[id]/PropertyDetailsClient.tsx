@@ -10,7 +10,7 @@ import {
   BedDouble, Bath, Users, ArrowRight, ChevronLeft, ChevronRight, ChevronDown,
   Wifi, Waves, Coffee, Monitor, Wind, Key, Flame, Compass, MessageSquareCode,
   ZoomIn, ZoomOut, Maximize, Download, Play, FileText, Info, ShieldAlert, Award, TrendingUp, BarChart2, FileCheck, RefreshCw,
-  Car, Building, Home, PhoneCall, Mail, UserRound, MessageCircle
+  Car, Building, Home, PhoneCall, Mail, UserRound, MessageCircle, Landmark
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -82,22 +82,26 @@ const AMENITY_ICONS: Record<string, any> = {
 
 const OFFERING_BADGE_ORDER: PropertyOfferingMode[] = ['SWAP', 'SHORT_RENT', 'MONTHLY_RENT', 'SALE'];
 
-const OFFERING_BADGE_META: Record<PropertyOfferingMode, { label: string; className: string }> = {
+const OFFERING_BADGE_META: Record<PropertyOfferingMode, { label: string; className: string; dotClassName: string }> = {
   SWAP: {
     label: 'Intercambio',
-    className: 'border-brand-accent/25 bg-brand-accent/5 text-brand-accent',
+    className: 'border-violet-200 bg-violet-50 text-violet-700',
+    dotClassName: 'bg-violet-500',
   },
   SHORT_RENT: {
     label: 'Renta temporal',
-    className: 'border-emerald-200/80 bg-emerald-50/70 text-emerald-700',
+    className: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    dotClassName: 'bg-emerald-500',
   },
   MONTHLY_RENT: {
     label: 'Renta mensual',
-    className: 'border-sky-200/80 bg-sky-50/70 text-sky-700',
+    className: 'border-sky-200 bg-sky-50 text-sky-800',
+    dotClassName: 'bg-sky-500',
   },
   SALE: {
     label: 'Venta',
-    className: 'border-amber-200/80 bg-amber-50/70 text-amber-700',
+    className: 'border-neutral-950 bg-neutral-950 text-white shadow-[0_8px_20px_-12px_rgba(0,0,0,0.8)]',
+    dotClassName: 'bg-amber-400',
   },
 };
 
@@ -874,29 +878,36 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               {publicationLabel}
             </span>
           )}
-          {property.internalCode && (
-            <span className="inline-flex items-center rounded-full border border-violet-200/80 bg-violet-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-violet-700">
-              Folio AuraSwap · {property.internalCode}
-            </span>
-          )}
         </div>
 
-        {activeOfferingModes.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 pt-2">
-            <span className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400">
-              Disponible como
-            </span>
-            {activeOfferingModes.map((mode) => {
-              const meta = OFFERING_BADGE_META[mode];
-              return (
-                <span
-                  key={mode}
-                  className={`inline-flex h-7 items-center rounded-full border px-3 text-[10px] font-extrabold leading-none tracking-wide shadow-sm ${meta.className}`}
-                >
-                  {meta.label}
-                </span>
-              );
-            })}
+        {(activeOfferingModes.length > 0 || property.internalCode) && (
+          <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3 pt-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400">
+                Disponible como
+              </span>
+              {activeOfferingModes.map((mode) => {
+                const meta = OFFERING_BADGE_META[mode];
+                return (
+                  <span
+                    key={mode}
+                    className={`inline-flex h-8 items-center gap-2 rounded-full border px-3.5 text-[10px] font-black uppercase leading-none tracking-[0.1em] ${meta.className}`}
+                  >
+                    <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${meta.dotClassName}`} />
+                    {meta.label}
+                  </span>
+                );
+              })}
+            </div>
+            {property.internalCode && (
+              <span
+                title={language === 'es' ? 'Folio interno AuraSwap' : 'AuraSwap internal reference'}
+                className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-brand-gray-400"
+              >
+                <FileText aria-hidden="true" className="h-3.5 w-3.5" />
+                Ref. {property.internalCode}
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -1134,10 +1145,14 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     className="group relative flex min-h-[128px] min-w-0 flex-col overflow-hidden rounded-2xl border border-neutral-100/80 bg-white/50 p-4 backdrop-blur-xs transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-0.5 hover:border-neutral-200 hover:shadow-[0_10px_20px_-5px_rgba(0,0,0,0.03)]"
                   >
                     <div className="flex items-start">
-                      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-neutral-50 text-neutral-500">
-                        <Icon className="h-4 w-4" aria-hidden="true" />
+                      <span className={`relative flex shrink-0 items-center justify-center rounded-xl ${
+                        badge
+                          ? 'h-10 w-10 bg-neutral-950 text-white shadow-[0_8px_18px_-12px_rgba(0,0,0,0.9)]'
+                          : 'h-9 w-9 bg-neutral-50 text-neutral-500'
+                      }`}>
+                        <Icon className={badge ? 'h-[18px] w-[18px]' : 'h-4 w-4'} aria-hidden="true" />
                         {badge && (
-                          <span className="absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-white bg-brand-black px-0.5 text-[8px] font-black text-white">
+                          <span className="absolute -bottom-1.5 -right-2 flex h-5 min-w-5 items-center justify-center rounded-md border-2 border-white bg-amber-400 px-1 text-[10px] font-black leading-none text-neutral-950 shadow-sm">
                             {badge}
                           </span>
                         )}
@@ -1707,6 +1722,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             <FinancingCompatibility property={property} language={language} />
           )}
 
+          <InternalAdvisorMarketplacePanel property={property} language={language} />
+
           {((selectedMode === 'MONTHLY_RENT' || selectedMode === 'SHORT_RENT') || selectedMode === 'SWAP') && (
             <div className="border-b border-brand-gray-200/80 pb-6 flex flex-col gap-4 animate-in fade-in duration-300">
               {/* RENT mode: Conditions of lease */}
@@ -1843,8 +1860,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           {/* 10. Análisis Inmobiliario con IA (Eterna) */}
           <EternaMarketAnalysis property={property} language={language} />
 
-          <InternalAdvisorMarketplacePanel property={property} language={language} />
-
         </div>
 
         {/* Right Column: Sticky Hybrid Booking / Swap / Purchase widget */}
@@ -1860,7 +1875,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   if (mode === 'SWAP') label = 'Swap 🔄';
                   else if (mode === 'SHORT_RENT') label = language === 'es' ? 'Temp 🏡' : 'Short 🏡';
                   else if (mode === 'MONTHLY_RENT') label = language === 'es' ? 'Mes 📅' : 'Monthly 📅';
-                  else if (mode === 'SALE') label = language === 'es' ? 'Venta 💰' : 'Sale 💰';
+                  else if (mode === 'SALE') label = language === 'es' ? 'Venta' : 'Sale';
 
                   return (
                     <button
@@ -2389,8 +2404,9 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             {selectedMode === 'SALE' && activeSaleOffering && (
               <div className="flex flex-col gap-4 animate-in fade-in duration-200">
                 <div className="border-b border-brand-gray-100 pb-4 mb-1">
-                  <span className="text-[10px] font-black uppercase text-amber-600 bg-amber-50 border border-amber-100 px-3 py-1 rounded-full tracking-wider inline-block">
-                    {language === 'es' ? 'Propiedad en Venta' : 'Property For Sale'}
+                  <span className="inline-flex items-center gap-2 rounded-full border border-neutral-950 bg-neutral-950 px-3.5 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-white shadow-[0_8px_20px_-12px_rgba(0,0,0,0.8)]">
+                    <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                    {language === 'es' ? 'Propiedad en venta' : 'Property for sale'}
                   </span>
                   <div className="flex items-baseline gap-1 mt-2.5">
                     <span className="text-3xl font-black text-brand-black tracking-tight">
@@ -2535,7 +2551,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 <details className="group rounded-3xl border border-brand-gray-200/60 bg-brand-gray-50 shadow-xs">
                   <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-3xl px-4 py-3.5 text-brand-black transition-colors hover:bg-brand-gray-100/70 [&::-webkit-details-marker]:hidden">
                     <span className="flex items-center gap-2.5 text-[10px] font-extrabold uppercase tracking-wider text-brand-accent">
-                      <span aria-hidden="true">💵</span>
+                      <Landmark aria-hidden="true" className="h-4 w-4" />
                       {language === 'es' ? 'Costos de Adquisición (Escrituración)' : 'Acquisition & Notary Costs'}
                     </span>
                     <ChevronDown className="h-4 w-4 shrink-0 text-brand-gray-500 transition-transform duration-200 group-open:rotate-180" />
