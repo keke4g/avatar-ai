@@ -209,7 +209,12 @@ export default function GooglePropertyLocation({ property, places, loading, erro
                   <PropertySubIcon
                     icon={Icon}
                     iconClassName="h-4.5 w-4.5"
-                    className="group-hover:border-neutral-300"
+                    className="group-hover:brightness-[0.98]"
+                    style={{
+                      background: `linear-gradient(145deg, #ffffff 0%, ${meta.color}18 100%)`,
+                      borderColor: `${meta.color}35`,
+                      color: meta.color,
+                    }}
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[9px] font-black uppercase tracking-wider text-slate-400">{NEARBY_CATEGORY_LABELS[place.category][language]}</span>

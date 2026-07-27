@@ -3,19 +3,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Building2,
+  CalendarDays,
   Check,
+  ChevronDown,
+  Clock3,
   Copy,
   ExternalLink,
+  KeyRound,
   LockKeyhole,
+  Mail,
   MapPin,
   Percent,
+  Phone,
   RefreshCw,
+  StickyNote,
+  UserRound,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useSwap } from '../../lib/context/SwapContext';
 import { supabase } from '../../lib/supabaseClient';
 import {
   getInternalPropertyMarketplaceDossier,
+  getAdminPropertyOwnerContact,
   InternalPropertyMarketplaceDossier,
+  InternalPropertyOwnerContact,
 } from '../../lib/services/InternalPropertyDossierService';
 import { Property } from '../../lib/types';
 
@@ -60,6 +71,41 @@ const formatPercent = (value: number | null): string => {
   return `${new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 }).format(value)}%`;
 };
 
+const RELATIONSHIP_LABELS: Record<string, string> = {
+  OWNER: 'Propietario(a)',
+  FAMILY: 'Familiar',
+  LEGAL_REPRESENTATIVE: 'Apoderado(a) legal',
+  HEIR: 'Heredero(a)',
+  EXECUTOR: 'Albacea',
+  DEVELOPER: 'Desarrollador(a)',
+  PROPERTY_MANAGER: 'Administrador(a) del inmueble',
+  OTHER: 'Otro',
+};
+
+const DAY_LABELS: Record<string, string> = {
+  MONDAY: 'Lunes',
+  TUESDAY: 'Martes',
+  WEDNESDAY: 'Miércoles',
+  THURSDAY: 'Jueves',
+  FRIDAY: 'Viernes',
+  SATURDAY: 'Sábado',
+  SUNDAY: 'Domingo',
+};
+
+const CONTACT_LABELS: Record<string, string> = {
+  WHATSAPP: 'WhatsApp',
+  PHONE: 'Llamada',
+  SMS: 'SMS',
+  EMAIL: 'Correo',
+};
+
+const OCCUPANCY_LABELS: Record<string, string> = {
+  VACANT: 'Desocupada',
+  OWNER_OCCUPIED: 'Habitada por propietario',
+  TENANT_OCCUPIED: 'Habitada por inquilino',
+  UNDER_CONSTRUCTION: 'En obra / adecuación',
+};
+
 const fallbackCopy = (text: string): boolean => {
   const textarea = document.createElement('textarea');
   textarea.value = text;
@@ -83,8 +129,13 @@ export default function InternalAdvisorMarketplacePanel({
   const [loadFailed, setLoadFailed] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [ownerContact, setOwnerContact] = useState<InternalPropertyOwnerContact | null>(null);
+  const [ownerContactLoading, setOwnerContactLoading] = useState(false);
+  const [ownerContactOpen, setOwnerContactOpen] = useState(false);
   const isSpanish = language === 'es';
-  const isStaff = STAFF_ROLES.has(normalizeRole(currentUser?.role));
+  const normalizedUserRole = normalizeRole(currentUser?.role);
+  const isStaff = STAFF_ROLES.has(normalizedUserRole);
+  const isAdmin = normalizedUserRole === 'ADMIN';
 
   useEffect(() => {
     let cancelled = false;
@@ -137,6 +188,30 @@ export default function InternalAdvisorMarketplacePanel({
       authListener.subscription.unsubscribe();
     };
   }, [currentUser?.id, isStaff, property.id, reloadToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isAdmin) {
+      setOwnerContact(null);
+      setOwnerContactLoading(false);
+      return;
+    }
+
+    const loadOwnerContact = async () => {
+      setOwnerContactLoading(true);
+      const result = await getAdminPropertyOwnerContact(property.id);
+      if (!cancelled) {
+        setOwnerContact(result);
+        setOwnerContactLoading(false);
+      }
+    };
+
+    void loadOwnerContact();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, property.id, reloadToken]);
 
   const fields = useMemo<MarketplaceField[]>(() => {
     if (!dossier) return [];
@@ -383,6 +458,160 @@ export default function InternalAdvisorMarketplacePanel({
           ))}
         </div>
       </div>
+
+      {isAdmin && (
+        <div className="relative border-t border-white/10">
+          <button
+            type="button"
+            onClick={() => setOwnerContactOpen((current) => !current)}
+            className="flex w-full items-center gap-3 px-5 py-5 text-left transition hover:bg-white/[0.035] sm:px-7"
+            aria-expanded={ownerContactOpen}
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-violet-300/20 bg-violet-400/10 text-violet-200">
+              <UserRound className="h-4.5 w-4.5" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[9px] font-black uppercase tracking-[0.16em] text-violet-300">
+                Solo administradores
+              </span>
+              <span className="mt-1 block text-sm font-black text-white">
+                Propietario o encargado legal
+              </span>
+              <span className="mt-0.5 block text-[10px] font-medium text-slate-500">
+                Contacto privado, disponibilidad y condiciones para mostrar el inmueble.
+              </span>
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200 ${ownerContactOpen ? 'rotate-180' : ''}`}
+              aria-hidden="true"
+            />
+          </button>
+
+          <AnimatePresence initial={false}>
+            {ownerContactOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className="overflow-hidden"
+              >
+                <div className="border-t border-white/10 px-5 pb-6 pt-5 sm:px-7">
+                  {ownerContactLoading ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {[0, 1, 2, 3].map((item) => (
+                        <div key={item} className="h-20 animate-pulse rounded-2xl bg-white/[0.06]" />
+                      ))}
+                    </div>
+                  ) : !ownerContact ? (
+                    <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.035] px-4 py-5 text-center">
+                      <p className="text-xs font-black text-white">Sin datos privados capturados</p>
+                      <p className="mt-1 text-[10px] font-medium leading-relaxed text-slate-500">
+                        Esta propiedad se publicó antes de habilitar la ficha del propietario o el paso se dejó vacío.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <article className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+                        <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.13em] text-slate-500">
+                          <UserRound className="h-3.5 w-3.5 text-violet-300" />
+                          Responsable
+                        </div>
+                        <p className="mt-2 text-sm font-black text-white">{ownerContact.fullName || 'Sin nombre'}</p>
+                        <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                          {ownerContact.relationship
+                            ? (RELATIONSHIP_LABELS[ownerContact.relationship] || ownerContact.relationship)
+                            : 'Relación no especificada'}
+                        </p>
+                      </article>
+
+                      <article className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+                        <div className="text-[9px] font-black uppercase tracking-[0.13em] text-slate-500">Contacto</div>
+                        <div className="mt-2 flex flex-col gap-2 text-[11px] font-semibold text-slate-200">
+                          <span className="flex items-center gap-2">
+                            <Phone className="h-3.5 w-3.5 text-emerald-300" />
+                            {ownerContact.phone || 'Sin teléfono'}
+                          </span>
+                          {ownerContact.email && (
+                            <span className="flex items-center gap-2 break-all">
+                              <Mail className="h-3.5 w-3.5 shrink-0 text-sky-300" />
+                              {ownerContact.email}
+                            </span>
+                          )}
+                          {ownerContact.contactPreference && (
+                            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500">
+                              Preferencia: {CONTACT_LABELS[ownerContact.contactPreference] || ownerContact.contactPreference}
+                            </span>
+                          )}
+                        </div>
+                      </article>
+
+                      <article className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 sm:col-span-2">
+                        <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.13em] text-slate-500">
+                          <CalendarDays className="h-3.5 w-3.5 text-amber-300" />
+                          Disponibilidad para visitas
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {ownerContact.viewingDays.length > 0 ? ownerContact.viewingDays.map((day) => (
+                            <span key={day} className="rounded-full border border-white/10 bg-white/[0.07] px-2.5 py-1 text-[9px] font-black text-slate-200">
+                              {DAY_LABELS[day] || day}
+                            </span>
+                          )) : (
+                            <span className="text-[10px] font-semibold text-slate-500">Días no especificados</span>
+                          )}
+                        </div>
+                        <div className="mt-3 grid gap-2 text-[10px] font-semibold text-slate-300 sm:grid-cols-3">
+                          <span className="flex items-center gap-2">
+                            <Clock3 className="h-3.5 w-3.5 text-sky-300" />
+                            {ownerContact.viewingStartTime && ownerContact.viewingEndTime
+                              ? `${ownerContact.viewingStartTime}–${ownerContact.viewingEndTime}`
+                              : 'Horario abierto'}
+                          </span>
+                          <span className="flex items-center gap-2">
+                            <KeyRound className="h-3.5 w-3.5 text-violet-300" />
+                            {ownerContact.hasKeys === null
+                              ? 'Llaves sin confirmar'
+                              : ownerContact.hasKeys ? 'Tenemos llave' : 'Coordinar acceso'}
+                          </span>
+                          <span>
+                            {ownerContact.appointmentNoticeHours === null
+                              ? 'Sin anticipación definida'
+                              : `${ownerContact.appointmentNoticeHours} h de anticipación`}
+                          </span>
+                        </div>
+                      </article>
+
+                      {(ownerContact.occupancyStatus || ownerContact.visitInstructions || ownerContact.extraNotes) && (
+                        <article className="rounded-2xl border border-white/10 bg-white/[0.045] p-4 sm:col-span-2">
+                          <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.13em] text-slate-500">
+                            <StickyNote className="h-3.5 w-3.5 text-rose-300" />
+                            Notas operativas
+                          </div>
+                          {ownerContact.occupancyStatus && (
+                            <p className="mt-2 text-[10px] font-black uppercase tracking-wider text-slate-300">
+                              {OCCUPANCY_LABELS[ownerContact.occupancyStatus] || ownerContact.occupancyStatus}
+                            </p>
+                          )}
+                          {ownerContact.visitInstructions && (
+                            <p className="mt-2 whitespace-pre-line text-[11px] font-medium leading-relaxed text-slate-300">
+                              {ownerContact.visitInstructions}
+                            </p>
+                          )}
+                          {ownerContact.extraNotes && (
+                            <p className="mt-2 whitespace-pre-line border-t border-white/10 pt-2 text-[11px] font-medium leading-relaxed text-slate-400">
+                              {ownerContact.extraNotes}
+                            </p>
+                          )}
+                        </article>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
     </section>
   );
 }

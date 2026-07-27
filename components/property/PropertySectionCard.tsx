@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 interface PropertySectionCardProps {
@@ -17,15 +17,18 @@ interface PropertySubIconProps {
   icon: LucideIcon;
   className?: string;
   iconClassName?: string;
+  style?: CSSProperties;
 }
 
 export function PropertySubIcon({
   icon: Icon,
   className = '',
   iconClassName = 'h-4 w-4',
+  style,
 }: PropertySubIconProps) {
   return (
     <span
+      style={style}
       className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-neutral-200/90 bg-[linear-gradient(145deg,#ffffff_0%,#f2f2ef_100%)] text-neutral-800 shadow-[0_12px_26px_-20px_rgba(15,23,42,0.8),inset_0_1px_0_rgba(255,255,255,0.95)] ${className}`}
     >
       <span aria-hidden="true" className="absolute inset-x-1 top-0 h-px bg-white" />

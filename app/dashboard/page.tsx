@@ -22,6 +22,10 @@ import PropertyEditorModal from '../../components/PropertyEditorModal';
 import { useLiveContext } from '../../lib/context/LiveContext';
 import { ServiceFactory } from '../../lib/services/ServiceFactory';
 import { Property } from '../../lib/types';
+import {
+  InternalPropertyOwnerContactInput,
+  saveInternalPropertyOwnerContact,
+} from '../../lib/services/InternalPropertyDossierService';
 
 type TabType = 'swaps' | 'properties' | 'leads' | 'favorites' | 'trips' | 'reviews';
 
@@ -50,11 +54,10 @@ function DashboardPageContent() {
     confirmSwapCompletion
   } = useSwap();
 
-  if (!currentUser) {
-    return <AuthGuard />;
-  }
+  // This content is mounted only after AuthGuard restores an authenticated user.
+  if (!currentUser) return null;
 
-  const [activeTab, setActiveTab] = useState<TabType>('swaps');
+  const [activeTab, setActiveTab] = useState<TabType>('properties');
   
   // Review submission states
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
@@ -175,7 +178,7 @@ function DashboardPageContent() {
         setListFormOpen(true);
         setActiveTab('properties');
       } else {
-        const validTabs: TabType[] = ['swaps', 'properties', 'leads', 'favorites', 'trips', 'reviews'];
+        const validTabs: TabType[] = ['properties', 'leads', 'favorites', 'trips', 'reviews', 'swaps'];
         if (validTabs.includes(tabParam as TabType)) {
           setActiveTab(tabParam as TabType);
         }
@@ -299,23 +302,6 @@ function DashboardPageContent() {
       {/* 2. Vercel-inspired Tab Navigation */}
       <div className="flex border-b border-brand-gray-200/80 mb-8 overflow-x-auto no-scrollbar">
         <button
-          onClick={() => setActiveTab('swaps')}
-          className={`px-6 py-3 font-bold text-sm tracking-tight outline-none border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
-            activeTab === 'swaps'
-              ? 'border-brand-accent text-brand-accent'
-              : 'border-transparent text-brand-gray-500 hover:text-brand-black'
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          <span>{t('dashboard.tabTimeline')}</span>
-          {incomingSwaps.filter(s => s.status === 'PENDING').length > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-brand-accent text-white animate-pulse">
-              {incomingSwaps.filter(s => s.status === 'PENDING').length}
-            </span>
-          )}
-        </button>
-
-        <button
           onClick={() => setActiveTab('properties')}
           className={`px-6 py-3 font-bold text-sm tracking-tight outline-none border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
             activeTab === 'properties'
@@ -388,6 +374,23 @@ function DashboardPageContent() {
           <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-brand-gray-100 text-brand-gray-500">
             {reviews.filter(r => r.reviewedUserId === currentUser.id).length}
           </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('swaps')}
+          className={`px-6 py-3 font-bold text-sm tracking-tight outline-none border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+            activeTab === 'swaps'
+              ? 'border-brand-accent text-brand-accent'
+              : 'border-transparent text-brand-gray-500 hover:text-brand-black'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          <span>{t('dashboard.tabTimeline')}</span>
+          {incomingSwaps.filter(s => s.status === 'PENDING').length > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-brand-accent text-white animate-pulse">
+              {incomingSwaps.filter(s => s.status === 'PENDING').length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -1629,7 +1632,16 @@ function DashboardPageContent() {
             }}
             onSubmit={async (propertyData) => {
               try {
-                await addProperty(propertyData);
+                const {
+                  internalOwnerContact,
+                  ...publicPropertyData
+                } = propertyData as typeof propertyData & {
+                  internalOwnerContact?: InternalPropertyOwnerContactInput;
+                };
+                const createdProperty = await addProperty(publicPropertyData);
+                if (internalOwnerContact && createdProperty?.id) {
+                  await saveInternalPropertyOwnerContact(createdProperty.id, internalOwnerContact);
+                }
                 setListFormOpen(false);
                 window.dispatchEvent(new CustomEvent('auraswap:flow-event', { detail: { event: 'property_created' } }));
               } catch (err) {
@@ -2060,7 +2072,9 @@ export default function DashboardPage() {
         <p className="text-brand-gray-500 text-sm font-semibold">{t('explore.loadingBtn')}</p>
       </div>
     }>
-      <DashboardPageContent />
+      <AuthGuard>
+        <DashboardPageContent />
+      </AuthGuard>
     </React.Suspense>
   );
 }

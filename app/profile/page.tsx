@@ -13,13 +13,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 type SubTabType = 'personal' | 'verification';
 
 export default function ProfilePage() {
+  return (
+    <AuthGuard>
+      <ProfilePageContent />
+    </AuthGuard>
+  );
+}
+
+function ProfilePageContent() {
   const { t, language } = useTranslation();
   const { currentUser, updateProfileMock } = useSwap();
-
-  // Route protection gate check
-  if (!currentUser) {
-    return <AuthGuard />;
-  }
+  // AuthGuard only mounts this component after the session has been restored.
+  // Keeping that gate outside prevents a different hook count between renders.
+  if (!currentUser) return null;
 
   // Sub Tab states
   const [activeTab, setActiveTab] = useState<SubTabType>('personal');

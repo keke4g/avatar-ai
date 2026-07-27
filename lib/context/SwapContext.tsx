@@ -29,7 +29,7 @@ interface SwapContextType {
   createLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'status' | 'userId'>) => Promise<Lead>;
   createReview: (review: Omit<Review, 'id' | 'createdAt'>) => Promise<Review>;
   confirmSwapCompletion: (swapId: string) => Promise<void>;
-  addProperty: (prop: Omit<Property, 'id' | 'hostId' | 'hostName' | 'hostAvatar' | 'hostVerified' | 'hostRating' | 'hostReviewsCount' | 'latitude' | 'longitude' | 'auraScore'> & { latitude?: number | null; longitude?: number | null }) => void;
+  addProperty: (prop: Omit<Property, 'id' | 'hostId' | 'hostName' | 'hostAvatar' | 'hostVerified' | 'hostRating' | 'hostReviewsCount' | 'latitude' | 'longitude' | 'auraScore'> & { latitude?: number | null; longitude?: number | null }) => Promise<Property>;
   updateProperty: (id: string, updatedFields: Partial<Property>) => void;
   deleteProperty: (id: string) => void;
   togglePublish: (id: string) => void;
@@ -743,7 +743,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setProperties(prev => [liveProp, ...prev]);
         setMyProperties(prev => [liveProp, ...prev]);
-        return;
+        return liveProp;
       } catch (err) {
         console.error('[SwapContext] Supabase addProperty failed:', err);
         throw err;
@@ -770,6 +770,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setProperties(prev => PropertyService.create(prev, newProp));
     setMyProperties(prev => PropertyService.create(prev, newProp));
+    return newProp;
   };
 
   const updateProperty = async (id: string, updatedFields: Partial<Property>) => {
