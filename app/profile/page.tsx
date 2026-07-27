@@ -66,10 +66,7 @@ export default function ProfilePage() {
       name,
       bio,
       favorites: [city],
-      avatar,
-      role,
-      kycStatus,
-      isVerified
+      avatar
     });
 
     window.dispatchEvent(new CustomEvent('auraswap:flow-event', { detail: { event: 'profile_saved' } }));
@@ -280,83 +277,54 @@ export default function ProfilePage() {
                   exit={{ opacity: 0, y: -5 }}
                   className="flex flex-col gap-6"
                 >
-                  {/* Tester switchers: Roles */}
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black text-brand-black uppercase tracking-wider">
-                      {t('profile.roleLabel')}
-                    </label>
-                    <div className="grid grid-cols-3 gap-2.5">
-                      {(['MEMBER', 'HOST', 'ADMIN'] as const).map(roleOption => (
-                        <button
-                          key={roleOption}
-                          type="button"
-                          onClick={() => setRole(roleOption)}
-                          className={`py-2 px-3 border rounded-xl text-[10px] font-black uppercase text-center transition-all cursor-pointer ${
-                            role === roleOption
-                              ? 'bg-brand-black border-brand-black text-white shadow-premium'
-                              : 'bg-white border-brand-gray-200 text-brand-gray-500 hover:bg-brand-gray-50'
-                          }`}
-                        >
-                          {roleOption}
-                        </button>
-                      ))}
+                  <div className="rounded-2xl border border-brand-gray-200 bg-brand-gray-50/70 p-4">
+                    <div className="flex items-start gap-3">
+                      <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-accent" />
+                      <div>
+                        <p className="text-xs font-black text-brand-black">
+                          {language === 'es' ? 'Acceso administrado de forma segura' : 'Securely managed access'}
+                        </p>
+                        <p className="mt-1 text-[10px] font-semibold leading-relaxed text-brand-gray-500">
+                          {language === 'es'
+                            ? 'Tu rol y estado de verificación solo pueden ser modificados por un administrador.'
+                            : 'Only an administrator can change your role and verification status.'}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Tester switchers: KYC */}
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black text-brand-black uppercase tracking-wider">
-                      {t('profile.kycLabel')}
-                    </label>
-                    <div className="grid grid-cols-3 gap-2.5">
-                      {(['PENDING', 'VERIFIED', 'FAILED'] as const).map(kycOption => (
-                        <button
-                          key={kycOption}
-                          type="button"
-                          onClick={() => setKycStatus(kycOption)}
-                          className={`py-2 px-3 border rounded-xl text-[10px] font-black uppercase text-center transition-all cursor-pointer ${
-                            kycStatus === kycOption
-                              ? 'bg-brand-black border-brand-black text-white shadow-premium'
-                              : 'bg-white border-brand-gray-200 text-brand-gray-500 hover:bg-brand-gray-50'
-                          }`}
-                        >
-                          {kycOption === 'VERIFIED' ? t('profile.kycStatusVerified') :
-                           kycOption === 'FAILED' ? t('profile.kycStatusFailed') : t('profile.kycStatusPending')}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Tester switchers: Verified host badge */}
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black text-brand-black uppercase tracking-wider">
-                      {t('profile.badgeLabel')}
-                    </label>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setIsVerified(true)}
-                        className={`py-2 px-3 border rounded-xl text-[10px] font-black uppercase text-center transition-all cursor-pointer ${
-                          isVerified
-                            ? 'bg-emerald-600 border-emerald-600 text-white shadow-premium'
-                            : 'bg-white border-brand-gray-200 text-brand-gray-500 hover:bg-brand-gray-50'
-                        }`}
-                      >
-                        {t('profile.verifiedBadgeActive')}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setIsVerified(false)}
-                        className={`py-2 px-3 border rounded-xl text-[10px] font-black uppercase text-center transition-all cursor-pointer ${
-                          !isVerified
-                            ? 'bg-rose-600 border-rose-600 text-white shadow-premium'
-                            : 'bg-white border-brand-gray-200 text-brand-gray-500 hover:bg-brand-gray-50'
-                        }`}
-                      >
-                        {t('profile.verifiedBadgeInactive')}
-                      </button>
-                    </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {[
+                      {
+                        label: t('profile.roleLabel'),
+                        value: role === 'INTERNAL_ADVISOR'
+                          ? (language === 'es' ? 'Asesor interno' : 'Internal advisor')
+                          : role,
+                      },
+                      {
+                        label: t('profile.kycLabel'),
+                        value: kycStatus === 'VERIFIED'
+                          ? t('profile.kycStatusVerified')
+                          : kycStatus === 'FAILED'
+                            ? t('profile.kycStatusFailed')
+                            : t('profile.kycStatusPending'),
+                      },
+                      {
+                        label: t('profile.badgeLabel'),
+                        value: isVerified
+                          ? t('profile.verifiedBadgeActive')
+                          : t('profile.verifiedBadgeInactive'),
+                      },
+                    ].map((item) => (
+                      <div key={item.label} className="rounded-2xl border border-brand-gray-200 bg-white p-4">
+                        <p className="text-[9px] font-black uppercase tracking-wider text-brand-gray-400">
+                          {item.label}
+                        </p>
+                        <p className="mt-2 text-xs font-black text-brand-black">
+                          {item.value}
+                        </p>
+                      </div>
+                    ))}
                   </div>
 
                 </motion.div>

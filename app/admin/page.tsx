@@ -427,7 +427,7 @@ export default function AdminPage() {
     addAudit('USER', 'auditUserDesc', { name }, 'alert');
   };
 
-  const handleChangeRole = (userId: string, role: 'ADMIN' | 'HOST' | 'MEMBER', name: string) => {
+  const handleChangeRole = (userId: string, role: 'ADMIN' | 'INTERNAL_ADVISOR' | 'HOST' | 'MEMBER', name: string) => {
     updateUserRole(userId, role);
     addAudit('USER', 'auditUserDesc', { name }, 'info');
   };
@@ -1177,6 +1177,7 @@ export default function AdminPage() {
                     >
                       <option value="All">{t('admin.roleSelector')}</option>
                       <option value="ADMIN">ADMIN</option>
+                      <option value="INTERNAL_ADVISOR">ASESOR INTERNO</option>
                       <option value="HOST">HOST</option>
                       <option value="MEMBER">MEMBER</option>
                     </select>
@@ -1241,6 +1242,7 @@ export default function AdminPage() {
                               >
                                 <option value="MEMBER">MEMBER</option>
                                 <option value="HOST">HOST</option>
+                                <option value="INTERNAL_ADVISOR">ASESOR INTERNO</option>
                                 <option value="ADMIN">ADMIN</option>
                               </select>
                             </td>

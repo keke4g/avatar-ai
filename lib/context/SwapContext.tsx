@@ -139,10 +139,10 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
         Promise.all([
           propertiesRequest,
           ServiceFactory.getUserService().getAll(),
-          ServiceFactory.getSwapService().getAll(),
+          userId ? ServiceFactory.getSwapService().getAll() : Promise.resolve([]),
           userId ? ServiceFactory.getMessageService().getAllForUser(userId) : Promise.resolve([]),
           userId ? ServiceFactory.getNotificationService().getAllForUser(userId) : Promise.resolve([]),
-          ServiceFactory.getSwapService().getAllTravelDetails(),
+          userId ? ServiceFactory.getSwapService().getAllTravelDetails() : Promise.resolve([]),
           ServiceFactory.getReviewService().getAll(),
           userId ? ServiceFactory.getLeadService().getAllForUser(userId) : Promise.resolve([])
         ]).then(([, liveUsers, liveSwaps, liveMessages, liveNotifications, liveTravelDetails, liveReviews, liveLeads]) => {

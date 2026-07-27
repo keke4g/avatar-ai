@@ -419,7 +419,7 @@ export interface Notification {
   createdAt: string;
 }
 
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'REAL_ESTATE_COMPANY' | 'DEVELOPER' | 'PROPERTY_MANAGER' | 'BROKER' | 'AGENT' | 'OWNER' | 'MARKETING' | 'ASSISTANT' | 'MEMBER' | 'HOST';
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'INTERNAL_ADVISOR' | 'REAL_ESTATE_COMPANY' | 'DEVELOPER' | 'PROPERTY_MANAGER' | 'BROKER' | 'AGENT' | 'OWNER' | 'MARKETING' | 'ASSISTANT' | 'MEMBER' | 'HOST';
 
 export interface User {
   id: string;

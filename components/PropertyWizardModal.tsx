@@ -1846,6 +1846,8 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
         availableUntil: mode === 'SWAP' ? swapAvailableEnd : (existing?.availableUntil || swapAvailableEnd),
         isFeatured: existing?.isFeatured || false,
         featuredRank: existing?.featuredRank || 0,
+        commissionTotalPct: commissionTotalPct === '' ? null : Number(commissionTotalPct),
+        commissionSharedPct: commissionSharedPct === '' ? null : Number(commissionSharedPct),
         metadata: existing?.metadata || {},
       } as PropertyOffering;
 

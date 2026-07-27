@@ -23,6 +23,7 @@ import { FinancingCompatibility } from '../../../components/property/sections/Fi
 import { EternaMarketAnalysis } from '../../../components/property/sections/EternaMarketAnalysis';
 import { getEmbeddableMediaUrl, getVimeoEmbedUrl, getYouTubeEmbedUrl } from '../../../lib/mediaEmbeds';
 import GooglePropertyLocation from '../../../components/property/GooglePropertyLocation';
+import InternalAdvisorMarketplacePanel from '../../../components/property/InternalAdvisorMarketplacePanel';
 import { useNearbyPlaces } from '../../../hooks/useNearbyPlaces';
 import {
   calculateMortgage,
@@ -1841,6 +1842,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
           {/* 10. Análisis Inmobiliario con IA (Eterna) */}
           <EternaMarketAnalysis property={property} language={language} />
+
+          <InternalAdvisorMarketplacePanel property={property} language={language} />
 
         </div>
 

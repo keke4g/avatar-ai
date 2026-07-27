@@ -601,6 +601,9 @@ export class SupabasePropertyService implements IPropertyService {
       cleaning_fee_amount: offering.cleaningFeeAmount,
       service_fee_percent: offering.serviceFeePercent,
       commission_percent: offering.commissionPercent,
+      commission_total_pct: offering.commissionTotalPct,
+      commission_shared_pct: offering.commissionSharedPct,
+      agent_responsible_id: offering.agentResponsibleId,
       min_nights: offering.minNights,
       max_nights: offering.maxNights,
       min_months: offering.minMonths,
@@ -617,6 +620,12 @@ export class SupabasePropertyService implements IPropertyService {
       is_featured: offering.isFeatured,
       featured_until: offering.featuredUntil,
       featured_rank: offering.featuredRank,
+      accepts_bank_credit: offering.acceptsBankCredit,
+      accepts_infonavit: offering.acceptsInfonavit,
+      accepts_fovissste: offering.acceptsFovissste,
+      accepts_cash: offering.acceptsCash,
+      developer_financing: offering.developerFinancing,
+      estimated_delivery_date: offering.estimatedDeliveryDate,
       metadata: offering.metadata || {}
     }));
 
@@ -788,6 +797,9 @@ export class SupabasePropertyService implements IPropertyService {
           cleaning_fee_amount: offering.cleaningFeeAmount,
           service_fee_percent: offering.serviceFeePercent,
           commission_percent: offering.commissionPercent,
+          commission_total_pct: offering.commissionTotalPct,
+          commission_shared_pct: offering.commissionSharedPct,
+          agent_responsible_id: offering.agentResponsibleId,
           min_nights: offering.minNights,
           max_nights: offering.maxNights,
           min_months: offering.minMonths,
@@ -804,6 +816,12 @@ export class SupabasePropertyService implements IPropertyService {
           is_featured: offering.isFeatured,
           featured_until: offering.featuredUntil,
           featured_rank: offering.featuredRank,
+          accepts_bank_credit: offering.acceptsBankCredit,
+          accepts_infonavit: offering.acceptsInfonavit,
+          accepts_fovissste: offering.acceptsFovissste,
+          accepts_cash: offering.acceptsCash,
+          developer_financing: offering.developerFinancing,
+          estimated_delivery_date: offering.estimatedDeliveryDate,
           metadata: offering.metadata || {}
         };
       });
