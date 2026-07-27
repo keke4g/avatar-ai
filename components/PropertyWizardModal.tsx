@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Sparkles, Check, Info, Loader2,
   Home, DollarSign, Calendar, MessageSquareCode, Award, Shield, User, Building, Briefcase, Camera, Play, Eye, AlertTriangle,
-  MapPin, Sliders, FileText, Image
+  MapPin, Sliders, FileText, Image, Search, PencilLine
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Property, PropertyOffering, PropertyOfferingMode, PropertyOfferingStatus, PropertyBillingPeriod, PropertyOfferingVisibility } from '../lib/types';
@@ -505,6 +505,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
   const [city, setCity] = useState<string | null>(null);
   const [stateName, setStateName] = useState<string | null>(null);
   const [geometrySource, setGeometrySource] = useState<'google_places' | 'google_geocoding' | 'manual' | 'legacy' | null>(null);
+  const [addressEntryMode, setAddressEntryMode] = useState<'google' | 'manual'>('google');
   
   // Location Details
   const [neighborhood, setNeighborhood] = useState('');
@@ -798,6 +799,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setCity(savedCity || null);
       setStateName(initialData.state || null);
       setGeometrySource(initialData.geometrySource || null);
+      setAddressEntryMode(initialData.placeId ? 'google' : 'manual');
       setBedrooms(initialData.bedrooms || 2);
       setBathrooms(initialData.bathrooms || 2);
       setHalfBathrooms(Number(initialData.metadata?.halfBathrooms) || 0);
@@ -956,6 +958,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       setCity(null);
       setStateName(null);
       setGeometrySource(null);
+      setAddressEntryMode('google');
       setBedrooms(2);
       setBathrooms(2);
       setHalfBathrooms(0);
@@ -988,6 +991,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
       longitude,
       placeId,
       formattedAddress,
+      addressEntryMode,
       city,
       stateName,
       neighborhood,
@@ -1084,6 +1088,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     longitude,
     placeId,
     formattedAddress,
+    addressEntryMode,
     city,
     stateName,
     neighborhood,
@@ -1182,6 +1187,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
             if (parsed.longitude) setLongitude(parsed.longitude);
             if (parsed.placeId) setPlaceId(parsed.placeId);
             if (parsed.formattedAddress) setFormattedAddress(parsed.formattedAddress);
+            if (parsed.addressEntryMode === 'google' || parsed.addressEntryMode === 'manual') setAddressEntryMode(parsed.addressEntryMode);
             if (parsed.city) setCity(parsed.city);
             if (parsed.stateName) setStateName(parsed.stateName);
             if (parsed.neighborhood) setNeighborhood(parsed.neighborhood);
@@ -1443,22 +1449,24 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
     setGeometrySource(null);
   };
 
+  const handleAddressFieldEdit = () => {
+    if (addressEntryMode === 'manual') invalidateResolvedLocation();
+  };
+
   const applyGoogleAddress = (result: GoogleAddressResult) => {
     setPlaceId(result.placeId);
     setFormattedAddress(result.formattedAddress);
     setLatitude(result.latitude);
     setLongitude(result.longitude);
     setGeometrySource('google_places');
-    if (result.city) {
-      setCity(result.city);
-      setLocation(result.city);
-    }
-    if (result.state) setStateName(result.state);
-    if (result.country) setCountry(result.country);
-    if (result.neighborhood) setNeighborhood(result.neighborhood);
-    if (result.postalCode) setPostalCode(result.postalCode);
-    if (result.streetName) setStreetName(result.streetName);
-    if (result.streetNumber) setStreetNumber(result.streetNumber);
+    setCity(result.city);
+    setLocation(result.city);
+    setStateName(result.state);
+    setCountry(result.country);
+    setNeighborhood(result.neighborhood);
+    setPostalCode(result.postalCode);
+    setStreetName(result.streetName);
+    setStreetNumber(result.streetNumber);
     setAddress([result.streetName, result.streetNumber].filter(Boolean).join(' '));
     setFieldErrors((previous) => ({ ...previous, city: '', country: '' }));
   };
@@ -2338,10 +2346,55 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                     </div>
 
                     <div className="flex flex-col gap-4">
-                      <GoogleAddressAutocomplete
-                        onSelect={applyGoogleAddress}
-                        selectedAddress={formattedAddress}
-                      />
+                      <div className="grid grid-cols-2 gap-1 rounded-2xl border border-brand-gray-200 bg-brand-gray-100 p-1" role="tablist" aria-label="Forma de capturar la dirección">
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={addressEntryMode === 'google'}
+                          onClick={() => setAddressEntryMode('google')}
+                          className={`flex min-w-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[10px] font-black transition ${
+                            addressEntryMode === 'google'
+                              ? 'bg-white text-brand-black shadow-sm'
+                              : 'text-brand-gray-500 hover:text-brand-black'
+                          }`}
+                        >
+                          <Search className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">Buscar con Google</span>
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={addressEntryMode === 'manual'}
+                          onClick={() => setAddressEntryMode('manual')}
+                          className={`flex min-w-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[10px] font-black transition ${
+                            addressEntryMode === 'manual'
+                              ? 'bg-white text-brand-black shadow-sm'
+                              : 'text-brand-gray-500 hover:text-brand-black'
+                          }`}
+                        >
+                          <PencilLine className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">Captura manual</span>
+                        </button>
+                      </div>
+
+                      {addressEntryMode === 'google' ? (
+                        <GoogleAddressAutocomplete
+                          onSelect={applyGoogleAddress}
+                          selectedAddress={formattedAddress}
+                        />
+                      ) : (
+                        <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-700 shadow-sm">
+                            <PencilLine className="h-4 w-4" />
+                          </span>
+                          <span>
+                            <span className="block text-xs font-black text-slate-950">Escribir la dirección manualmente</span>
+                            <span className="mt-1 block text-[10px] font-medium leading-relaxed text-slate-500">
+                              Completa ciudad y país para continuar. Los demás datos son opcionales y podrás corregirlos cuando quieras.
+                            </span>
+                          </span>
+                        </div>
+                      )}
 
                       <section className="rounded-2xl border border-brand-gray-200 bg-white p-4 shadow-sm">
                         <div className="mb-4 flex items-start gap-3">
@@ -2358,7 +2411,7 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                           <div className="flex flex-col gap-1.5" data-error={fieldErrors.city ? 'true' : 'false'}>
                             <label htmlFor="property-city" className="text-xs font-bold text-brand-gray-600">Ciudad <span className="text-brand-rose">*</span></label>
                             <input id="property-city" type="text" required autoComplete="address-level2" value={city || ''}
-                              onChange={(e) => { const value = e.target.value; setCity(value); setLocation(value); invalidateResolvedLocation(); }}
+                              onChange={(e) => { const value = e.target.value; setCity(value); setLocation(value); handleAddressFieldEdit(); }}
                               placeholder="Ej. Culiacán"
                               className={`w-full rounded-xl border bg-brand-gray-50 p-3 text-xs font-semibold outline-none transition focus:bg-white focus:ring-2 focus:ring-brand-accent/10 ${fieldErrors.city ? 'border-brand-rose' : 'border-brand-gray-200 focus:border-brand-accent'}`}
                             />
@@ -2367,20 +2420,20 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                           <div className="flex flex-col gap-1.5">
                             <label htmlFor="property-state" className="text-xs font-bold text-brand-gray-600">Estado / Provincia</label>
                             <input id="property-state" type="text" autoComplete="address-level1" value={stateName || ''}
-                              onChange={(e) => { setStateName(e.target.value); invalidateResolvedLocation(); }} placeholder="Ej. Sinaloa"
+                              onChange={(e) => { setStateName(e.target.value); handleAddressFieldEdit(); }} placeholder="Ej. Sinaloa"
                               className="w-full rounded-xl border border-brand-gray-200 bg-brand-gray-50 p-3 text-xs font-semibold outline-none transition focus:border-brand-accent focus:bg-white focus:ring-2 focus:ring-brand-accent/10" />
                           </div>
                           <div className="flex flex-col gap-1.5" data-error={fieldErrors.country ? 'true' : 'false'}>
                             <label htmlFor="property-country" className="text-xs font-bold text-brand-gray-600">País <span className="text-brand-rose">*</span></label>
                             <input id="property-country" type="text" required autoComplete="country-name" value={country}
-                              onChange={(e) => { setCountry(e.target.value); invalidateResolvedLocation(); }} placeholder="Ej. México"
+                              onChange={(e) => { setCountry(e.target.value); handleAddressFieldEdit(); }} placeholder="Ej. México"
                               className={`w-full rounded-xl border bg-brand-gray-50 p-3 text-xs font-semibold outline-none transition focus:bg-white focus:ring-2 focus:ring-brand-accent/10 ${fieldErrors.country ? 'border-brand-rose' : 'border-brand-gray-200 focus:border-brand-accent'}`} />
                             {fieldErrors.country && <p className="text-[10px] font-bold text-brand-rose">⚠ {fieldErrors.country}</p>}
                           </div>
                           <div className="flex flex-col gap-1.5">
                             <label htmlFor="property-neighborhood" className="text-xs font-bold text-brand-gray-600">Colonia / Fraccionamiento</label>
                             <input id="property-neighborhood" type="text" autoComplete="address-level3" value={neighborhood}
-                              onChange={(e) => { setNeighborhood(e.target.value); invalidateResolvedLocation(); }} placeholder="Ej. Tres Ríos"
+                              onChange={(e) => { setNeighborhood(e.target.value); handleAddressFieldEdit(); }} placeholder="Ej. Tres Ríos"
                               className="w-full rounded-xl border border-brand-gray-200 bg-brand-gray-50 p-3 text-xs font-semibold outline-none transition focus:border-brand-accent focus:bg-white focus:ring-2 focus:ring-brand-accent/10" />
                           </div>
                         </div>
@@ -2398,19 +2451,19 @@ export default function PropertyWizardModal({ isOpen, onClose, onSubmit, initial
                           <div className="flex flex-col gap-1.5 sm:col-span-3">
                             <label htmlFor="property-street" className="text-xs font-bold text-brand-gray-600">Calle</label>
                             <input id="property-street" type="text" autoComplete="address-line1" value={streetName}
-                              onChange={(e) => { setStreetName(e.target.value); invalidateResolvedLocation(); }} placeholder="Ej. Av. Álvaro Obregón"
+                              onChange={(e) => { setStreetName(e.target.value); handleAddressFieldEdit(); }} placeholder="Ej. Av. Álvaro Obregón"
                               className="w-full rounded-xl border border-brand-gray-200 bg-white p-3 text-xs font-semibold outline-none transition focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/10" />
                           </div>
                           <div className="flex flex-col gap-1.5 sm:col-span-1">
                             <label htmlFor="property-number" className="text-xs font-bold text-brand-gray-600">Número</label>
                             <input id="property-number" type="text" value={streetNumber}
-                              onChange={(e) => { setStreetNumber(e.target.value); invalidateResolvedLocation(); }} placeholder="123"
+                              onChange={(e) => { setStreetNumber(e.target.value); handleAddressFieldEdit(); }} placeholder="123"
                               className="w-full rounded-xl border border-brand-gray-200 bg-white p-3 text-xs font-semibold outline-none transition focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/10" />
                           </div>
                           <div className="flex flex-col gap-1.5 sm:col-span-2">
                             <label htmlFor="property-postal" className="text-xs font-bold text-brand-gray-600">Código postal</label>
                             <input id="property-postal" type="text" inputMode="numeric" autoComplete="postal-code" value={postalCode}
-                              onChange={(e) => { setPostalCode(e.target.value); invalidateResolvedLocation(); }} placeholder="80000"
+                              onChange={(e) => { setPostalCode(e.target.value); handleAddressFieldEdit(); }} placeholder="80000"
                               className="w-full rounded-xl border border-brand-gray-200 bg-white p-3 text-xs font-semibold outline-none transition focus:border-brand-accent focus:ring-2 focus:ring-brand-accent/10" />
                           </div>
                           <div className="flex flex-col gap-1.5 sm:col-span-6">
