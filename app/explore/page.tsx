@@ -10,7 +10,7 @@ import InteractiveMap from '../../components/InteractiveMap';
 import { Map, List, RefreshCw, Compass, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { buildExploreSearchParams, filterAndSortProperties, resolveSearchDestination, PROPERTY_TYPE_MAPPING, normalizeSearchText } from '../../lib/searchFilters';
+import { buildExploreSearchParams, filterAndSortProperties, findPropertyByReference, resolveSearchDestination, PROPERTY_TYPE_MAPPING, normalizeSearchText } from '../../lib/searchFilters';
 import { CalendarPicker } from '../../components/CalendarPicker';
 import { AuraSearchBar } from '../../components/search/AuraSearchBar';
 import { GuestPicker } from '../../components/search/GuestPicker';
@@ -698,8 +698,11 @@ function ExploreContent() {
     if (activeSearch && activeSearch.loading) {
       return [];
     }
+    if (findPropertyByReference(allModeFilteredProperties, searchQuery)) {
+      return allModeFilteredProperties;
+    }
     return allModeFilteredProperties.filter((property) => propertyMatchesOfferingTab(property, activeOfferingTab));
-  }, [allModeFilteredProperties, activeOfferingTab, activeSearch]);
+  }, [allModeFilteredProperties, activeOfferingTab, activeSearch, searchQuery]);
 
   // Paginated properties for progressive load
   const paginatedProperties = useMemo(() => {

@@ -857,11 +857,16 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           </div>
         </div>
 
-        <div className="flex items-center text-xs sm:text-sm text-brand-gray-500 font-medium mt-1">
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium text-brand-gray-500 sm:text-sm">
           <div className="flex items-center gap-1.5">
             <MapPin className="w-3.5 h-3.5 text-brand-gray-400" />
             <span>{formatPropertyLocation(property.location, property.country)}</span>
           </div>
+          {property.internalCode && (
+            <span className="inline-flex items-center rounded-full border border-violet-200/80 bg-violet-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-violet-700">
+              Folio AuraSwap · {property.internalCode}
+            </span>
+          )}
         </div>
 
         {activeOfferingModes.length > 0 && (
@@ -1572,8 +1577,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
             const label = getResponsibleLabel(property, language);
             const whatsappMessage = language === 'es'
-              ? `Hola ${broker.name}, me interesa la propiedad "${property.title}" (${property.id}). ¿Podrías darme más información?`
-              : `Hello ${broker.name}, I am interested in "${property.title}" (${property.id}). Could you share more information?`;
+              ? `Hola ${broker.name}, me interesa la propiedad "${property.title}" (folio ${property.internalCode || property.id}). ¿Podrías darme más información?`
+              : `Hello ${broker.name}, I am interested in "${property.title}" (reference ${property.internalCode || property.id}). Could you share more information?`;
             const mailSubject = language === 'es'
               ? `Interés en propiedad AuraSwap: ${property.title}`
               : `AuraSwap property inquiry: ${property.title}`;

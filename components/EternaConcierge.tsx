@@ -53,6 +53,7 @@ import { useSearchActions } from '../lib/eterna/actions/SearchActions';
 import { useNavigationActions } from '../lib/eterna/actions/NavigationActions';
 import { useGeneralActions } from '../lib/eterna/actions/GeneralActions';
 import { Property } from '../lib/types';
+import { findPropertyByReference } from '../lib/searchFilters';
 import { ServiceFactory } from '../lib/services/ServiceFactory';
 import { parseBudgetToNumber, parseBudgetRange } from '../lib/search/SearchEngine';
 import { PropertySearchFilters } from '../lib/search/types';
@@ -1712,6 +1713,24 @@ Explore actualizado: Redirecting to /explore`);
     setChatHistory(prev => [...prev, { role: 'user', content: prompt }]);
     setTypedInput('');
 
+    const referencedProperty = findPropertyByReference(properties, prompt);
+    if (referencedProperty) {
+      const reference = referencedProperty.internalCode || referencedProperty.shortCode || referencedProperty.id;
+      const location = formatPropertyLocation(referencedProperty.location, referencedProperty.country);
+      const reply = language === 'es'
+        ? `Encontré el folio ${reference}: “${referencedProperty.title}”, en ${location}. Voy a abrir la propiedad para que la revisemos juntos.`
+        : `I found reference ${reference}: “${referencedProperty.title}” in ${location}. I’ll open the listing so we can review it together.`;
+
+      setChatHistory(prev => [...prev, {
+        role: 'assistant',
+        content: reply,
+        route: `/property/${referencedProperty.id}`,
+      }]);
+      speak(reply, () => setSimulatedStatus('idle'));
+      router.push(`/property/${referencedProperty.id}`);
+      return;
+    }
+
     // ── LOCAL PROPERTY QA ROUTER ──
     const activeProperty = liveContext.property;
     const currentPropertyId = activeProperty?.id || liveContext.propertyPage?.propertyId || null;
@@ -2720,11 +2739,11 @@ Explore actualizado: Redirecting to /explore`);
       if (chatHistoryRef.current.length > 0) return;
 
       const part1 = language === 'es'
-        ? "Hola, soy Eterna, tu asesora inmobiliaria en AuraSwap."
-        : "Hello, I am Eterna, your real estate advisor at AuraSwap.";
+        ? "Hola, soy Eterna. Puedes hablarme como le hablarías a una asesora."
+        : "Hi, I’m Eterna. You can talk to me just as you would talk to a real estate advisor.";
       const part2 = language === 'es'
-        ? "Dime qué quieres lograr: puedo buscar y comparar propiedades, revisar la que estás viendo o llevarte exactamente a la sección que necesitas."
-        : "Tell me what you want to accomplish: I can search and compare properties, review the one you are viewing, or take you directly to the section you need.";
+        ? "Por ejemplo: “busco una casa en Guadalajara de hasta tres millones”. Yo encontraré opciones y te ayudaré con el siguiente paso."
+        : "For example: “I’m looking for a home in Guadalajara under three million pesos.” I’ll find options and help you with the next step.";
 
       const welcomeMsg = part1 + " " + part2;
 

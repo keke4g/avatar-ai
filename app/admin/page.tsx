@@ -209,10 +209,15 @@ export default function AdminPage() {
 
   // 2. Properties CMS processing
   const filteredProperties = useMemo(() => {
+    const normalizedSearch = propertySearch.trim().toLowerCase();
     return properties.filter(p => {
-      const matchesSearch = p.title.toLowerCase().includes(propertySearch.toLowerCase()) || 
-                            p.location.toLowerCase().includes(propertySearch.toLowerCase()) ||
-                            p.country.toLowerCase().includes(propertySearch.toLowerCase());
+      const matchesSearch = !normalizedSearch ||
+                            p.title.toLowerCase().includes(normalizedSearch) ||
+                            p.location.toLowerCase().includes(normalizedSearch) ||
+                            p.country.toLowerCase().includes(normalizedSearch) ||
+                            p.internalCode?.toLowerCase().includes(normalizedSearch) ||
+                            p.shortCode?.toLowerCase().includes(normalizedSearch) ||
+                            p.id.toLowerCase().includes(normalizedSearch);
       const matchesType = propertyTypeFilter === 'All' || p.type === propertyTypeFilter;
       const matchesTier = propertyTierFilter === 'All' || p.valueRating === propertyTierFilter;
       return matchesSearch && matchesType && matchesTier;
@@ -382,8 +387,8 @@ export default function AdminPage() {
     setPropertyDrawerOpen(false);
   };
 
-  const handleTogglePublish = (id: string, name: string) => {
-    togglePublish(id);
+  const handleTogglePublish = async (id: string, name: string) => {
+    await togglePublish(id);
     const prop = properties.find(p => p.id === id);
     const nextPublished = prop ? !prop.isPublished : false;
     addAudit('PROPERTY', 'auditPropDesc', { name: currentUser.name, title: name }, nextPublished ? 'success' : 'info');
@@ -1028,7 +1033,9 @@ export default function AdminPage() {
                                 />
                                 <div>
                                   <p className="font-bold text-brand-black line-clamp-1">{p.title}</p>
-                                  <p className="text-[10px] text-brand-gray-400 font-bold mt-0.5 uppercase tracking-wide">ID: {p.id}</p>
+                                  <p className="mt-0.5 text-[10px] font-black uppercase tracking-[0.1em] text-violet-600">
+                                    Folio: {p.internalCode || 'Pendiente'}
+                                  </p>
                                 </div>
                               </div>
                             </td>
@@ -1047,14 +1054,17 @@ export default function AdminPage() {
                             <td className="p-4 text-center">
                               <button
                                 onClick={() => handleTogglePublish(p.id, p.title)}
-                                className={`p-1.5 rounded-full transition-colors cursor-pointer inline-flex items-center justify-center ${
-                                  p.isPublished !== false 
-                                    ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' 
-                                    : 'bg-brand-gray-100 text-brand-gray-400 hover:bg-brand-gray-200'
+                                className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full px-2.5 text-[9px] font-black uppercase tracking-wide transition-colors cursor-pointer ${
+                                  p.folderStatus === 'UNDER_REVIEW'
+                                    ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                    : p.isPublished !== false
+                                      ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                      : 'bg-brand-gray-100 text-brand-gray-500 hover:bg-brand-gray-200'
                                 }`}
-                                title={p.isPublished !== false ? t('admin.actionUnpublish') : t('admin.actionPublish')}
+                                title={p.folderStatus === 'UNDER_REVIEW' ? 'Aprobar publicación' : p.isPublished !== false ? t('admin.actionUnpublish') : t('admin.actionPublish')}
                               >
-                                {p.isPublished !== false ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                                {p.folderStatus === 'UNDER_REVIEW' ? <CheckCircle className="h-3.5 w-3.5" /> : p.isPublished !== false ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                                <span>{p.folderStatus === 'UNDER_REVIEW' ? 'Aprobar' : p.isPublished !== false ? 'Publicada' : 'Oculta'}</span>
                               </button>
                             </td>
                             <td className="p-4 text-center">

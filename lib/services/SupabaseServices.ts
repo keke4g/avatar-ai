@@ -21,6 +21,7 @@ const LEGACY_PROPERTY_SELECT = '*, property_media(*), profiles:public_profiles_v
 // selected from the base table and merged into the sanitized view response.
 const PUBLIC_PROPERTY_DETAILS_SELECT = [
   'id',
+  'internal_code',
   'primary_operation',
   'development_name',
   'subdivision_name',
@@ -81,7 +82,9 @@ const enrichPublicPropertyRows = async <T extends PublicPropertyRow>(rows: T[]):
     .eq('is_published', true);
 
   if (error) {
-    console.warn('[SupabasePropertyService] Public property details enrichment unavailable:', error.message);
+    if (error.code !== '42501') {
+      console.warn('[SupabasePropertyService] Public property details enrichment unavailable:', error.message);
+    }
     return rows;
   }
 
@@ -94,6 +97,80 @@ const enrichPublicPropertyRows = async <T extends PublicPropertyRow>(rows: T[]):
     ...row,
     ...(row.id ? detailsById.get(row.id) : undefined),
   } as T));
+};
+
+const fetchSanitizedPublicPropertyRows = async (propertyId?: string): Promise<PublicPropertyRow[]> => {
+  let propertyQuery = supabase
+    .from('public_properties_view')
+    .select('*');
+
+  if (propertyId) {
+    propertyQuery = propertyQuery.eq('id', propertyId);
+  }
+
+  const { data: propertyRows, error: propertyError } = await propertyQuery;
+  if (propertyError || !propertyRows?.length) {
+    if (propertyError) {
+      console.error('[SupabasePropertyService] Sanitized property query failed:', propertyError.message);
+    }
+    return [];
+  }
+
+  const propertyIds = propertyRows.map((row) => row.id);
+  const hostIds = Array.from(new Set(propertyRows.map((row) => row.host_id).filter(Boolean)));
+
+  const [mediaResult, offeringsResult, profilesResult] = await Promise.all([
+    supabase
+      .from('public_property_media_view')
+      .select('*')
+      .in('property_id', propertyIds),
+    supabase
+      .from('public_property_offerings_view')
+      .select('*')
+      .in('property_id', propertyIds),
+    hostIds.length > 0
+      ? supabase
+          .from('public_profiles_view')
+          .select('id,name,avatar_url,is_verified')
+          .in('id', hostIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (mediaResult.error) {
+    console.warn('[SupabasePropertyService] Public media view unavailable:', mediaResult.error.message);
+  }
+  if (offeringsResult.error) {
+    console.warn('[SupabasePropertyService] Public offerings view unavailable:', offeringsResult.error.message);
+  }
+
+  const mediaByProperty = new Map<string, any[]>();
+  (mediaResult.data || []).forEach((row) => {
+    const current = mediaByProperty.get(row.property_id) || [];
+    current.push(row);
+    mediaByProperty.set(row.property_id, current);
+  });
+
+  const offeringsByProperty = new Map<string, any[]>();
+  (offeringsResult.data || []).forEach((row) => {
+    const current = offeringsByProperty.get(row.property_id) || [];
+    current.push({
+      ...row,
+      property_offering_availability: [],
+      property_offering_pricing_rules: [],
+    });
+    offeringsByProperty.set(row.property_id, current);
+  });
+
+  const profilesById = new Map(
+    (profilesResult.data || []).map((profile) => [profile.id, profile]),
+  );
+
+  return propertyRows.map((row) => ({
+    ...row,
+    property_media: mediaByProperty.get(row.id) || [],
+    property_offerings: offeringsByProperty.get(row.id) || [],
+    profiles: profilesById.get(row.host_id) || null,
+  }));
 };
 
 
@@ -223,6 +300,11 @@ export class SupabasePropertyService implements IPropertyService {
 
       let { data, error } = await query;
 
+      if (error?.code === '42501') {
+        data = await fetchSanitizedPublicPropertyRows();
+        error = null;
+      }
+
       if (error && isMissingOfferingsRelationError(error)) {
         let legacyQuery = supabase.from('public_properties_view').select(LEGACY_PROPERTY_SELECT);
         if (filters.type) {
@@ -283,6 +365,11 @@ export class SupabasePropertyService implements IPropertyService {
       .from('public_properties_view')
       .select(HYBRID_PROPERTY_SELECT);
 
+    if (error?.code === '42501') {
+      data = await fetchSanitizedPublicPropertyRows();
+      error = null;
+    }
+
     if (error && isMissingOfferingsRelationError(error)) {
       console.warn('[SupabasePropertyService] property_offerings relation not available yet. Falling back to legacy property select.');
       const legacy = await supabase
@@ -298,7 +385,49 @@ export class SupabasePropertyService implements IPropertyService {
     }
 
     const enrichedData = await enrichPublicPropertyRows((data || []) as PublicPropertyRow[]);
-    return enrichedData.map(mapPostgresProperty);
+    const publicProperties = enrichedData.map(mapPostgresProperty);
+
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData.user;
+    if (!user) return publicProperties;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    let accessibleQuery = supabase
+      .from('properties')
+      .select(HYBRID_PROPERTY_SELECT);
+
+    if (profile?.role !== 'ADMIN') {
+      accessibleQuery = accessibleQuery.eq('host_id', user.id);
+    }
+
+    let { data: accessibleData, error: accessibleError } = await accessibleQuery;
+    if (accessibleError && isMissingOfferingsRelationError(accessibleError)) {
+      let legacyQuery = supabase
+        .from('properties')
+        .select(LEGACY_PROPERTY_SELECT);
+      if (profile?.role !== 'ADMIN') {
+        legacyQuery = legacyQuery.eq('host_id', user.id);
+      }
+      const legacy = await legacyQuery;
+      accessibleData = legacy.data;
+      accessibleError = legacy.error;
+    }
+
+    if (accessibleError) {
+      console.warn('[SupabasePropertyService] Could not load moderated properties:', accessibleError.message);
+      return publicProperties;
+    }
+
+    const merged = new Map(publicProperties.map((property) => [property.id, property]));
+    (accessibleData || []).map(mapPostgresProperty).forEach((property) => {
+      merged.set(property.id, property);
+    });
+    return Array.from(merged.values());
   }
 
   async getById(id: string): Promise<Property | null> {
@@ -307,6 +436,12 @@ export class SupabasePropertyService implements IPropertyService {
       .select(HYBRID_PROPERTY_SELECT)
       .eq('id', id)
       .single();
+
+    if (error?.code === '42501') {
+      const [sanitizedRow] = await fetchSanitizedPublicPropertyRows(id);
+      data = sanitizedRow || null;
+      error = sanitizedRow ? null : error;
+    }
 
     if (error && isMissingOfferingsRelationError(error)) {
       console.warn('[SupabasePropertyService] property_offerings relation not available yet. Falling back to legacy property select.');
@@ -320,8 +455,29 @@ export class SupabasePropertyService implements IPropertyService {
     }
 
     if (error) {
-      console.error(`[SupabasePropertyService] Error fetching property ${id}:`, error);
-      return null;
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user) return null;
+
+      let fallback = await supabase
+        .from('properties')
+        .select(HYBRID_PROPERTY_SELECT)
+        .eq('id', id)
+        .maybeSingle();
+
+      if (fallback.error && isMissingOfferingsRelationError(fallback.error)) {
+        fallback = await supabase
+          .from('properties')
+          .select(LEGACY_PROPERTY_SELECT)
+          .eq('id', id)
+          .maybeSingle();
+      }
+
+      if (fallback.error || !fallback.data) {
+        console.error(`[SupabasePropertyService] Error fetching property ${id}:`, fallback.error || error);
+        return null;
+      }
+
+      return mapPostgresProperty(fallback.data);
     }
 
     if (!data) return null;
@@ -686,7 +842,10 @@ export class SupabasePropertyService implements IPropertyService {
 
     const { data, error } = await supabase
       .from('properties')
-      .update({ is_published: !property.isPublished })
+      .update({
+        is_published: !property.isPublished,
+        folder_status: property.isPublished === false ? 'PUBLISHED' : 'PAUSED',
+      })
       .eq('id', id)
       .select()
       .single();

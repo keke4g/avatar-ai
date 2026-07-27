@@ -596,13 +596,17 @@ function DashboardPageContent() {
                     <div className="absolute top-3 left-3 flex flex-col gap-1.5 pointer-events-none">
                       {/* Publish Badge */}
                       <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1 bg-white/95 backdrop-blur-sm ${
-                        myProp.isPublished !== false 
+                        myProp.folderStatus === 'UNDER_REVIEW'
+                          ? 'text-amber-700 border border-amber-200/20'
+                          : myProp.isPublished !== false
                           ? 'text-emerald-600 border border-emerald-200/20' 
-                          : 'text-amber-600 border border-amber-200/20'
+                          : 'text-slate-600 border border-slate-200/20'
                       }`}>
-                        {myProp.isPublished !== false 
+                        {myProp.folderStatus === 'UNDER_REVIEW'
+                          ? (language === 'es' ? 'En revisión' : 'Under review')
+                          : myProp.isPublished !== false
                           ? (language === 'es' ? 'Publicado' : 'Published') 
-                          : (language === 'es' ? 'Borrador' : 'Draft')
+                          : (language === 'es' ? 'No publicado' : 'Unpublished')
                         }
                       </span>
                       
@@ -642,6 +646,9 @@ function DashboardPageContent() {
                     <p className="text-xs text-brand-gray-500 font-medium truncate group-hover:text-brand-accent/80 transition-colors">
                       {myProp.title}
                     </p>
+                    <p className="text-[9px] font-black uppercase tracking-[0.1em] text-violet-600">
+                      Folio {myProp.internalCode || 'pendiente'}
+                    </p>
                     <div className="flex items-center gap-2 text-[10px] text-brand-gray-500 font-semibold mt-1">
                       <span>{language === 'es' ? formatCount(myProp.bedrooms || 0, 'habitación', 'habitaciones', 'feminine') : `${myProp.bedrooms || 0} bedroom${myProp.bedrooms !== 1 ? 's' : ''}`}</span>
                       <span>•</span>
@@ -662,6 +669,7 @@ function DashboardPageContent() {
                   {/* Direct Controls Row */}
                   <div className="flex flex-wrap items-center justify-between gap-2 mt-auto">
                     {/* Toggle publish button */}
+                    {currentUser.role === 'ADMIN' || myProp.isPublished !== false ? (
                     <button 
                       onClick={async () => {
                         await togglePublish(myProp.id);
@@ -681,6 +689,18 @@ function DashboardPageContent() {
                       {myProp.isPublished !== false ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       <span>{myProp.isPublished !== false ? (language === 'es' ? 'Ocultar' : 'Hide') : (language === 'es' ? 'Publicar' : 'Publish')}</span>
                     </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={myProp.folderStatus === 'UNDER_REVIEW'}
+                        onClick={() => updateProperty(myProp.id, { isPublished: false, folderStatus: 'UNDER_REVIEW' })}
+                        className="flex min-w-[65px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 p-2 text-[10px] font-bold text-amber-800 transition disabled:cursor-wait disabled:opacity-80"
+                        title={language === 'es' ? 'AuraSwap revisará el anuncio antes de publicarlo' : 'AuraSwap will review the listing before publication'}
+                      >
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>{myProp.folderStatus === 'UNDER_REVIEW' ? (language === 'es' ? 'En revisión' : 'Under review') : (language === 'es' ? 'Enviar a revisión' : 'Submit')}</span>
+                      </button>
+                    )}
 
                     {/* Toggle feature button */}
                     <button 

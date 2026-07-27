@@ -35,9 +35,41 @@ export function normalizeSearchText(value: string): string {
     .trim();
 }
 
+export function normalizePropertyReference(value: string): string {
+  return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+export function findPropertyByReference(
+  properties: Property[],
+  query: string,
+): Property | undefined {
+  const compactQuery = normalizePropertyReference(query);
+  const rawQuery = query.trim().toLowerCase();
+  if (!compactQuery && !rawQuery) return undefined;
+
+  return properties.find((property) => {
+    if (rawQuery === property.id.toLowerCase() || rawQuery.includes(property.id.toLowerCase())) {
+      return true;
+    }
+
+    const references = [property.internalCode, property.shortCode]
+      .filter((value): value is string => Boolean(value))
+      .map(normalizePropertyReference)
+      .filter((value) => value.length >= 6);
+
+    return references.some((reference) => (
+      compactQuery === reference || compactQuery.includes(reference)
+    ));
+  });
+}
+
 export function resolveSearchDestination(destination: string, properties: Property[]): string {
   const cleanDestination = normalizeSearchText(destination);
   if (!cleanDestination) return '';
+
+  if (findPropertyByReference(properties, destination)) {
+    return destination.trim();
+  }
 
   if (['playa', 'mar', 'beach', 'costa'].includes(cleanDestination)) {
     return 'playa';
@@ -134,6 +166,11 @@ export function filterAndSortProperties({
     .map(ensurePropertyOfferings)
     .filter(p => p.isPublished !== false);
 
+  const referenceMatch = findPropertyByReference(published, searchQuery);
+  if (referenceMatch) {
+    return [referenceMatch];
+  }
+
   const filtered = published.filter((property) => {
     const activeOfferings = getActiveOfferings(property);
     const matchesOfferingMode = offeringMode === 'ALL'
@@ -151,7 +188,10 @@ export function filterAndSortProperties({
     const matchesSearch = !cleanQuery ||
       normalizeSearchText(property.title).includes(cleanQuery) ||
       normalizeSearchText(property.location).includes(cleanQuery) ||
-      normalizeSearchText(property.country).includes(cleanQuery);
+      normalizeSearchText(property.country).includes(cleanQuery) ||
+      normalizeSearchText(property.internalCode || '').includes(cleanQuery) ||
+      normalizeSearchText(property.shortCode || '').includes(cleanQuery) ||
+      property.id.toLowerCase() === searchQuery.trim().toLowerCase();
 
     const swapOffering = getOfferingsByMode(property, 'SWAP')[0];
     const swapValueTier = swapOffering?.swapValueTier || property.valueRating;

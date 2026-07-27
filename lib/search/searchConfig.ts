@@ -46,17 +46,17 @@ export const BUDGET_RENT_OPTIONS: DropdownOption[] = [
 
 export const SEARCH_CONFIG: Record<OperationMode, OperationSearchConfig> = {
   SWAP: {
-    placeholder: '¿A dónde te gustaría viajar?',
+    placeholder: 'Ciudad, zona o folio AuraSwap',
     submitLabel: 'Buscar Swaps',
     budgetOptions: []
   },
   SALE: {
-    placeholder: '¿En qué ciudad quieres comprar?',
+    placeholder: 'Ciudad, zona o folio AuraSwap',
     submitLabel: 'Buscar Propiedades',
     budgetOptions: BUDGET_SALE_OPTIONS
   },
   RENT: {
-    placeholder: '¿Dónde quieres rentar?',
+    placeholder: 'Ciudad, zona o folio AuraSwap',
     submitLabel: 'Buscar Rentas',
     budgetOptions: BUDGET_RENT_OPTIONS
   }

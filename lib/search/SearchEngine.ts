@@ -1,6 +1,6 @@
 import { Property } from '../types';
 import { PropertySearchFilters, SearchSort } from './types';
-import { PROPERTY_TYPE_MAPPING } from '../searchFilters';
+import { findPropertyByReference, PROPERTY_TYPE_MAPPING } from '../searchFilters';
 
 export function normalizeSearchText(value: string): string {
   return value
@@ -11,6 +11,14 @@ export function normalizeSearchText(value: string): string {
 }
 
 export function searchProperties(properties: Property[], filters: PropertySearchFilters): Property[] {
+  const referenceMatch = filters.city
+    ? findPropertyByReference(properties, filters.city)
+    : undefined;
+
+  if (referenceMatch) {
+    return [referenceMatch];
+  }
+
   const results = properties.map(prop => {
     let score = 0;
     let isExcluded = false;

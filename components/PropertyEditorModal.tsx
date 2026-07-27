@@ -26,6 +26,7 @@ import VideoUploadDropzone from './VideoUploadDropzone';
 import { getVirtualTourProvider } from '../lib/mediaEmbeds';
 import GoogleAddressAutocomplete from './maps/GoogleAddressAutocomplete';
 import type { GoogleAddressResult } from '../lib/maps/types';
+import { useSwap } from '../lib/context/SwapContext';
 
 interface PropertyEditorModalProps {
   isOpen: boolean;
@@ -371,6 +372,8 @@ function Section({
 }
 
 export default function PropertyEditorModal({ isOpen, property, onClose, onSubmit, onDelete }: PropertyEditorModalProps) {
+  const { currentUser } = useSwap();
+  const isAdmin = currentUser?.role === 'ADMIN';
   const initialForm = useMemo(() => formFromProperty(property), [property]);
   const [form, setForm] = useState<EditorForm>(initialForm);
   const [activeSection, setActiveSection] = useState<EditorSectionId>('general');
@@ -674,7 +677,7 @@ export default function PropertyEditorModal({ isOpen, property, onClose, onSubmi
                 <h2 className="truncate text-base font-black tracking-[-0.03em] text-slate-950 sm:text-lg">Editar propiedad</h2>
                 <span className={`hidden rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wider sm:inline-flex ${form.isPublished ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{form.isPublished ? 'Publicada' : 'Borrador'}</span>
               </div>
-              <p className="mt-0.5 truncate text-[10px] text-slate-500 sm:text-xs">Todo el anuncio en una sola vista · {property.internalCode || property.id.slice(0, 8)}</p>
+              <p className="mt-0.5 truncate text-[10px] text-slate-500 sm:text-xs">Todo el anuncio en una sola vista · Folio {property.internalCode || property.id.slice(0, 8)}</p>
             </div>
             <div className="flex items-center gap-2">
               <span className={`hidden items-center gap-1.5 text-[10px] font-bold sm:flex ${saved ? 'text-emerald-600' : isDirty ? 'text-amber-600' : 'text-slate-400'}`}>
@@ -846,9 +849,23 @@ export default function PropertyEditorModal({ isOpen, property, onClose, onSubmi
               <Section id="publishing" eyebrow="08 · Visibilidad" title="Publicación y buscadores" description="Controla el estado operativo del anuncio y cómo se presenta en resultados de búsqueda.">
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field label="Operación principal"><select value={form.primaryOperation || 'SWAP'} onChange={(event) => update('primaryOperation', event.target.value as Property['primaryOperation'])} className={inputClass}><option value="SALE">Venta</option><option value="RENT">Renta</option><option value="SWAP">Intercambio</option></select></Field>
-                  <Field label="Estado del expediente"><select value={form.folderStatus} onChange={(event) => update('folderStatus', event.target.value as EditorForm['folderStatus'])} className={inputClass}><option value="DRAFT">Borrador</option><option value="PENDING_DOCUMENTS">Documentos pendientes</option><option value="UNDER_REVIEW">En revisión</option><option value="PUBLISHED">Publicado</option><option value="PAUSED">Pausado</option><option value="SOLD">Vendido</option><option value="RENTED">Rentado</option><option value="ARCHIVED">Archivado</option></select></Field>
-                  <Field label="Código interno"><input value={form.internalCode} onChange={(event) => update('internalCode', event.target.value)} className={inputClass} placeholder="Se genera automáticamente si está vacío" /></Field>
-                  <Toggle checked={form.isPublished} onChange={(value) => update('isPublished', value)} label="Anuncio visible" description="Disponible en Explorar y mediante su enlace público." />
+                  {isAdmin ? (
+                    <Field label="Estado del expediente"><select value={form.folderStatus} onChange={(event) => update('folderStatus', event.target.value as EditorForm['folderStatus'])} className={inputClass}><option value="DRAFT">Borrador</option><option value="PENDING_DOCUMENTS">Documentos pendientes</option><option value="UNDER_REVIEW">En revisión</option><option value="PUBLISHED">Publicado</option><option value="PAUSED">Pausado</option><option value="SOLD">Vendido</option><option value="RENTED">Rentado</option><option value="ARCHIVED">Archivado</option></select></Field>
+                  ) : (
+                    <Field label="Estado del expediente">
+                      <div className={`${inputClass} flex items-center bg-amber-50 text-amber-800`}>
+                        {form.folderStatus === 'UNDER_REVIEW' ? 'En revisión por AuraSwap' : form.isPublished ? 'Publicado' : 'Pendiente de aprobación'}
+                      </div>
+                    </Field>
+                  )}
+                  <Field label="Folio AuraSwap" hint="Identificador único, visible y no editable."><input value={form.internalCode || 'Se asignará al guardar'} readOnly className={`${inputClass} cursor-not-allowed bg-slate-100 font-black tracking-wide text-slate-600`} /></Field>
+                  {isAdmin ? (
+                    <Toggle checked={form.isPublished} onChange={(value) => update('isPublished', value)} label="Anuncio visible" description="Disponible en Explorar y mediante su enlace público." />
+                  ) : (
+                    <div className="rounded-2xl border border-violet-100 bg-violet-50/70 px-4 py-3 text-[11px] font-semibold leading-relaxed text-violet-800">
+                      Al guardar, el anuncio se enviará a revisión. Un administrador debe aprobarlo antes de que aparezca en Explorar.
+                    </div>
+                  )}
                   <Field label="Título SEO" className="md:col-span-2"><input value={form.metaTitle} onChange={(event) => update('metaTitle', event.target.value)} className={inputClass} placeholder={form.title ? `${form.title} | AuraSwap` : ''} /></Field>
                   <Field label="Descripción SEO" className="md:col-span-2"><textarea value={form.metaDescription} onChange={(event) => update('metaDescription', event.target.value)} rows={3} className={`${inputClass} resize-y py-3.5`} /></Field>
                   <Field label="Palabras clave" hint="Sepáralas con comas." className="md:col-span-2"><input value={form.metaKeywords} onChange={(event) => update('metaKeywords', event.target.value)} className={inputClass} placeholder="departamento, terraza, Guadalajara" /></Field>

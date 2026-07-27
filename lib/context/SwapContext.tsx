@@ -722,13 +722,15 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (useSupabase && currentUser) {
       try {
+        const canPublishDirectly = currentUser.role === 'ADMIN';
         const payload = {
           ...prop,
           hostId: currentUser.id,
           hostName: currentUser.name,
           hostAvatar: currentUser.avatar,
           hostVerified: currentUser.isVerified,
-          isPublished: true,
+          isPublished: canPublishDirectly,
+          folderStatus: canPublishDirectly ? 'PUBLISHED' as const : 'UNDER_REVIEW' as const,
           auraScore: 95 + Math.floor(Math.random() * 5),
           latitude: prop.latitude !== undefined && prop.latitude !== null ? Number(prop.latitude) : 0.0,
           longitude: prop.longitude !== undefined && prop.longitude !== null ? Number(prop.longitude) : 0.0
@@ -759,7 +761,8 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
       auraScore: 95 + Math.floor(Math.random() * 5),
       latitude: prop.latitude !== undefined && prop.latitude !== null ? Number(prop.latitude) : 0.0,
       longitude: prop.longitude !== undefined && prop.longitude !== null ? Number(prop.longitude) : 0.0,
-      isPublished: true,
+      isPublished: currentUser?.role === 'ADMIN',
+      folderStatus: currentUser?.role === 'ADMIN' ? 'PUBLISHED' : 'UNDER_REVIEW',
       rules: prop.rules || [],
       reviews: []
     };
