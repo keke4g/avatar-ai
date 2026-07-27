@@ -2859,6 +2859,10 @@ Explore actualizado: Redirecting to /explore`);
     touchStartY.current = null;
   };
 
+  if (pathname === '/reset-password') {
+    return null;
+  }
+
   return (
     <>
       {/* A. SCROLL-AWARE PREMIUM FLOATING ORB */}

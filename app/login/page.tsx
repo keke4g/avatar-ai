@@ -18,6 +18,8 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isVerifiedParam = searchParams.get('verified') === 'true';
+  const isPasswordResetParam = searchParams.get('passwordReset') === 'true';
+  const requestedMode = searchParams.get('mode');
   const { t, language } = useTranslation();
   const { 
     loginMock, registerMock, resetPasswordMock, resendVerificationEmail
@@ -52,6 +54,14 @@ function LoginForm() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (requestedMode === 'forgot') {
+      setActiveTab('forgot');
+      setForgotSuccess(false);
+      setErrorMsg(null);
+    }
+  }, [requestedMode]);
 
   // 2. Clear pending email from storage once successfully verified
   useEffect(() => {
@@ -367,6 +377,17 @@ function LoginForm() {
                     {t('auth.loginSubtitle')}
                   </p>
                 </div>
+
+                {isPasswordResetParam && (
+                  <div className="flex items-start gap-2.5 rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5 text-[11px] font-bold leading-relaxed text-emerald-700">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      {language === 'es'
+                        ? 'Tu contraseña fue actualizada. Ya puedes iniciar sesión con la nueva.'
+                        : 'Your password was updated. You can now sign in with your new password.'}
+                    </span>
+                  </div>
+                )}
 
                 {errorMsg && (
                   <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-[11px] font-bold text-rose-600 flex flex-col gap-2">

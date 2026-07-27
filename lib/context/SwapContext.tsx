@@ -13,6 +13,7 @@ import { ensurePropertyOfferings } from '../propertyOfferings';
 import { PropertySearchFilters, SearchSession } from '../search/types';
 import { searchLogger } from '../search/searchLogger';
 import { searchCache } from '../search/SearchCache';
+import { getAuthRedirectUrl } from '../authUrls';
 
 interface SwapContextType {
   properties: Property[];
@@ -1346,6 +1347,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password: password || 'password', // Standard password parameter with fallback
         options: {
+          emailRedirectTo: getAuthRedirectUrl('/login?verified=true'),
           data: {
             name: name,
             avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
@@ -1487,7 +1489,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resetPasswordMock = async (email: string): Promise<void> => {
     if (useSupabase) {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/login`
+        redirectTo: getAuthRedirectUrl('/reset-password')
       });
       if (error) throw error;
       return;
@@ -1503,7 +1505,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
         type: 'signup',
         email,
         options: {
-          emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/login?verified=true`
+          emailRedirectTo: getAuthRedirectUrl('/login?verified=true')
         }
       });
       if (error) {
