@@ -833,15 +833,26 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
       
       {/* 1. Sub-Header: Title & Sharing Controls */}
       <div className="flex flex-col gap-2 mb-6">
-        <button
-          type="button"
-          onClick={handleBack}
-          aria-label={language === 'es' ? 'Volver a la página anterior' : 'Return to the previous page'}
-          className="group mb-1 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-full border border-brand-gray-200 bg-white px-3.5 text-xs font-extrabold text-brand-gray-600 shadow-xs transition-all hover:border-brand-gray-300 hover:bg-brand-gray-50 hover:text-brand-black active:scale-[0.97]"
-        >
-          <ChevronLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-          <span>{language === 'es' ? 'Atrás' : 'Back'}</span>
-        </button>
+        <div className="mb-1 flex min-h-11 items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={handleBack}
+            aria-label={language === 'es' ? 'Volver a la página anterior' : 'Return to the previous page'}
+            className="group inline-flex min-h-11 w-fit items-center gap-1.5 rounded-full border border-brand-gray-200 bg-white px-3.5 text-xs font-extrabold text-brand-gray-600 shadow-xs transition-all hover:border-brand-gray-300 hover:bg-brand-gray-50 hover:text-brand-black active:scale-[0.97]"
+          >
+            <ChevronLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+            <span>{language === 'es' ? 'Atrás' : 'Back'}</span>
+          </button>
+          {property.internalCode && (
+            <span
+              title={language === 'es' ? 'Folio interno AuraSwap' : 'AuraSwap internal reference'}
+              className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-brand-gray-400"
+            >
+              <FileText aria-hidden="true" className="h-3.5 w-3.5" />
+              Ref. {property.internalCode}
+            </span>
+          )}
+        </div>
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-brand-black">
@@ -880,8 +891,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
           )}
         </div>
 
-        {(activeOfferingModes.length > 0 || property.internalCode) && (
-          <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3 pt-2">
+        {activeOfferingModes.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3 pt-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400">
                 Disponible como
@@ -899,15 +910,6 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 );
               })}
             </div>
-            {property.internalCode && (
-              <span
-                title={language === 'es' ? 'Folio interno AuraSwap' : 'AuraSwap internal reference'}
-                className="inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-brand-gray-400"
-              >
-                <FileText aria-hidden="true" className="h-3.5 w-3.5" />
-                Ref. {property.internalCode}
-              </span>
-            )}
           </div>
         )}
       </div>
