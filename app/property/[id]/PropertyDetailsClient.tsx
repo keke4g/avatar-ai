@@ -833,7 +833,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
       
       {/* 1. Sub-Header: Title & Sharing Controls */}
       <div className="flex flex-col gap-2 mb-6">
-        <div className="mb-1 flex min-h-11 items-center justify-between gap-4">
+        <div className="mb-1 flex min-h-11 flex-wrap items-center gap-x-4 gap-y-2">
           <button
             type="button"
             onClick={handleBack}
