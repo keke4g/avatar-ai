@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { Clock3, Gauge, TrendingUp } from 'lucide-react';
 import { Property } from '../../../lib/types';
-import { PropertySectionCard } from '../PropertySectionCard';
+import { PropertySectionCard, PropertySubIcon } from '../PropertySectionCard';
 
 interface EternaMarketAnalysisProps {
   property: Property;
@@ -64,9 +64,7 @@ export function EternaMarketAnalysis({
         {metrics.map(({ key, Icon, label, value, detail }) => (
           <article key={key} className="flex min-h-[150px] flex-col rounded-2xl border border-neutral-200/80 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-950 text-white">
-                <Icon className="h-4 w-4" aria-hidden="true" />
-              </span>
+              <PropertySubIcon icon={Icon} className="h-9 w-9 rounded-xl" iconClassName="h-4 w-4" />
               <span className="text-right text-[9px] font-black uppercase tracking-[0.11em] text-brand-gray-500">
                 {label}
               </span>

@@ -7,6 +7,7 @@ import type { Property } from '../../lib/types';
 import type { NearbyPlace, NearbyPlaceCategory } from '../../lib/maps/types';
 import { NEARBY_CATEGORY_LABELS } from '../../lib/maps/types';
 import { loadGoogleMaps } from '../../lib/maps/googleMapsLoader';
+import { PropertySubIcon } from './PropertySectionCard';
 
 interface GooglePropertyLocationProps {
   property: Property;
@@ -205,7 +206,11 @@ export default function GooglePropertyLocation({ property, places, loading, erro
               const duration = formatDuration(place.durationSeconds, language);
               return (
                 <a key={place.id} href={place.googleMapsUri || `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`} target="_blank" rel="noopener noreferrer" className="group flex min-w-0 items-center gap-3 rounded-2xl border border-neutral-200/80 bg-neutral-50/55 p-3.5 transition hover:-translate-y-0.5 hover:border-neutral-300 hover:bg-white hover:shadow-md">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-950 text-white"><Icon className="h-4.5 w-4.5" /></span>
+                  <PropertySubIcon
+                    icon={Icon}
+                    iconClassName="h-4.5 w-4.5"
+                    className="group-hover:border-neutral-300"
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[9px] font-black uppercase tracking-wider text-slate-400">{NEARBY_CATEGORY_LABELS[place.category][language]}</span>
                     <span className="mt-0.5 block truncate text-xs font-extrabold text-slate-900">{place.name}</span>

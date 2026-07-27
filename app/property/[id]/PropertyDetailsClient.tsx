@@ -24,7 +24,7 @@ import { EternaMarketAnalysis } from '../../../components/property/sections/Eter
 import { getEmbeddableMediaUrl, getVimeoEmbedUrl, getYouTubeEmbedUrl } from '../../../lib/mediaEmbeds';
 import GooglePropertyLocation from '../../../components/property/GooglePropertyLocation';
 import InternalAdvisorMarketplacePanel from '../../../components/property/InternalAdvisorMarketplacePanel';
-import { PropertySectionCard } from '../../../components/property/PropertySectionCard';
+import { PropertySectionCard, PropertySubIcon } from '../../../components/property/PropertySectionCard';
 import { useNearbyPlaces } from '../../../hooks/useNearbyPlaces';
 import {
   calculateMortgage,
@@ -1195,9 +1195,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {property.appraisalAmount && (
                   <div className="flex min-h-36 flex-col rounded-2xl border border-neutral-200/80 bg-white p-4">
-                    <span className="mb-5 flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-950 text-white">
-                      <Award aria-hidden="true" className="h-4 w-4" />
-                    </span>
+                    <PropertySubIcon icon={Award} className="mb-5" />
                     <span className="text-[10px] font-black uppercase text-brand-gray-400 tracking-wider">
                       {language === 'es' ? 'Certificación de Avalúo' : 'Appraisal Certificate'}
                     </span>
@@ -1217,9 +1215,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   const details = PropertyEligibilityEngine.getInvestmentDetails(property);
                   return (
                     <div className="flex min-h-36 flex-col rounded-2xl border border-neutral-200/80 bg-white p-4">
-                      <span className="mb-5 flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-950 text-white">
-                        <TrendingUp aria-hidden="true" className="h-4 w-4" />
-                      </span>
+                      <PropertySubIcon icon={TrendingUp} className="mb-5" />
                       <span className="text-[10px] font-black uppercase tracking-wider text-brand-gray-400">
                         {language === 'es' ? 'Plusvalía Estimada (Zona)' : 'Estimated Appreciation'}
                       </span>
@@ -1252,9 +1248,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                   const displayAmenity = translatedAmenity.startsWith('amenities.') ? amenity : translatedAmenity;
                   return (
                     <div key={amenity} className="flex min-h-14 items-center gap-3 rounded-2xl border border-neutral-200/75 bg-white px-3.5 py-3 text-sm font-semibold text-brand-gray-600">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-neutral-950 text-white">
-                        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                      </span>
+                      <PropertySubIcon icon={Icon} className="h-9 w-9 rounded-xl" iconClassName="h-3.5 w-3.5" />
                       <span className="leading-tight">{displayAmenity}</span>
                     </div>
                   );
@@ -1884,7 +1878,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
         {/* Right Column: Sticky Hybrid Booking / Swap / Purchase widget */}
         <div className="w-full lg:w-96 lg:sticky lg:top-28 shrink-0">
-          <div className="w-full bg-white rounded-3xl border border-brand-gray-200/60 p-6 shadow-floating overflow-hidden">
+          <div className="w-full overflow-hidden rounded-[28px] border border-neutral-200/80 bg-white p-5 shadow-[0_22px_55px_-42px_rgba(15,23,42,0.55)] sm:p-6">
             
             {/* Segmented Mode Control if 2 or more offerings are active */}
             {activeOfferingModes.length >= 2 && (
@@ -2423,13 +2417,13 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             {/* EXPERIENCE 4: SALE (Sotheby's / Pacaso luxury style) */}
             {selectedMode === 'SALE' && activeSaleOffering && (
               <div className="flex flex-col gap-4 animate-in fade-in duration-200">
-                <div className="border-b border-brand-gray-100 pb-4 mb-1">
+                <div className="mb-1 border-b border-neutral-200/70 pb-5">
                   <span className="inline-flex items-center gap-2 rounded-full border border-neutral-950 bg-neutral-950 px-3.5 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-white shadow-[0_8px_20px_-12px_rgba(0,0,0,0.8)]">
                     <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-amber-400" />
                     {language === 'es' ? 'Propiedad en venta' : 'Property for sale'}
                   </span>
-                  <div className="flex items-baseline gap-1 mt-2.5">
-                    <span className="text-3xl font-black text-brand-black tracking-tight">
+                  <div className="mt-3 flex items-baseline gap-1">
+                    <span className="text-3xl font-black tracking-[-0.045em] text-brand-black">
                       {activeSaleOffering.currency || 'USD'} ${(activeSaleOffering.priceAmount || 450000).toLocaleString()}
                     </span>
                   </div>
@@ -2462,22 +2456,22 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                     </div>
                   )}
 
-                  <p className="text-[10px] text-brand-gray-500 font-semibold mt-1">
+                  <p className="mt-1.5 text-[10px] font-semibold leading-relaxed text-brand-gray-500">
                     {language === 'es' ? 'Listado inmobiliario premium de propiedad verificada.' : 'Premium verified real estate listing.'}
                   </p>
                 </div>
 
-                <div className="bg-gradient-to-br from-amber-50/20 to-brand-gray-50 border border-amber-200/40 rounded-2xl p-4 text-xs leading-relaxed text-brand-gray-600 font-semibold flex flex-col gap-3">
-                  <div className="flex items-center gap-2 text-brand-black font-extrabold text-[10px] uppercase tracking-wider text-amber-700">
-                    <ShieldCheck className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                    <span>{language === 'es' ? 'Transacción Segura Incluida' : 'Secure Transaction Included'}</span>
+                <div className="flex flex-col gap-3 rounded-[22px] border border-neutral-200/80 bg-neutral-50/45 p-4 text-xs font-semibold leading-relaxed text-brand-gray-600">
+                  <div className="flex items-center gap-3 text-[10px] font-extrabold uppercase tracking-wider text-brand-black">
+                    <PropertySubIcon icon={ShieldCheck} className="h-9 w-9 rounded-xl" iconClassName="h-4 w-4" />
+                    <span>{language === 'es' ? 'Transacción segura incluida' : 'Secure transaction included'}</span>
                   </div>
                   <p className="text-[10px] text-brand-gray-500 leading-normal font-medium">
                     {language === 'es'
                       ? 'Nuestros asesores gestionan el contrato de compraventa y los fondos de garantía en fideicomiso (Escrow) para tu tranquilidad.'
                       : 'Our advisors manage the purchase contract and escrow safety deposit accounts for your absolute peace of mind.'}
                   </p>
-                  <div className="border-t border-brand-gray-200/60 my-1" />
+                  <div className="my-1 border-t border-neutral-200/70" />
                   <div className="flex justify-between items-center text-[10px]">
                     <span>{language === 'es' ? 'Acepta ofertas de compra:' : 'Accepts buying offers:'}</span>
                     <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-black">
@@ -2487,15 +2481,15 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 </div>
 
                 {/* 1. Simulador Hipotecario Financiero */}
-                <details className="group rounded-3xl border border-brand-gray-200/60 bg-brand-gray-50 shadow-xs">
-                  <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-3xl px-4 py-3.5 text-brand-black transition-colors hover:bg-brand-gray-100/70 [&::-webkit-details-marker]:hidden">
-                    <span className="flex items-center gap-2.5 text-[10px] font-extrabold uppercase tracking-wider text-brand-accent">
-                      <BarChart2 className="h-4 w-4 shrink-0" />
-                      {language === 'es' ? 'Simulador Hipotecario (Informativo)' : 'Mortgage Simulator'}
+                <details className="group overflow-hidden rounded-[22px] border border-neutral-200/80 bg-white">
+                  <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-3 text-brand-black transition-colors hover:bg-neutral-50/70 [&::-webkit-details-marker]:hidden">
+                    <span className="flex min-w-0 items-center gap-3 text-[9px] font-black uppercase tracking-[0.1em] text-neutral-700">
+                      <PropertySubIcon icon={BarChart2} className="h-9 w-9 rounded-xl" iconClassName="h-4 w-4" />
+                      <span className="leading-snug">{language === 'es' ? 'Simulador hipotecario' : 'Mortgage simulator'}</span>
                     </span>
-                    <ChevronDown className="h-4 w-4 shrink-0 text-brand-gray-500 transition-transform duration-200 group-open:rotate-180" />
+                    <ChevronDown className="h-4 w-4 shrink-0 text-neutral-400 transition-transform duration-200 group-open:rotate-180" />
                   </summary>
-                  <div className="flex flex-col gap-3.5 border-t border-brand-gray-200/60 px-4 pb-4 pt-4">
+                  <div className="flex flex-col gap-3.5 border-t border-neutral-200/70 bg-neutral-50/35 px-4 pb-4 pt-4">
 
                   {/* Down payment percentage selector */}
                   <div className="flex flex-col gap-1.5">
@@ -2568,15 +2562,15 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 </details>
 
                 {/* 2. Desglose de Gastos de Adquisición */}
-                <details className="group rounded-3xl border border-brand-gray-200/60 bg-brand-gray-50 shadow-xs">
-                  <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-3xl px-4 py-3.5 text-brand-black transition-colors hover:bg-brand-gray-100/70 [&::-webkit-details-marker]:hidden">
-                    <span className="flex items-center gap-2.5 text-[10px] font-extrabold uppercase tracking-wider text-brand-accent">
-                      <Landmark aria-hidden="true" className="h-4 w-4" />
-                      {language === 'es' ? 'Costos de Adquisición (Escrituración)' : 'Acquisition & Notary Costs'}
+                <details className="group overflow-hidden rounded-[22px] border border-neutral-200/80 bg-white">
+                  <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-3 text-brand-black transition-colors hover:bg-neutral-50/70 [&::-webkit-details-marker]:hidden">
+                    <span className="flex min-w-0 items-center gap-3 text-[9px] font-black uppercase tracking-[0.1em] text-neutral-700">
+                      <PropertySubIcon icon={Landmark} className="h-9 w-9 rounded-xl" iconClassName="h-4 w-4" />
+                      <span className="leading-snug">{language === 'es' ? 'Costos de adquisición' : 'Acquisition & notary costs'}</span>
                     </span>
-                    <ChevronDown className="h-4 w-4 shrink-0 text-brand-gray-500 transition-transform duration-200 group-open:rotate-180" />
+                    <ChevronDown className="h-4 w-4 shrink-0 text-neutral-400 transition-transform duration-200 group-open:rotate-180" />
                   </summary>
-                  <div className="border-t border-brand-gray-200/60 px-4 pb-4 pt-4">
+                  <div className="border-t border-neutral-200/70 bg-neutral-50/35 px-4 pb-4 pt-4">
 
                   {(() => {
                     const price = activeSaleOffering.priceAmount || 450000;
@@ -2625,7 +2619,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
                 </details>
 
                 {isSelfProperty ? (
-                  <div className="mt-3 p-4 bg-brand-accent/5 border border-brand-accent/20 rounded-2xl text-xs font-semibold text-brand-black">
+                  <div className="mt-2 rounded-[18px] border border-neutral-200/80 bg-neutral-50/60 p-4 text-xs font-semibold text-brand-black">
                     {language === 'es' ? 'Esta es tu propiedad listada.' : 'This is your own listed property.'}
                   </div>
                 ) : (

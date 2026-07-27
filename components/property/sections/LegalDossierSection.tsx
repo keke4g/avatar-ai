@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { Property } from '../../../lib/types';
 import { PropertyEligibilityEngine } from '../../../lib/services/PropertyEligibilityEngine';
-import { PropertySectionCard } from '../PropertySectionCard';
+import { PropertySectionCard, PropertySubIcon } from '../PropertySectionCard';
 
 interface LegalDossierSectionProps {
   property: Property;
@@ -147,9 +147,7 @@ export const LegalDossierSection: React.FC<LegalDossierSectionProps> = ({
               whileHover={{ y: -4, scale: 1.01, boxShadow: '0 10px 20px -5px rgba(0, 0, 0, 0.03)' }}
               className="relative flex min-h-32 flex-col overflow-hidden rounded-2xl border border-neutral-200/80 bg-white p-4 transition-shadow duration-300"
             >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neutral-950 text-white">
-                <Icon className="h-4 w-4" aria-hidden="true" />
-              </div>
+              <PropertySubIcon icon={Icon} />
               
               <div className="mt-auto pt-4">
                 <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider block">

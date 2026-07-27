@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { Property } from '../../../lib/types';
 import { PropertyEligibilityEngine } from '../../../lib/services/PropertyEligibilityEngine';
-import { PropertySectionCard } from '../PropertySectionCard';
+import { PropertySectionCard, PropertySubIcon } from '../PropertySectionCard';
 
 interface FinancingCompatibilityProps {
   property: Property;
@@ -203,9 +203,7 @@ export const FinancingCompatibility: React.FC<FinancingCompatibilityProps> = ({
               className="group flex min-h-48 flex-col gap-3 rounded-2xl border border-neutral-200/80 bg-white p-5 transition-shadow duration-300"
             >
               <div className="flex items-center justify-between">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-neutral-950 text-white">
-                  <Icon className="w-5 h-5" />
-                </div>
+                <PropertySubIcon icon={Icon} iconClassName="h-[18px] w-[18px]" />
                 <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/40">
                   {language === 'es' ? 'Listo' : 'Eligible'}
                 </span>

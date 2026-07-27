@@ -2976,7 +2976,7 @@ Explore actualizado: Redirecting to /explore`);
                   ? 'bg-slate-950 border-transparent shadow-[0_20px_60px_rgba(0,0,0,0.3)] text-white p-[3.2px] cursor-pointer'
                   : 'bg-white/95 border-brand-gray-200/60 shadow-[0_20px_50px_rgba(0,0,0,0.12)] text-brand-black'
               } ${
-                isCompact ? 'h-[150px]' : 'h-[85vh] md:h-[580px]'
+                isCompact ? 'h-[150px] md:h-[580px]' : 'h-[85vh] md:h-[580px]'
               } ${
                 conciergeMode === 'avatar' && activeStatus === 'thinking' ? 'animate-border-glow-pulse' :
                 conciergeMode === 'avatar' && activeStatus === 'talking' ? 'animate-border-glow-breath' : ''
