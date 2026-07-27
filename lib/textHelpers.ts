@@ -120,3 +120,50 @@ export function formatPropertyLocation(location?: string | null, country?: strin
     .filter((part, index) => index === 0 || normalizePart(part) !== normalizePart(parts[index - 1]))
     .join(', ');
 }
+
+/**
+ * Formats a listing's first publication date with stable, easy-to-scan units.
+ * It intentionally avoids overly precise timestamps because shoppers care
+ * about how fresh the listing is, not the exact publication hour.
+ */
+export function formatPublishedAgo(
+  value?: string | null,
+  lang: 'es' | 'en' = 'es',
+  now: Date = new Date(),
+): string {
+  if (!value) return '';
+
+  const publishedDate = new Date(value);
+  if (Number.isNaN(publishedDate.getTime())) return '';
+
+  const elapsedMs = Math.max(0, now.getTime() - publishedDate.getTime());
+  const hours = Math.floor(elapsedMs / (60 * 60 * 1000));
+  const days = Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
+
+  if (days < 1) {
+    if (hours < 1) {
+      return lang === 'es' ? 'Publicado hace unos minutos' : 'Published a few minutes ago';
+    }
+    return lang === 'es'
+      ? `Publicado hace ${hours} ${hours === 1 ? 'hora' : 'horas'}`
+      : `Published ${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  }
+
+  if (days < 30) {
+    return lang === 'es'
+      ? `Publicado hace ${days} ${days === 1 ? 'día' : 'días'}`
+      : `Published ${days} ${days === 1 ? 'day' : 'days'} ago`;
+  }
+
+  if (days < 365) {
+    const months = Math.max(1, Math.floor(days / 30));
+    return lang === 'es'
+      ? `Publicado hace ${months} ${months === 1 ? 'mes' : 'meses'}`
+      : `Published ${months} ${months === 1 ? 'month' : 'months'} ago`;
+  }
+
+  const years = Math.max(1, Math.floor(days / 365));
+  return lang === 'es'
+    ? `Publicado hace ${years} ${years === 1 ? 'año' : 'años'}`
+    : `Published ${years} ${years === 1 ? 'year' : 'years'} ago`;
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
-import { formatCount, formatPropertyLocation } from '../../../lib/textHelpers';
+import { formatCount, formatPropertyLocation, formatPublishedAgo } from '../../../lib/textHelpers';
 import { useSwap } from '../../../lib/context/SwapContext';
 import { useTranslation } from '../../../lib/context/LanguageContext';
 import { useRouter } from 'next/navigation';
@@ -818,6 +818,11 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
     router.push('/explore');
   };
 
+  const publicationLabel = formatPublishedAgo(
+    property.publishedAt || property.createdAt,
+    language === 'es' ? 'es' : 'en',
+  );
+
   return (
     <div className="max-w-7xl mx-auto px-6 sm:px-12 md:px-24">
       
@@ -862,6 +867,12 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
             <MapPin className="w-3.5 h-3.5 text-brand-gray-400" />
             <span>{formatPropertyLocation(property.location, property.country)}</span>
           </div>
+          {publicationLabel && (
+            <span className="inline-flex items-center gap-1.5">
+              <Calendar aria-hidden="true" className="h-3.5 w-3.5 text-brand-gray-400" />
+              {publicationLabel}
+            </span>
+          )}
           {property.internalCode && (
             <span className="inline-flex items-center rounded-full border border-violet-200/80 bg-violet-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-violet-700">
               Folio AuraSwap · {property.internalCode}

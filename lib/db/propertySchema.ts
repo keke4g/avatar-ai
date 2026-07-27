@@ -23,6 +23,7 @@ export const PROPERTY_COLUMNS = [
   'is_published',
   'is_featured',
   'created_at',
+  'published_at',
   'featured_until',
   'featured_rank',
   'internal_code',

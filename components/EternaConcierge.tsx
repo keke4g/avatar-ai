@@ -33,7 +33,7 @@ import {
   ConversationStep
 } from '../lib/eterna/ConversationEngine';
 import { IntentClassifier } from '../lib/eterna/IntentClassifier';
-import { generatePropertySummary } from '../lib/eterna/actions/PropertyActions';
+import { generatePropertySummary, selectEternaNearbyHighlights } from '../lib/eterna/actions/PropertyActions';
 import { resolveMortgageQuestion } from '../lib/eterna/actions/MortgageActions';
 import type { MortgageConversationContext } from '../lib/eterna/actions/MortgageActions';
 import { MORTGAGE_SIMULATION_EVENT } from '../lib/finance/mortgage';
@@ -1824,12 +1824,10 @@ Explore actualizado: Redirecting to /explore`);
           estadoConservacion: activeProperty.conservationStateId || null,
         },
         amenidades: activeProperty.amenities || [],
-        entornoGoogle: (activeProperty.nearbyPlaces || []).map((place) => ({
+        entornoGoogle: selectEternaNearbyHighlights(activeProperty.nearbyPlaces || []).map((place) => ({
           categoria: place.category,
           nombre: place.name,
-          distanciaMetros: place.distanceMeters,
-          tiempoEnAutoMinutos: place.durationSeconds ? Math.max(1, Math.round(place.durationSeconds / 60)) : null,
-          fuenteDistancia: place.routeSource === 'google_routes' ? 'Ruta de Google Maps' : 'Distancia lineal',
+          tiempoEnAutoMinutos: place.drivingMinutes,
         })),
         expedienteJuridico: legalStatus,
         modalidadesYMetodosPago: paymentMethods,

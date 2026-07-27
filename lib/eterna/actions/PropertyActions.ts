@@ -1,23 +1,71 @@
 import { Property } from '../../types';
-import { formatCount } from '../../textHelpers';
+import { formatCount, formatPropertyLocation } from '../../textHelpers';
 import { formatGooglePlaceName } from '../../maps/placeNames';
+import type { NearbyPlace, NearbyPlaceCategory } from '../../maps/types';
 
 export interface EternaProperty extends Property {
   price?: number;
   rating?: number;
 }
 
+export interface EternaNearbyHighlight {
+  category: NearbyPlaceCategory;
+  name: string;
+  drivingMinutes: number;
+}
+
+const ETERNA_NEARBY_CATEGORY_ORDER: NearbyPlaceCategory[] = [
+  'hospital',
+  'park',
+  'supermarket',
+  'school',
+];
+
+const getDrivingMinutes = (place: NearbyPlace): number => {
+  if (place.durationSeconds && place.durationSeconds > 0) {
+    return Math.max(1, Math.round(place.durationSeconds / 60));
+  }
+
+  // Google Routes can occasionally omit a route while Places still returns
+  // the destination. Keep Eterna's spoken unit consistent without exposing
+  // raw meters by using a conservative urban-driving estimate.
+  return Math.max(1, Math.round(place.distanceMeters / 450));
+};
+
+/**
+ * Gives Eterna a concise neighborhood context: the closest useful place in
+ * each category, expressed only as driving time.
+ */
+export const selectEternaNearbyHighlights = (
+  places: NearbyPlace[] = [],
+): EternaNearbyHighlight[] => ETERNA_NEARBY_CATEGORY_ORDER.flatMap((category) => {
+  const closest = places
+    .filter((place) => place.category === category)
+    .sort((a, b) => {
+      const aDuration = a.durationSeconds || Number.POSITIVE_INFINITY;
+      const bDuration = b.durationSeconds || Number.POSITIVE_INFINITY;
+      return aDuration - bDuration || a.distanceMeters - b.distanceMeters;
+    })[0];
+
+  if (!closest) return [];
+
+  return [{
+    category,
+    name: formatGooglePlaceName(closest.name),
+    drivingMinutes: getDrivingMinutes(closest),
+  }];
+});
+
 export const generatePropertySummary = (property: EternaProperty, lang: 'es' | 'en'): string => {
   const t = property.title || 'Propiedad';
   const loc = property.location || 'Destino';
   const c = property.country || '';
+  const location = formatPropertyLocation(loc, c);
 
   if (lang === 'es') {
-    const location = [loc, c].filter(Boolean).join(', ');
-    return `Ya tengo abierta la ficha de "${t}" en ${location}. Puedo analizar contigo cualquier dato del anuncio, señalar lo que falta o llevarte a la sección que necesites; pregúntame con total libertad.`;
+    return `Estás viendo "${t}" en ${location}. Pregúntame lo que quieras: puedo explicarte lo más importante, revisar contigo el precio y sus condiciones, o ayudarte a contactar al responsable cuando estés listo.`;
   } else {
-    const location = [loc, c].filter(Boolean).join(', ');
-    return `I have the full listing for "${t}" in ${location} open. I can analyze any detail with you, point out what is missing, or take you to the section you need—ask me naturally.`;
+    return `You are viewing "${t}" in ${location}. Ask me anything: I can explain the key details, review the price and terms with you, or help you contact the person responsible when you are ready.`;
   }
 };
 
@@ -42,16 +90,14 @@ export const resolveLocalPropertyQA = (prompt: string, property: EternaProperty,
       return /parque|park/.test(clean);
     });
     const categories = requestedCategories.length ? requestedCategories : (Object.keys(categoryNames) as Array<keyof typeof categoryNames>);
+    const selectedPlaces = selectEternaNearbyHighlights(property.nearbyPlaces);
     const highlights = categories.flatMap((category) => {
-      const place = property.nearbyPlaces
-        ?.filter((item) => item.category === category)
-        .sort((a, b) => a.distanceMeters - b.distanceMeters)[0];
+      const place = selectedPlaces.find((item) => item.category === category);
       if (!place) return [];
-      const distance = place.distanceMeters < 1000 ? `${Math.round(place.distanceMeters / 10) * 10} m` : `${(place.distanceMeters / 1000).toFixed(1)} km`;
-      const duration = place.durationSeconds
-        ? (lang === 'es' ? `${Math.max(1, Math.round(place.durationSeconds / 60))} min en auto` : `${Math.max(1, Math.round(place.durationSeconds / 60))} min drive`)
-        : distance;
-      return [`${categoryNames[category]}: ${formatGooglePlaceName(place.name)}, a ${duration}`];
+      const duration = lang === 'es'
+        ? `${place.drivingMinutes} ${place.drivingMinutes === 1 ? 'minuto' : 'minutos'} en auto`
+        : `${place.drivingMinutes} ${place.drivingMinutes === 1 ? 'minute' : 'minutes'} by car`;
+      return [`${categoryNames[category]}: ${place.name}, a ${duration}`];
     });
     if (highlights.length) {
       return lang === 'es'

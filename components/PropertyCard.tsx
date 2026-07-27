@@ -4,10 +4,10 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Property, PropertyOfferingMode } from '../lib/types';
 import { useSwap } from '../lib/context/SwapContext';
-import { Heart, ChevronLeft, ChevronRight, Star, ShieldCheck } from 'lucide-react';
+import { Heart, ChevronLeft, ChevronRight, Star, ShieldCheck, CalendarDays } from 'lucide-react';
 import { useTranslation } from '../lib/context/LanguageContext';
 import { getActiveOfferings } from '../lib/propertyOfferings';
-import { formatCount, formatBathrooms, formatPropertyLocation } from '../lib/textHelpers';
+import { formatCount, formatBathrooms, formatPropertyLocation, formatPublishedAgo } from '../lib/textHelpers';
 
 interface PropertyCardProps {
   property: Property;
@@ -91,6 +91,11 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
 
     return priceTexts.join('  |  ');
   }, [property, language]);
+
+  const publicationLabel = formatPublishedAgo(
+    property.publishedAt || property.createdAt,
+    language === 'es' ? 'es' : 'en',
+  );
 
   const handleNextImage = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -242,6 +247,13 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
           <p className="text-sm text-brand-gray-500 truncate max-w-xs leading-normal">
             {t(`properties.${property.id}.title`).startsWith('properties.') ? property.title : t(`properties.${property.id}.title`)}
           </p>
+
+          {publicationLabel && (
+            <p className="mt-0.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-gray-400">
+              <CalendarDays aria-hidden="true" className="h-3.5 w-3.5" />
+              <span>{publicationLabel}</span>
+            </p>
+          )}
 
           {/* Key Specs Row */}
           <div className="flex items-center gap-2 text-xs text-brand-gray-500 font-medium mt-0.5 font-semibold">

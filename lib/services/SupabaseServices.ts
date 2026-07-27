@@ -22,6 +22,7 @@ const LEGACY_PROPERTY_SELECT = '*, property_media(*), profiles:public_profiles_v
 const PUBLIC_PROPERTY_DETAILS_SELECT = [
   'id',
   'internal_code',
+  'published_at',
   'primary_operation',
   'development_name',
   'subdivision_name',

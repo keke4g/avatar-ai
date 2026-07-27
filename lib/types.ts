@@ -294,6 +294,8 @@ export interface Property {
   qrCodeUrl?: string | null;
   shortCode?: string | null;
   shortLink?: string | null;
+  createdAt?: string;
+  publishedAt?: string | null;
   updatedAt?: string;
   desiredExchange?: string | null;
 
