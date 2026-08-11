@@ -83,15 +83,8 @@ interface PropertySubjectOverrideRow {
 }
 
 const fetchPropertySubjectOverrides = async (): Promise<PropertySubjectOverrideRow[]> => {
-  const { data, error } = await client
-    .schema('valuation')
-    .from('property_subject_overrides')
-    .select('property_id,surface_built_m2,surface_total_m2,neighborhood,city,state')
-    .eq('review_status', 'VERIFIED');
-  if (error) {
-    if (error.code === '42P01' || error.code === 'PGRST205') return [];
-    throw error;
-  }
+  const { data, error } = await client.rpc('get_verified_property_subject_overrides');
+  if (error) throw error;
   return (data || []) as PropertySubjectOverrideRow[];
 };
 

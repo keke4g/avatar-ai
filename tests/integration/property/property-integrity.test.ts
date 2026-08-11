@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import test from 'node:test';
 import { Property, PropertyOffering } from '../../../lib/types';
 import { PropertyEligibilityEngine } from '../../../lib/services/PropertyEligibilityEngine';
@@ -1065,4 +1067,29 @@ test('Eterna calls an area reference asking-price guidance, not an appraisal or 
   assert.match(answer?.reply || '', /no es un avalúo ni un precio de cierre/i);
   assert.doesNotMatch(answer?.reply || '', /estimación automatizada de Towers/i);
   assert.match(JSON.stringify(getEternaValuationDossier(property)), /REFERENCIA_ORIENTATIVA_DE_OFERTA/);
+});
+
+test('valuation recalculation reads private subject overrides through a service-only RPC', () => {
+  const recalculationScript = readFileSync(
+    resolve(process.cwd(), 'scripts/valuation/recalculate-market-valuations.ts'),
+    'utf8',
+  );
+  const rpcMigration = readFileSync(
+    resolve(
+      process.cwd(),
+      'supabase/migrations/20260811030840_expose_verified_valuation_subject_overrides.sql',
+    ),
+    'utf8',
+  );
+
+  assert.match(recalculationScript, /rpc\('get_verified_property_subject_overrides'\)/);
+  assert.doesNotMatch(recalculationScript, /\.schema\('valuation'\)/);
+  assert.match(
+    rpcMigration,
+    /revoke all on function public\.get_verified_property_subject_overrides\(\)[\s\S]*from public, anon, authenticated;/,
+  );
+  assert.match(
+    rpcMigration,
+    /grant execute on function public\.get_verified_property_subject_overrides\(\)[\s\S]*to service_role;/,
+  );
 });
