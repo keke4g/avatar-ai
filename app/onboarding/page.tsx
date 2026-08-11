@@ -1,15 +1,18 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSwap } from '../../lib/context/SwapContext';
 import { useTranslation } from '../../lib/context/LanguageContext';
+import { useSupabase } from '../../lib/services/ServiceFactory';
+import { supabase } from '../../lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Sparkles, Compass, ShieldCheck, FileText, Check, ArrowRight, ArrowLeft, 
-  Upload, File, CheckCircle2, User, HelpCircle, MapPin
+  Sparkles, Compass, ShieldCheck, Check, ArrowRight, ArrowLeft,
+  Upload, File, CheckCircle2, User, MapPin
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import ProfilePhotoUploader from '../../components/ProfilePhotoUploader';
 
 type StepType = 0 | 1 | 2 | 3;
 
@@ -32,20 +35,12 @@ export default function OnboardingPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [fileUploaded, setFileUploaded] = useState(false);
   const [fileName, setFileName] = useState('');
+  const [uploadError, setUploadError] = useState('');
+  const [finishing, setFinishing] = useState(false);
 
   // STEP 3 FIELDS: Bio & Avatar
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
-
-  // Pre-configured Unsplash portraits for quick avatar selection
-  const curatedAvatars = [
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=150&q=80',
-    'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=150&q=80',
-    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=150&q=80',
-    'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=150&q=80',
-    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80'
-  ];
 
   // Curated target cities options
   const targetCities = [
@@ -57,47 +52,158 @@ export default function OnboardingPage() {
     { id: 'Tokyo', name: 'Tokyo, Japan', img: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=300&q=80' }
   ];
 
+  useEffect(() => {
+    if (!useSupabase || !currentUser?.id) return;
+
+    let cancelled = false;
+    const restorePendingSubmission = async () => {
+      const { data, error } = await supabase
+        .from('kyc_requests')
+        .select('original_file_name,status')
+        .eq('user_id', currentUser.id)
+        .eq('status', 'PENDING')
+        .order('submitted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (cancelled) return;
+      if (error) {
+        console.error('[Onboarding] Unable to restore pending KYC request:', error);
+        return;
+      }
+      if (data) {
+        setFileName(data.original_file_name);
+        setUploadProgress(100);
+        setFileUploaded(true);
+      }
+    };
+
+    void restorePendingSubmission();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id]);
+
   const handleToggleCity = (cityId: string) => {
     setSelectedCities(prev =>
       prev.includes(cityId) ? prev.filter(c => c !== cityId) : [...prev, cityId]
     );
   };
 
-  const handleSimulateKycUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleKycUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    
+
     const file = files[0];
+    const allowedMimeTypes = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+    const maxFileSize = 10 * 1024 * 1024;
+
+    setUploadError('');
+    setFileUploaded(false);
     setFileName(file.name);
-    setUploading(true);
     setUploadProgress(0);
 
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setUploading(false);
-          setFileUploaded(true);
-          return 100;
-        }
-        return prev + 10;
+    if (!allowedMimeTypes.has(file.type)) {
+      setUploadError(language === 'es'
+        ? 'Usa un archivo PDF, JPG o PNG válido.'
+        : 'Use a valid PDF, JPG, or PNG file.');
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size <= 0 || file.size > maxFileSize) {
+      setUploadError(language === 'es'
+        ? 'El documento debe pesar menos de 10 MB.'
+        : 'The document must be smaller than 10 MB.');
+      e.target.value = '';
+      return;
+    }
+
+    if (!useSupabase) {
+      setUploadError(language === 'es'
+        ? 'La verificación de identidad requiere el backend seguro de Supabase.'
+        : 'Identity verification requires the secure Supabase backend.');
+      e.target.value = '';
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(15);
+
+    let objectPath = '';
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user || authData.user.id !== currentUser?.id) {
+        throw new Error(language === 'es'
+          ? 'Tu sesión expiró. Inicia sesión nuevamente.'
+          : 'Your session expired. Please sign in again.');
+      }
+
+      const extension = file.type === 'application/pdf'
+        ? 'pdf'
+        : file.type === 'image/png'
+          ? 'png'
+          : 'jpg';
+      objectPath = `${authData.user.id}/${crypto.randomUUID()}.${extension}`;
+
+      const { error: storageError } = await supabase.storage
+        .from('kyc-documents')
+        .upload(objectPath, file, {
+          cacheControl: '3600',
+          contentType: file.type,
+          upsert: false
+        });
+
+      if (storageError) throw storageError;
+      setUploadProgress(75);
+
+      const { error: requestError } = await supabase.rpc('submit_kyc_request', {
+        target_object_path: objectPath,
+        target_original_file_name: file.name,
+        target_mime_type: file.type,
+        target_size_bytes: file.size
       });
-    }, 120);
+
+      if (requestError) {
+        await supabase.storage.from('kyc-documents').remove([objectPath]);
+        throw requestError;
+      }
+
+      setUploadProgress(100);
+      setFileUploaded(true);
+    } catch (error) {
+      console.error('[Onboarding] Secure KYC upload failed:', error);
+      setUploadError(error instanceof Error
+        ? error.message
+        : language === 'es'
+          ? 'No pudimos enviar el documento. Inténtalo de nuevo.'
+          : 'We could not submit the document. Please try again.');
+      setUploadProgress(0);
+      e.target.value = '';
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const handleFinishOnboarding = () => {
-    // 1. Save data mock-reactively in SwapContext
-    completeOnboardingMock(selectedCities, bio, avatarUrl, profileType);
+  const handleFinishOnboarding = async () => {
+    setFinishing(true);
+    try {
+      await completeOnboardingMock(selectedCities, bio, avatarUrl, profileType);
 
-    // 2. Play beautiful confetti fireworks
-    confetti({
-      particleCount: 180,
-      spread: 80,
-      origin: { y: 0.6 }
-    });
+      confetti({
+        particleCount: 180,
+        spread: 80,
+        origin: { y: 0.6 }
+      });
 
-    // 3. Forwards user to dashboard
-    router.push('/dashboard');
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('[Onboarding] Profile completion failed:', error);
+      setUploadError(language === 'es'
+        ? 'El documento está en revisión, pero no pudimos guardar el perfil. Inténtalo nuevamente.'
+        : 'The document is under review, but we could not save the profile. Please try again.');
+      setFinishing(false);
+    }
   };
 
   // Redirect to login if user is completely logged out (route protection simulation)
@@ -198,7 +304,7 @@ export default function OnboardingPage() {
                   <span>{language === 'es' ? 'Paso 0: Rol' : 'Step 0: Role'}</span>
                 </span>
                 <h2 className="text-xl font-black text-brand-black tracking-tight mt-1 mb-2">
-                  {language === 'es' ? '¿Cómo deseas utilizar AuraSwap?' : 'How do you want to use AuraSwap?'}
+                  {language === 'es' ? '¿Cómo deseas utilizar Towers México?' : 'How do you want to use Towers México?'}
                 </h2>
                 <p className="text-xs text-brand-gray-500 font-semibold leading-relaxed">
                   {language === 'es' 
@@ -373,7 +479,7 @@ export default function OnboardingPage() {
             </motion.div>
           )}
 
-          {/* STEP 2: Simulated KYC Document Upload */}
+          {/* STEP 2: Private KYC Document Upload */}
           {step === 2 && (
             <motion.div
               key="step2"
@@ -395,13 +501,13 @@ export default function OnboardingPage() {
                 </p>
               </div>
 
-              {/* Upload Drag-and-drop simulated box */}
+              {/* Documents are uploaded directly to the private KYC bucket. */}
               <div className="border-2 border-dashed border-brand-gray-200/80 hover:border-brand-black transition-colors rounded-2xl p-6 text-center bg-brand-gray-50/20 relative flex flex-col items-center justify-center min-h-[160px]">
                 <input
                   type="file"
                   id="kyc-file-input"
                   className="hidden"
-                  onChange={handleSimulateKycUpload}
+                  onChange={handleKycUpload}
                   accept=".pdf,.jpg,.jpeg,.png"
                 />
 
@@ -420,7 +526,9 @@ export default function OnboardingPage() {
                     <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 mb-2 border border-emerald-100">
                       <CheckCircle2 className="w-6 h-6" />
                     </div>
-                    <p className="text-xs font-black text-brand-black">{t('onboarding.kycVerified')}</p>
+                    <p className="text-xs font-black text-brand-black">
+                      {language === 'es' ? 'Documento enviado a revisión' : 'Document submitted for review'}
+                    </p>
                     <p className="text-[10px] text-brand-gray-400 font-semibold flex items-center gap-1 mt-0.5">
                       <File className="w-3.5 h-3.5 text-brand-gray-400" />
                       <span>{fileName}</span>
@@ -438,6 +546,20 @@ export default function OnboardingPage() {
                   </label>
                 )}
               </div>
+
+              {uploadError && (
+                <p role="alert" className="text-[10px] font-bold text-red-600">
+                  {uploadError}
+                </p>
+              )}
+
+              {fileUploaded && (
+                <p className="text-[10px] font-semibold leading-relaxed text-brand-gray-500">
+                  {language === 'es'
+                    ? 'Tu estado permanecerá PENDIENTE hasta que un administrador revise el documento. La carga no verifica automáticamente tu identidad.'
+                    : 'Your status will remain PENDING until an administrator reviews the document. Uploading never verifies your identity automatically.'}
+                </p>
+              )}
 
               {/* Controls */}
               <div className="flex justify-between pt-6 border-t border-brand-gray-100 mt-4">
@@ -486,32 +608,18 @@ export default function OnboardingPage() {
               {/* Bio and Avatar Forms */}
               <div className="flex flex-col gap-4">
                 
-                {/* Curator Avatar selection */}
+                {/* Profile photo or deterministic initial */}
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] font-black text-brand-black uppercase tracking-wider">
-                    {t('profile.avatarLabel') || 'Elige tu foto de perfil premium'}
+                    {t('profile.avatarLabel')}
                   </label>
-                  <div className="flex items-center gap-3 overflow-x-auto py-1">
-                    {curatedAvatars.map((url, index) => {
-                      const isSelected = avatarUrl === url;
-                      return (
-                        <button
-                          key={index}
-                          onClick={() => setAvatarUrl(url)}
-                          className={`relative w-12 h-12 rounded-full overflow-hidden shrink-0 border-2 cursor-pointer transition-all hover:scale-105 ${
-                            isSelected ? 'border-brand-accent ring-2 ring-brand-accent/25 scale-105 shadow-sm' : 'border-brand-gray-200'
-                          }`}
-                        >
-                          <img src={url} className="w-full h-full object-cover" />
-                          {isSelected && (
-                            <div className="absolute inset-0 bg-brand-accent/15 flex items-center justify-center text-white">
-                              <Check className="w-4 h-4 stroke-[3]" />
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <ProfilePhotoUploader
+                    userId={currentUser.id}
+                    name={currentUser.name}
+                    value={avatarUrl}
+                    onChange={setAvatarUrl}
+                    compact
+                  />
                 </div>
 
                 {/* Introductory Bio */}
@@ -530,6 +638,12 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
+              {uploadError && (
+                <p role="alert" className="text-[10px] font-bold text-red-600">
+                  {uploadError}
+                </p>
+              )}
+
               {/* Controls */}
               <div className="flex justify-between pt-6 border-t border-brand-gray-100 mt-4">
                 <button
@@ -542,11 +656,13 @@ export default function OnboardingPage() {
 
                 <button
                   onClick={handleFinishOnboarding}
-                  disabled={!bio}
+                  disabled={!bio || !fileUploaded || finishing}
                   className="py-3 px-6 rounded-full bg-brand-black hover:bg-brand-black/90 text-white font-bold text-xs tracking-wider uppercase transition-colors cursor-pointer flex items-center gap-1.5 shadow-premium disabled:opacity-40"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-brand-accent animate-pulse" />
-                  <span>{t('onboarding.completeBtn')}</span>
+                  <span>{finishing
+                    ? (language === 'es' ? 'Guardando…' : 'Saving…')
+                    : t('onboarding.completeBtn')}</span>
                 </button>
               </div>
             </motion.div>

@@ -3,73 +3,22 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Property, SwapRequest, ChatMessage, User, SwapStatus, UserRole, Notification, SwapTravelDetails, Review, Lead } from '../types';
-import { MOCK_PROPERTIES, USER_PROPERTIES, CURRENT_USER, MOCK_USERS } from '../mockData';
+import { CURRENT_USER, MOCK_USERS } from '../mockData';
 import { PropertyService } from '../services/PropertyService';
 import { UserService } from '../services/UserService';
 import { SwapService } from '../services/SwapService';
 import { ServiceFactory, useSupabase } from '../services/ServiceFactory';
 import { supabase } from '../supabaseClient';
-import { ensurePropertyOfferings } from '../propertyOfferings';
-import { PropertySearchFilters, SearchSession } from '../search/types';
-import { searchLogger } from '../search/searchLogger';
 import { searchCache } from '../search/SearchCache';
 import { getAuthRedirectUrl } from '../authUrls';
-
-interface SwapContextType {
-  properties: Property[];
-  myProperties: Property[];
-  swaps: SwapRequest[];
-  messages: ChatMessage[];
-  favorites: string[];
-  currentUser: User | null;
-  users: User[];
-  notifications: Notification[];
-  reviews: Review[];
-  leads: Lead[];
-  createLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'status' | 'userId'>) => Promise<Lead>;
-  createReview: (review: Omit<Review, 'id' | 'createdAt'>) => Promise<Review>;
-  confirmSwapCompletion: (swapId: string) => Promise<void>;
-  addProperty: (prop: Omit<Property, 'id' | 'hostId' | 'hostName' | 'hostAvatar' | 'hostVerified' | 'hostRating' | 'hostReviewsCount' | 'latitude' | 'longitude' | 'auraScore'> & { latitude?: number | null; longitude?: number | null }) => Promise<Property>;
-  updateProperty: (id: string, updatedFields: Partial<Property>) => void;
-  deleteProperty: (id: string) => void;
-  togglePublish: (id: string) => void;
-  toggleFeature: (id: string) => void;
-  requestSwap: (request: Omit<SwapRequest, 'id' | 'senderId' | 'status' | 'createdAt'>) => Promise<SwapRequest>;
-  updateSwapStatus: (swapId: string, status: SwapStatus) => Promise<void>;
-  deleteSwap: (swapId: string) => Promise<void>;
-  createSwapDispute: (swapId: string, reason: string) => Promise<void>;
-  resolveSwapDispute: (swapId: string) => Promise<void>;
-  sendChatMessage: (swapRequestId: string, content: string, senderId?: string) => Promise<ChatMessage>;
-  toggleFavorite: (propertyId: string) => void;
-  getSwapMessages: (swapRequestId: string) => ChatMessage[];
-  updateUserKyc: (userId: string, kycStatus: 'PENDING' | 'VERIFIED' | 'FAILED') => void;
-  toggleHostVerified: (userId: string) => void;
-  updateUserRole: (userId: string, role: UserRole) => void;
-  toggleUserSuspension: (userId: string) => void;
-  loginMock: (email: string, password: string) => Promise<boolean>;
-  registerMock: (email: string, name: string, password?: string) => Promise<User>;
-  logoutMock: () => void;
-  updateProfileMock: (updatedFields: Partial<User>) => void;
-  completeOnboardingMock: (selectedCities: string[], bio: string, avatarUrl: string, profileType?: 'OWNER' | 'AGENT' | 'PROPERTY_MANAGER' | null) => void;
-  resetPasswordMock: (email: string) => Promise<void>;
-  resendVerificationEmail: (email: string) => Promise<boolean>;
-  markMessagesAsRead: (swapRequestId: string) => Promise<void>;
-  markNotificationAsRead: (id: string) => Promise<void>;
-  markAllNotificationsAsRead: () => Promise<void>;
-  isLoggingOut: boolean;
-  logoutToast: boolean;
-  setLogoutToast: (val: boolean) => void;
-  archivedSwapIds: string[];
-  archiveConversation: (swapId: string) => Promise<void>;
-  unarchiveConversation: (swapId: string) => Promise<void>;
-  travelDetails: SwapTravelDetails[];
-  loadTravelDetails: (swapId: string, travelerId: string) => Promise<SwapTravelDetails | null>;
-  updateTravelDetails: (details: Partial<SwapTravelDetails> & { swapId: string; travelerId: string; propertyId: string }) => Promise<SwapTravelDetails>;
-  loading: boolean;
-  error: string | null;
-  activeSearch: (SearchSession & { loading: boolean; error: string | null }) | null;
-  setActiveSearch: React.Dispatch<React.SetStateAction<SwapContextType['activeSearch']>>;
-}
+import type { NewPropertyInput, OnboardingProfileType, SwapContextType, TravelDetailsInput } from './swap/types';
+import {
+  loadMockSwapState,
+  parseArchivedSwapIds,
+  parseStoredCurrentUser,
+  persistSwapContextState,
+} from './swap/storage';
+import { useLatestRef } from './swap/useLatestRef';
 
 const SwapContext = createContext<SwapContextType | undefined>(undefined);
 
@@ -99,7 +48,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Reset isLoggingOut when user navigates to public routes
   useEffect(() => {
     if (pathname === '/' || pathname === '/explore' || pathname === '/login') {
-      setIsLoggingOut(false);
+      queueMicrotask(() => setIsLoggingOut(false));
     }
   }, [pathname]);
 
@@ -117,15 +66,12 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const storedArchived = localStorage.getItem('auraswap_archived_swaps');
-      setArchivedSwapIds(storedArchived ? JSON.parse(storedArchived) : []);
+      queueMicrotask(() => setArchivedSwapIds(parseArchivedSwapIds(storedArchived)));
 
       if (useSupabase) {
         // Load live data from Supabase via abstract ServiceFactory
         const storedCurrentUser = localStorage.getItem('auraswap_current_user');
-        let initialUser: User | null = null;
-        if (storedCurrentUser) {
-          initialUser = JSON.parse(storedCurrentUser);
-        }
+        const initialUser = parseStoredCurrentUser(storedCurrentUser);
         
         const userId = initialUser?.id || '';
         const propertiesRequest = ServiceFactory.getPropertyService().getAll().then(liveProps => {
@@ -155,7 +101,6 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setReviews(liveReviews);
           setLeads(liveLeads);
           
-          setCurrentUser(initialUser);
           setIsLoaded(true);
         }).catch(err => {
           console.error('[SwapContext] Live Supabase initial fetch failed:', err);
@@ -165,109 +110,38 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLoading(false);
         });
       } else {
-        const storedSwaps = localStorage.getItem('auraswap_swaps');
-        const storedMessages = localStorage.getItem('auraswap_messages');
-        const storedFavorites = localStorage.getItem('auraswap_favorites');
-        const storedUsers = localStorage.getItem('auraswap_users');
-        const storedNotifications = localStorage.getItem('auraswap_notifications');
-        const storedLeads = localStorage.getItem('auraswap_leads');
-        setSwaps(storedSwaps ? JSON.parse(storedSwaps) : [
-          {
-            id: 'swap-preload-1',
-            senderId: 'host-sofia',
-            senderPropertyId: 'prop-3', // CDMX Penthouse
-            receiverId: 'current-user',
-            receiverPropertyId: 'user-prop-1', // Shibuya Studio
-            startDate: '2026-09-10',
-            endDate: '2026-09-24',
-            status: 'PENDING',
-            message: 'Hola Mateo! I absolutely love your Shibuya micro-loft. I am planning a research trip to Tokyo in September. Would you be open to exchanging it for my Roma Norte penthouse? It has a stunning plant-filled rooftop terrace.',
-            createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          }
-        ]);
-        setMessages(storedMessages ? JSON.parse(storedMessages) : [
-          {
-            id: 'msg-preload-1',
-            swapRequestId: 'swap-preload-1',
-            senderId: 'host-sofia',
-            senderName: 'Sofia Alvarez',
-            content: 'Hola Mateo! I absolutely love your Shibuya micro-loft. I am planning a research trip to Tokyo in September. Would you be open to exchanging it for my Roma Norte penthouse? It has a stunning plant-filled rooftop terrace.',
-            createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          }
-        ]);
-        setFavorites(storedFavorites ? JSON.parse(storedFavorites) : CURRENT_USER.favorites);
-        
-        let parsedUsers = storedUsers ? JSON.parse(storedUsers) : MOCK_USERS;
-        // Self-healing: if any parsed user is missing email, merge with MOCK_USERS by ID
-        const hasMissingEmails = parsedUsers.some((u: any) => !u.email && MOCK_USERS.some(mu => mu.id === u.id));
-        if (hasMissingEmails) {
-          parsedUsers = parsedUsers.map((u: any) => {
-            if (!u.email) {
-              const match = MOCK_USERS.find(mu => mu.id === u.id);
-              if (match) return { ...u, email: match.email };
-            }
-            return u;
-          });
-        }
-        setUsers(parsedUsers);
+        queueMicrotask(() => {
+          const mockState = loadMockSwapState(localStorage);
+          const initialUser = mockState.currentUser;
 
-        setNotifications(storedNotifications ? JSON.parse(storedNotifications) : [
-          {
-            id: 'noti-preload-1',
-            userId: 'current-user',
-            title: 'Perfil Verificado ✨',
-            content: 'Tu verificación KYC ha sido aprobada.',
-            isRead: false,
-            createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString()
-          },
-          {
-            id: 'noti-preload-2',
-            userId: 'current-user',
-            title: 'Bienvenido a AuraSwap',
-            content: 'Explora espacios y propone swaps sin pagar renta.',
-            isRead: false,
-            createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-          }
-        ]);
-        setLeads(storedLeads ? JSON.parse(storedLeads) : []);
+          setSwaps(mockState.swaps);
+          setMessages(mockState.messages);
+          setFavorites(mockState.favorites);
+          setUsers(mockState.users);
+          setNotifications(mockState.notifications);
+          setLeads(mockState.leads);
+          setCurrentUser(initialUser);
+          setTravelDetails(mockState.travelDetails);
 
-        const storedCurrentUser = localStorage.getItem('auraswap_current_user');
-        let initialUser: User | null = null;
-        if (storedCurrentUser) {
-          const parsed = JSON.parse(storedCurrentUser);
-          if (!parsed.email) {
-            const match = MOCK_USERS.find(mu => mu.id === parsed.id);
-            initialUser = match ? { ...parsed, email: match.email } : parsed;
-          } else {
-            initialUser = parsed;
-          }
-        } else {
-          const isGuest = localStorage.getItem('auraswap_guest_mode') === 'true';
-          initialUser = isGuest ? null : CURRENT_USER;
-        }
-        setCurrentUser(initialUser);
+          ServiceFactory.getReviewService().getAll().then(r => setReviews(r));
 
-        const storedTravelDetails = localStorage.getItem('auraswap_swap_travel_details');
-        setTravelDetails(storedTravelDetails ? JSON.parse(storedTravelDetails) : []);
-
-        ServiceFactory.getReviewService().getAll().then(r => setReviews(r));
-
-        setLoading(true);
-        ServiceFactory.getPropertyService().getAll()
-          .then(liveProps => {
-            setProperties(liveProps);
-            if (initialUser) {
-              setMyProperties(liveProps.filter(p => p.hostId === initialUser.id));
-            }
-            setLoading(false);
-            setIsLoaded(true);
-          })
-          .catch(err => {
-            console.error('[SwapContext] Fetching mock properties failed:', err);
-            setError(err.message || 'Failed to fetch properties');
-            setLoading(false);
-            setIsLoaded(true);
-          });
+          setLoading(true);
+          ServiceFactory.getPropertyService().getAll()
+            .then(liveProps => {
+              setProperties(liveProps);
+              if (initialUser) {
+                setMyProperties(liveProps.filter(p => p.hostId === initialUser.id));
+              }
+              setLoading(false);
+              setIsLoaded(true);
+            })
+            .catch(err => {
+              console.error('[SwapContext] Fetching mock properties failed:', err);
+              setError(err.message || 'Failed to fetch properties');
+              setLoading(false);
+              setIsLoaded(true);
+            });
+        });
       }
     }
   }, []);
@@ -335,37 +209,11 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // Create refs to prevent connection churn in real-time WebSockets
-  const currentUserRef = React.useRef<User | null>(currentUser);
-  const swapsRef = React.useRef<SwapRequest[]>(swaps);
-  const messagesRef = React.useRef<ChatMessage[]>(messages);
-  const notificationsRef = React.useRef<Notification[]>(notifications);
-  const usersRef = React.useRef<User[]>(users);
-  const travelDetailsRef = React.useRef<SwapTravelDetails[]>(travelDetails);
-
-  // Keep refs up-to-date
-  useEffect(() => {
-    currentUserRef.current = currentUser;
-  }, [currentUser]);
-
-  useEffect(() => {
-    swapsRef.current = swaps;
-  }, [swaps]);
-
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  useEffect(() => {
-    notificationsRef.current = notifications;
-  }, [notifications]);
-
-  useEffect(() => {
-    usersRef.current = users;
-  }, [users]);
-
-  useEffect(() => {
-    travelDetailsRef.current = travelDetails;
-  }, [travelDetails]);
+  const currentUserRef = useLatestRef(currentUser);
+  const swapsRef = useLatestRef(swaps);
+  const messagesRef = useLatestRef(messages);
+  const notificationsRef = useLatestRef(notifications);
+  const usersRef = useLatestRef(users);
 
   // Hydrate swaps, messages & notifications reactively when active user changes
   useEffect(() => {
@@ -466,7 +314,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUserRef, swapsRef]);
 
   // Realtime messages subscription
   useEffect(() => {
@@ -495,7 +343,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             // Hydrate senderName instantly using users ref lookup in memory
             const senderId = row.sender_id;
-            let senderName = 'AuraSwap';
+            let senderName = 'Towers México';
             if (senderId) {
               if (senderId === user.id) {
                 senderName = user.name;
@@ -551,7 +399,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUserRef, messagesRef, swapsRef, usersRef]);
 
   // Realtime notifications subscription
   useEffect(() => {
@@ -624,7 +472,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUserRef, notificationsRef]);
 
   // Realtime travel_details subscription
   useEffect(() => {
@@ -685,39 +533,39 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUserRef, swapsRef]);
 
   // Synchronize myProperties reactively whenever properties or currentUser changes
   useEffect(() => {
-    if (currentUser) {
-      setMyProperties(properties.filter(p => p.hostId === currentUser.id));
-    } else {
-      setMyProperties([]);
-    }
+    queueMicrotask(() => {
+      if (currentUser) {
+        setMyProperties(properties.filter(p => p.hostId === currentUser.id));
+      } else {
+        setMyProperties([]);
+      }
+    });
   }, [properties, currentUser]);
 
   // Save changes to localStorage
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem('auraswap_properties', JSON.stringify(properties));
-      localStorage.setItem('auraswap_my_properties', JSON.stringify(myProperties));
-      localStorage.setItem('auraswap_swaps', JSON.stringify(swaps));
-      localStorage.setItem('auraswap_messages', JSON.stringify(messages));
-      localStorage.setItem('auraswap_favorites', JSON.stringify(favorites));
-      localStorage.setItem('auraswap_users', JSON.stringify(users));
-      localStorage.setItem('auraswap_notifications', JSON.stringify(notifications));
-      localStorage.setItem('auraswap_archived_swaps', JSON.stringify(archivedSwapIds));
-      localStorage.setItem('auraswap_leads', JSON.stringify(leads));
-      if (currentUser) {
-        localStorage.setItem('auraswap_current_user', JSON.stringify(currentUser));
-      } else {
-        localStorage.removeItem('auraswap_current_user');
-      }
+      persistSwapContextState(localStorage, {
+        properties,
+        myProperties,
+        swaps,
+        messages,
+        favorites,
+        users,
+        currentUser,
+        notifications,
+        archivedSwapIds,
+        leads,
+      });
     }
-  }, [properties, myProperties, swaps, messages, favorites, users, currentUser, archivedSwapIds, leads, isLoaded]);
+  }, [properties, myProperties, swaps, messages, favorites, users, currentUser, notifications, archivedSwapIds, leads, isLoaded]);
 
   // Actions delegating to concrete services
-  const addProperty = async (prop: Omit<Property, 'id' | 'hostId' | 'hostName' | 'hostAvatar' | 'hostVerified' | 'hostRating' | 'hostReviewsCount' | 'latitude' | 'longitude' | 'auraScore'> & { latitude?: number | null; longitude?: number | null }) => {
+  const addProperty = async (prop: NewPropertyInput) => {
     console.log('[Publish] SwapContext.addProperty recibido:', prop);
     console.log('[GeoTrace] [Fase E] Recibido en SwapContext.addProperty:', { latitude: prop.latitude, longitude: prop.longitude });
 
@@ -906,7 +754,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const newRequest: SwapRequest = {
       ...request,
-      id: `swap-${Date.now()}`,
+      id: `swap-${crypto.randomUUID()}`,
       senderId: activeSenderId,
       status: 'PENDING',
       createdAt: new Date().toISOString(),
@@ -932,7 +780,6 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateSwapStatus = async (swapId: string, status: SwapStatus): Promise<void> => {
-    const activeUserId = currentUser?.id || CURRENT_USER.id;
     const activeUserName = currentUser?.name || CURRENT_USER.name;
 
     if (useSupabase) {
@@ -1036,7 +883,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const sysMsg = await ServiceFactory.getMessageService().send(
           swapId,
-          `[Moderation Incident] A dispute has been filed for this swap request: "${reason}". AuraSwap administrators are reviewing the case.`,
+          `[Moderation Incident] A dispute has been filed for this swap request: "${reason}". Towers México administrators are reviewing the case.`,
           'system'
         );
         setMessages(prev => prev.some(m => m.id === sysMsg.id) ? prev : [...prev, sysMsg]);
@@ -1050,7 +897,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSwaps(prev => SwapService.createDispute(prev, swapId, reason));
     await sendChatMessage(
       swapId,
-      `[Moderation Incident] A dispute has been filed for this swap request: "${reason}". AuraSwap administrators are reviewing the case.`,
+      `[Moderation Incident] A dispute has been filed for this swap request: "${reason}". Towers México administrators are reviewing the case.`,
       'system'
     );
   };
@@ -1116,7 +963,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (activeSenderId === (currentUser?.id || CURRENT_USER.id)) {
       senderName = currentUser?.name || CURRENT_USER.name;
     } else if (activeSenderId === 'system') {
-      senderName = 'AuraSwap';
+      senderName = 'Towers México';
     } else {
       const match = users.find((u) => u.id === activeSenderId) || MOCK_USERS.find((u) => u.id === activeSenderId);
       senderName = match ? match.name : 'Host';
@@ -1293,14 +1140,16 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
             id: profile.id,
             name: profile.name,
             email: profile.email,
-            avatar: profile.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+            avatar: profile.avatar_url || '',
             role: profile.role || 'MEMBER',
             isVerified: profile.is_verified,
             kycStatus: profile.kyc_status || 'PENDING',
             joinDate: profile.created_at?.split('T')[0] || new Date().toLocaleDateString('es-ES'),
             swapsCount: 0,
             isSuspended: false,
-            favorites: []
+            favorites: [],
+            bio: profile.bio || '',
+            location: profile.location || '',
           };
           setCurrentUser(sessionUser);
           localStorage.setItem('auraswap_current_user', JSON.stringify(sessionUser));
@@ -1342,16 +1191,20 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
     throw new Error('Invalid credentials');
   };
 
-  const registerMock = async (email: string, name: string, password?: string): Promise<User> => {
+  const registerMock = async (
+    email: string,
+    name: string,
+    password?: string,
+    _redirectAfterVerification?: string,
+  ): Promise<User> => {
     if (useSupabase) {
       const { data, error } = await supabase.auth.signUp({
         email,
         password: password || 'password', // Standard password parameter with fallback
         options: {
-          emailRedirectTo: getAuthRedirectUrl('/login?verified=true'),
           data: {
-            name: name,
-            avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'
+            name,
+            avatar_url: null,
           }
         }
       });
@@ -1361,12 +1214,21 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
+        // Email confirmation is disabled for this project, so a successful
+        // registration must also create the authenticated session. Supabase
+        // intentionally returns no session when the address already exists.
+        if (!data.session) {
+          setCurrentUser(null);
+          localStorage.removeItem('auraswap_current_user');
+          throw new Error('Ya existe una cuenta con este correo. Inicia sesión para continuar.');
+        }
+
         // Mirrored public profiles row is auto-inserted by trigger handle_new_user
         const registeredUser: User = {
           id: data.user.id,
           name,
           email,
-          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+          avatar: '',
           role: 'MEMBER',
           isVerified: false,
           kycStatus: 'PENDING',
@@ -1386,7 +1248,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: `user-${Date.now()}`,
       name,
       email,
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+      avatar: '',
       role: 'MEMBER',
       isVerified: false,
       kycStatus: 'PENDING',
@@ -1434,55 +1296,61 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfileMock = async (updatedFields: Partial<User>) => {
     if (!currentUser) return;
-    
+
+    let persistedFields = updatedFields;
+    if (useSupabase) {
+      const persistedUser = await ServiceFactory.getUserService().update(currentUser.id, updatedFields);
+      persistedFields = {
+        ...updatedFields,
+        name: persistedUser.name,
+        avatar: persistedUser.avatar,
+        bio: persistedUser.bio,
+        location: persistedUser.location,
+      };
+    }
+
     const updatedUser = {
       ...currentUser,
-      ...updatedFields
+      ...persistedFields,
     };
-    
+
     setCurrentUser(updatedUser);
     localStorage.setItem('auraswap_current_user', JSON.stringify(updatedUser));
-    
-    if (useSupabase) {
-      try {
-        await ServiceFactory.getUserService().update(currentUser.id, updatedFields);
-      } catch (err) {
-        console.error('[SwapContext] Supabase profile update failed:', err);
-      }
-    }
-    
+
     // Sincronizar en la lista general de usuarios
     setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
   };
 
-  const completeOnboardingMock = async (selectedCities: string[], bio: string, avatarUrl: string, profileType?: 'OWNER' | 'AGENT' | 'PROPERTY_MANAGER' | null) => {
+  const completeOnboardingMock = async (selectedCities: string[], bio: string, avatarUrl: string, profileType?: OnboardingProfileType) => {
     if (!currentUser) return;
-    
+
+    // Verification state is server-authoritative. Completing a profile never
+    // turns a pending KYC submission into an approved identity.
+    const wasAlreadyVerified = currentUser.kycStatus === 'VERIFIED' && currentUser.isVerified;
     const updatedUser: User = {
       ...currentUser,
       avatar: avatarUrl || currentUser.avatar,
-      kycStatus: 'VERIFIED', // Automatically verify KYC on onboarding complete for simulation!
-      isVerified: true,
+      kycStatus: wasAlreadyVerified ? 'VERIFIED' : 'PENDING',
+      isVerified: wasAlreadyVerified,
       favorites: selectedCities, // Save selected target destinations as favorites or profile metadata
       profileType: profileType || currentUser.profileType
     };
-    
-    setCurrentUser(updatedUser);
-    localStorage.setItem('auraswap_current_user', JSON.stringify(updatedUser));
-    
+
     if (useSupabase) {
       try {
         await ServiceFactory.getUserService().update(currentUser.id, {
           avatar: avatarUrl || currentUser.avatar,
-          kycStatus: 'VERIFIED',
-          isVerified: true,
           profileType: profileType || currentUser.profileType
         });
       } catch (err) {
         console.error('[SwapContext] Supabase onboarding save failed:', err);
+        throw err;
       }
     }
-    
+
+    setCurrentUser(updatedUser);
+    localStorage.setItem('auraswap_current_user', JSON.stringify(updatedUser));
+
     // Sync users list
     setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
   };
@@ -1500,13 +1368,19 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return new Promise(resolve => setTimeout(resolve, 800)); // Simulate networking
   };
 
-  const resendVerificationEmail = async (email: string): Promise<boolean> => {
+  const resendVerificationEmail = async (
+    email: string,
+    redirectAfterVerification?: string,
+  ): Promise<boolean> => {
     if (useSupabase) {
+      const verifiedPath = redirectAfterVerification
+        ? `/login?verified=true&intent=publish&next=${encodeURIComponent(redirectAfterVerification)}`
+        : '/login?verified=true';
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email,
         options: {
-          emailRedirectTo: getAuthRedirectUrl('/login?verified=true')
+          emailRedirectTo: getAuthRedirectUrl(verifiedPath)
         }
       });
       if (error) {
@@ -1607,7 +1481,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateTravelDetails = async (details: Partial<SwapTravelDetails> & { swapId: string; travelerId: string; propertyId: string }): Promise<SwapTravelDetails> => {
+  const updateTravelDetails = async (details: TravelDetailsInput): Promise<SwapTravelDetails> => {
     try {
       const result = await ServiceFactory.getSwapService().upsertTravelDetails(details);
       setTravelDetails(prev => {

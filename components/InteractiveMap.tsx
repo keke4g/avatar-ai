@@ -1,9 +1,8 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any -- Google Maps is loaded dynamically at runtime. */
-
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowUpRight, Compass, Info, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight, Compass, Info, Minus, Plus, ShieldCheck } from 'lucide-react';
 import { Property } from '../lib/types';
 import { useTranslation } from '../lib/context/LanguageContext';
 import { hasValidCoordinates } from '../lib/searchFilters';
@@ -72,11 +71,47 @@ function markerIcon(google: any, highlighted: boolean, label: string) {
   };
 }
 
+function clusterIcon(google: any, count: number) {
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    fillColor: '#0a77a8',
+    fillOpacity: 1,
+    strokeColor: '#ffffff',
+    strokeOpacity: 1,
+    strokeWeight: 3,
+    scale: count >= 10 ? 20 : 18,
+    labelOrigin: new google.maps.Point(0, 0),
+  };
+}
+
+function clusterPropertiesByZoom(properties: Property[], zoom: number) {
+  const cellSize = Math.max(0.00008, (360 / (2 ** Math.max(1, zoom))) * 0.22);
+  const buckets = new Map<string, Property[]>();
+
+  properties.forEach((property) => {
+    const latitude = Number(property.latitude);
+    const longitude = Number(property.longitude);
+    const key = `${Math.round(latitude / cellSize)}:${Math.round(longitude / cellSize)}`;
+    const bucket = buckets.get(key) || [];
+    bucket.push(property);
+    buckets.set(key, bucket);
+  });
+
+  return Array.from(buckets.values()).map((items) => ({
+    properties: items,
+    position: {
+      lat: items.reduce((sum, property) => sum + Number(property.latitude), 0) / items.length,
+      lng: items.reduce((sum, property) => sum + Number(property.longitude), 0) / items.length,
+    },
+  }));
+}
+
 export default function InteractiveMap({ properties, hoveredPropertyId, onHoverProperty, mobileShowMap }: InteractiveMapProps) {
   const { t, language } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<Record<string, any>>({});
+  const renderedMarkersRef = useRef<any[]>([]);
   const hoverHandlerRef = useRef(onHoverProperty);
   const [mapsApi, setMapsApi] = useState<any>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -110,6 +145,7 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
       fullscreenControl: false,
       mapTypeControl: false,
       streetViewControl: false,
+      zoomControl: false,
       styles: MAP_STYLE,
     });
   }, [mapsApi]);
@@ -117,39 +153,100 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
   useEffect(() => {
     if (!mapsApi || !mapRef.current) return;
     const google = mapsApi.namespace;
-    Object.values(markersRef.current).forEach((marker: any) => marker.setMap(null));
-    markersRef.current = {};
     const bounds = new google.maps.LatLngBounds();
 
     mappableProperties.forEach((property) => {
-      const position = { lat: Number(property.latitude), lng: Number(property.longitude) };
-      const priceLabel = propertyMarkerPrice(property);
-      const marker = new google.maps.Marker({
-        map: mapRef.current,
-        position,
-        title: property.title,
-        zIndex: 1,
-        label: {
-          text: priceLabel,
-          color: '#18181b',
-          fontSize: '11px',
-          fontWeight: '900',
-        },
-        icon: markerIcon(google, false, priceLabel),
-      });
-      marker.addListener('mouseover', () => {
-        setSelectedId(property.id);
-        hoverHandlerRef.current?.(property.id);
-      });
-      marker.addListener('mouseout', () => hoverHandlerRef.current?.(null));
-      marker.addListener('click', () => {
-        setSelectedId(property.id);
-        mapRef.current.panTo(position);
-        mapRef.current.setZoom(Math.max(mapRef.current.getZoom() || 12, 13));
-      });
-      markersRef.current[property.id] = marker;
-      bounds.extend(position);
+      bounds.extend({ lat: Number(property.latitude), lng: Number(property.longitude) });
     });
+
+    const clearRenderedMarkers = () => {
+      renderedMarkersRef.current.forEach((marker) => marker.setMap(null));
+      renderedMarkersRef.current = [];
+      markersRef.current = {};
+    };
+
+    const renderMarkers = () => {
+      clearRenderedMarkers();
+      const zoom = Math.round(mapRef.current?.getZoom() || 5);
+      const clusters = clusterPropertiesByZoom(mappableProperties, zoom);
+
+      clusters.forEach((cluster) => {
+        if (cluster.properties.length > 1) {
+          const count = cluster.properties.length;
+          const clusterMarker = new google.maps.Marker({
+            map: mapRef.current,
+            position: cluster.position,
+            title: language === 'es'
+              ? `${count} propiedades en esta zona`
+              : `${count} properties in this area`,
+            zIndex: 10,
+            label: {
+              text: String(count),
+              color: '#ffffff',
+              fontSize: count >= 10 ? '12px' : '13px',
+              fontWeight: '900',
+            },
+            icon: clusterIcon(google, count),
+          });
+          clusterMarker.addListener('click', () => {
+            setSelectedId(null);
+            hoverHandlerRef.current?.(null);
+            const currentZoom = Number(mapRef.current.getZoom() || zoom);
+            if (currentZoom >= 17) {
+              setSelectedId(cluster.properties[0].id);
+              return;
+            }
+
+            const clusterBounds = new google.maps.LatLngBounds();
+            cluster.properties.forEach((property) => {
+              clusterBounds.extend({
+                lat: Number(property.latitude),
+                lng: Number(property.longitude),
+              });
+            });
+            mapRef.current.fitBounds(clusterBounds, 72);
+            google.maps.event.addListenerOnce(mapRef.current, 'idle', () => {
+              const fittedZoom = Number(mapRef.current?.getZoom() || currentZoom);
+              mapRef.current?.setZoom(Math.min(17, Math.max(currentZoom + 2, fittedZoom)));
+            });
+          });
+          renderedMarkersRef.current.push(clusterMarker);
+          return;
+        }
+
+        const property = cluster.properties[0];
+        const position = cluster.position;
+        const priceLabel = propertyMarkerPrice(property);
+        const marker = new google.maps.Marker({
+          map: mapRef.current,
+          position,
+          title: property.title,
+          zIndex: 1,
+          label: {
+            text: priceLabel,
+            color: '#18181b',
+            fontSize: '11px',
+            fontWeight: '900',
+          },
+          icon: markerIcon(google, false, priceLabel),
+        });
+        marker.addListener('mouseover', () => {
+          setSelectedId(property.id);
+          hoverHandlerRef.current?.(property.id);
+        });
+        marker.addListener('mouseout', () => hoverHandlerRef.current?.(null));
+        marker.addListener('click', () => {
+          setSelectedId(property.id);
+          mapRef.current.panTo(position);
+          mapRef.current.setZoom(Math.max(mapRef.current.getZoom() || 12, 13));
+        });
+        markersRef.current[property.id] = marker;
+        renderedMarkersRef.current.push(marker);
+      });
+    };
+
+    renderMarkers();
+    const zoomListener = mapRef.current.addListener('zoom_changed', renderMarkers);
 
     if (!bounds.isEmpty()) {
       mapRef.current.fitBounds(bounds, 48);
@@ -157,7 +254,12 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
         if ((mapRef.current.getZoom() || 0) > 14) mapRef.current.setZoom(14);
       });
     }
-  }, [mapsApi, mappableProperties]);
+
+    return () => {
+      zoomListener.remove();
+      clearRenderedMarkers();
+    };
+  }, [language, mapsApi, mappableProperties]);
 
   useEffect(() => {
     if (!mapsApi) return;
@@ -192,7 +294,8 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
 
   useEffect(() => () => {
     if (!mapsApi) return;
-    Object.values(markersRef.current).forEach((marker: any) => marker.setMap(null));
+    renderedMarkersRef.current.forEach((marker) => marker.setMap(null));
+    renderedMarkersRef.current = [];
     if (mapRef.current) mapsApi.namespace.maps.event.clearInstanceListeners(mapRef.current);
     markersRef.current = {};
     mapRef.current = null;
@@ -207,6 +310,26 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
       <div className="glass absolute left-4 top-4 z-10 flex items-center gap-1.5 rounded-full border border-brand-gray-200/30 bg-white/95 px-3.5 py-1.5 text-[10px] font-extrabold uppercase tracking-widest text-brand-black shadow-sm">
         <Compass className="h-3.5 w-3.5 text-brand-accent" />
         <span>{language === 'es' ? 'Propiedades en Google Maps' : 'Properties on Google Maps'}</span>
+      </div>
+
+      <div className="absolute right-4 top-4 z-10 flex flex-col overflow-hidden rounded-2xl border border-brand-gray-200/70 bg-white/95 shadow-md backdrop-blur">
+        <button
+          type="button"
+          onClick={() => mapRef.current?.setZoom(Math.min(18, Number(mapRef.current?.getZoom() || 5) + 1))}
+          aria-label={language === 'es' ? 'Acercar mapa' : 'Zoom in'}
+          className="flex h-9 w-9 items-center justify-center text-brand-black transition hover:bg-brand-gray-100"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+        <span className="h-px bg-brand-gray-200" />
+        <button
+          type="button"
+          onClick={() => mapRef.current?.setZoom(Math.max(3, Number(mapRef.current?.getZoom() || 5) - 1))}
+          aria-label={language === 'es' ? 'Alejar mapa' : 'Zoom out'}
+          className="flex h-9 w-9 items-center justify-center text-brand-black transition hover:bg-brand-gray-100"
+        >
+          <Minus className="h-4 w-4" />
+        </button>
       </div>
 
       {!mapsApi && !loadError && (
@@ -224,8 +347,15 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
       <div className="relative z-10 mt-auto w-full p-4">
         {selectedProperty ? (
           <div className="pointer-events-auto flex w-full gap-3 rounded-[22px] border border-white/70 bg-white/95 p-3 shadow-[0_22px_55px_-26px_rgba(15,23,42,0.55)] backdrop-blur-xl">
-            <div className="h-[86px] w-[86px] shrink-0 overflow-hidden rounded-2xl bg-brand-gray-100">
-              <img src={selectedProperty.images[0]} alt={selectedProperty.title} className="h-full w-full object-cover" />
+            <div className="relative h-[86px] w-[86px] shrink-0 overflow-hidden rounded-2xl bg-brand-gray-100">
+              <Image
+                src={selectedProperty.images[0] || '/property-placeholder.svg'}
+                alt={selectedProperty.title}
+                fill
+                sizes="86px"
+                className="object-cover"
+                unoptimized
+              />
             </div>
             <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
               <div>
@@ -234,7 +364,9 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
                   {selectedProperty.hostVerified && <ShieldCheck className="h-3.5 w-3.5 text-brand-accent" />}
                 </div>
                 <h4 className="truncate text-sm font-black tracking-tight text-brand-black">{selectedProperty.location}</h4>
-                <p className="truncate text-[10px] font-semibold text-brand-gray-500">{t(`properties.${selectedProperty.id}.title`).startsWith('properties.') ? selectedProperty.title : t(`properties.${selectedProperty.id}.title`)}</p>
+                <p className="truncate text-[10px] font-semibold text-brand-gray-500">
+                  {t(`properties.${selectedProperty.id}.title`, undefined, selectedProperty.title)}
+                </p>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="truncate text-[10px] font-bold uppercase tracking-wider text-brand-gray-500">{language === 'es' ? formatCount(selectedProperty.bedrooms || 0, 'habitación', 'habitaciones', 'feminine') : `${selectedProperty.bedrooms || 0} bedrooms`}</span>

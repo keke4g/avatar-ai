@@ -9,15 +9,33 @@ export interface IStorageService {
 export class SupabaseStorageService implements IStorageService {
   private bucketName = 'property-images';
 
-  async uploadImage(file: File): Promise<string> {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-    const filePath = `${fileName}`;
+  private async getAuthenticatedUploadPrefix(): Promise<string> {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) {
+      throw new Error('Debes iniciar sesión para subir archivos de una propiedad.');
+    }
+    return data.user.id;
+  }
 
-    const { data, error } = await supabase.storage
+  private createObjectName(extension: string): string {
+    const safeExtension = extension.toLowerCase().replace(/[^a-z0-9]/g, '') || 'webp';
+    const id = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 14)}`;
+    return `${id}.${safeExtension}`;
+  }
+
+  async uploadImage(file: File): Promise<string> {
+    const userPrefix = await this.getAuthenticatedUploadPrefix();
+    const fileExt = file.name.split('.').pop() || 'webp';
+    const filePath = `${userPrefix}/${this.createObjectName(fileExt)}`;
+
+    const { error } = await supabase.storage
       .from(this.bucketName)
       .upload(filePath, file, {
         contentType: file.type,
+        cacheControl: '31536000',
+        upsert: false,
       });
 
     if (error) {
@@ -33,13 +51,18 @@ export class SupabaseStorageService implements IStorageService {
   }
 
   async uploadImagePair(galleryFile: File, thumbFile: File): Promise<{ galleryUrl: string; thumbnailUrl: string }> {
-    const baseName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
-    const galleryPath = `${baseName}.webp`;
-    const thumbPath = `${baseName}-thumb.webp`;
+    const userPrefix = await this.getAuthenticatedUploadPrefix();
+    const baseName = this.createObjectName('webp').replace(/\.webp$/, '');
+    const galleryPath = `${userPrefix}/${baseName}.webp`;
+    const thumbPath = `${userPrefix}/${baseName}-thumb.webp`;
 
     const { error: gError } = await supabase.storage
       .from(this.bucketName)
-      .upload(galleryPath, galleryFile);
+      .upload(galleryPath, galleryFile, {
+        contentType: 'image/webp',
+        cacheControl: '31536000',
+        upsert: false,
+      });
 
     if (gError) {
       console.error('[SupabaseStorageService] Gallery upload error:', gError.message);
@@ -48,9 +71,14 @@ export class SupabaseStorageService implements IStorageService {
 
     const { error: tError } = await supabase.storage
       .from(this.bucketName)
-      .upload(thumbPath, thumbFile);
+      .upload(thumbPath, thumbFile, {
+        contentType: 'image/webp',
+        cacheControl: '31536000',
+        upsert: false,
+      });
 
     if (tError) {
+      await supabase.storage.from(this.bucketName).remove([galleryPath]);
       console.error('[SupabaseStorageService] Thumbnail upload error:', tError.message);
       throw tError;
     }
@@ -72,11 +100,15 @@ export class SupabaseStorageService implements IStorageService {
       // Example public URL: https://[project-id].supabase.co/storage/v1/object/public/property-images/1715000000-abc.jpg
       const parts = url.split(`/storage/v1/object/public/${this.bucketName}/`);
       if (parts.length < 2) return false;
-      const filePath = parts[1];
+      const filePath = decodeURIComponent(parts[1].split('?')[0]);
+      const extensionIndex = filePath.lastIndexOf('.');
+      const thumbnailPath = extensionIndex >= 0
+        ? `${filePath.slice(0, extensionIndex)}-thumb${filePath.slice(extensionIndex)}`
+        : `${filePath}-thumb.webp`;
 
       const { error } = await supabase.storage
         .from(this.bucketName)
-        .remove([filePath]);
+        .remove([filePath, thumbnailPath]);
 
       if (error) {
         console.error('[SupabaseStorageService] Delete error:', error.message);

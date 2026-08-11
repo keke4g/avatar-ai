@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any -- Google Maps is loaded dynamically at runtime. */
 
 let googleMapsPromise: Promise<any> | null = null;
 

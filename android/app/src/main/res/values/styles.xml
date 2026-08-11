@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <!-- Customize your theme here. -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+    </style>
+
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@null</item>
+    </style>
+
+    <style name="AppTheme.Onboarding" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">@color/onboarding_surface</item>
+        <item name="android:navigationBarColor">@color/onboarding_surface</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="OnboardingEyebrow">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textColor">@color/onboarding_blue</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:letterSpacing">0.15</item>
+    </style>
+
+    <style name="OnboardingTitle">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">@color/onboarding_ink</item>
+        <item name="android:textSize">@dimen/onboarding_title_size</item>
+        <item name="android:lineSpacingExtra">0dp</item>
+        <item name="android:gravity">center</item>
+    </style>
+
+    <style name="OnboardingBody">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:textColor">@color/onboarding_text</item>
+        <item name="android:textSize">@dimen/onboarding_body_size</item>
+        <item name="android:lineSpacingExtra">2dp</item>
+        <item name="android:gravity">center</item>
+    </style>
+
+
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="android:background">@color/brand_navy</item>
+        <item name="windowSplashScreenBackground">@color/brand_navy</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+    </style>
+</resources>

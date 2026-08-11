@@ -63,6 +63,159 @@ export function findPropertyByReference(
   });
 }
 
+const PROPERTY_REFERENCE_STOP_WORDS = new Set([
+  'a', 'al', 'aqui', 'asi', 'con', 'cual', 'de', 'del', 'donde', 'el', 'en',
+  'esa', 'ese', 'esas', 'esos', 'esta', 'este', 'estas', 'estos', 'la', 'las',
+  'lo', 'los', 'me', 'mi', 'mis', 'para', 'por', 'que', 'se', 'si', 'su', 'sus',
+  'te', 'un', 'una', 'y',
+]);
+
+const PROPERTY_SELECTION_SIGNAL = /\b(?:ese|esa|esos|esas|este|esta|estos|estas|primero|primera|segundo|segunda|tercero|tercera|cuarto|cuarta|quinto|quinta|me gusta(?:ria|ría|ndo)?|me esta gustando|me interesa|me quedo|quiero (?:ese|esa|el|la)|quiero ver|quiero conocer|ver ese|ver esa|elijo|escojo|selecciono|muestrame|mostrarme|ensename|abrir|abre|entrar|entra|ver detalles|conocer)\b/i;
+
+const PROPERTY_TYPE_ALIASES: Record<string, string[]> = {
+  departamento: ['apartment', 'departamento', 'departamentos', 'apartamento', 'apartamentos', 'condo', 'condominio', 'depa', 'depas', 'penthouse'],
+  casa: ['beach house', 'cabin', 'casa', 'casas', 'house', 'residencia', 'villa'],
+  loft: ['loft', 'lofts'],
+  terreno: ['land', 'lote', 'terreno', 'terrenos'],
+  local: ['local', 'locales', 'local comercial'],
+  oficina: ['office', 'oficina', 'oficinas'],
+};
+
+const PROPERTY_ORDINALS: Record<string, number> = {
+  primero: 0,
+  primera: 0,
+  segundo: 1,
+  segunda: 1,
+  tercero: 2,
+  tercera: 2,
+  cuarto: 3,
+  cuarta: 3,
+  quinto: 4,
+  quinta: 4,
+};
+
+function tokenizePropertyReference(value: string): string[] {
+  return normalizeSearchText(value)
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((token) => token.length >= 2 && !PROPERTY_REFERENCE_STOP_WORDS.has(token));
+}
+
+function propertyReferenceFields(property: Property): {
+  title: string;
+  location: string;
+  type: string;
+  all: string;
+} {
+  const title = normalizeSearchText(property.title || '');
+  const location = normalizeSearchText([
+    property.location,
+    property.city,
+    property.neighborhood,
+    property.subdivisionName,
+    property.developmentName,
+  ].filter(Boolean).join(' '));
+  const type = normalizeSearchText(property.type || '');
+  return { title, location, type, all: `${title} ${location} ${type}`.trim() };
+}
+
+function hasPropertyTypeMatch(query: string, type: string): boolean {
+  const normalizedType = normalizeSearchText(type);
+  return Object.values(PROPERTY_TYPE_ALIASES).some((aliases) => {
+    const queryHasAlias = aliases.some((alias) => query.includes(normalizeSearchText(alias)));
+    const typeHasAlias = aliases.some((alias) => normalizedType.includes(normalizeSearchText(alias)));
+    return queryHasAlias && typeHasAlias;
+  });
+}
+
+function hasLocationPhraseMatch(query: string, location: string): boolean {
+  const words = tokenizePropertyReference(location);
+  if (words.length < 2) return false;
+
+  // Match distinctive two/three-word location fragments, so “ese de Tres Ríos”
+  // resolves “Desarrollo Urbano Tres Ríos” without requiring the full address.
+  for (let size = Math.min(3, words.length); size >= 2; size -= 1) {
+    for (let start = 0; start <= words.length - size; start += 1) {
+      const phrase = words.slice(start, start + size).join(' ');
+      if (phrase.length >= 5 && query.includes(phrase)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Resolves colloquial references to one of the properties currently in view.
+ * This is intentionally separate from findPropertyByReference: search filters
+ * must still return every listing for a city, while a conversational selection
+ * should open one specific card such as “ese de Tres Ríos” or “la segunda”.
+ */
+export function findPropertyByNaturalReference(
+  properties: Property[],
+  query: string,
+  candidateProperties: Property[] = properties,
+): Property | undefined {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery || !PROPERTY_SELECTION_SIGNAL.test(normalizedQuery)) return undefined;
+
+  const uniqueCandidates = Array.from(
+    new Map(candidateProperties.filter(Boolean).map((property) => [property.id, property])).values(),
+  );
+  if (uniqueCandidates.length === 0) return undefined;
+
+  const ordinalMatch = normalizedQuery.match(/\b(?:opcion|opción|numero|número|el|la)?\s*(primero|primera|segundo|segunda|tercero|tercera|cuarto|cuarta|quinto|quinta)\b/i);
+  if (ordinalMatch) {
+    const ordinalIndex = PROPERTY_ORDINALS[normalizeSearchText(ordinalMatch[1])];
+    if (ordinalIndex !== undefined && uniqueCandidates[ordinalIndex]) {
+      return uniqueCandidates[ordinalIndex];
+    }
+  }
+
+  const queryTokens = new Set(tokenizePropertyReference(normalizedQuery));
+  const scored = uniqueCandidates.map((property, index) => {
+    const fields = propertyReferenceFields(property);
+    const titleTokens = new Set(tokenizePropertyReference(fields.title));
+    const locationTokens = new Set(tokenizePropertyReference(fields.location));
+    const matchingTitleTokens = [...queryTokens].filter((token) => titleTokens.has(token));
+    const matchingLocationTokens = [...queryTokens].filter((token) => locationTokens.has(token));
+    const typeMatch = hasPropertyTypeMatch(normalizedQuery, fields.type);
+    const locationPhraseMatch = hasLocationPhraseMatch(normalizedQuery, fields.location);
+    const exactTitleMatch = fields.title.length >= 6 && normalizedQuery.includes(fields.title);
+    const exactLocationMatch = fields.location.length >= 6 && normalizedQuery.includes(fields.location);
+
+    let score = matchingTitleTokens.length * 8 + matchingLocationTokens.length * 10;
+    if (typeMatch) score += 12;
+    if (locationPhraseMatch) score += 18;
+    if (exactTitleMatch) score += 28;
+    if (exactLocationMatch) score += 32;
+    // A single card in the active Eterna result set is the natural referent of
+    // “ese/esa/me gusta”, even if the user did not repeat its location.
+    if (uniqueCandidates.length === 1) score += 22;
+
+    return {
+      property,
+      score,
+      index,
+      hasMeaningfulMatch: matchingTitleTokens.length > 0
+        || matchingLocationTokens.length > 0
+        || typeMatch
+        || locationPhraseMatch
+        || exactTitleMatch
+        || exactLocationMatch,
+    };
+  }).sort((left, right) => right.score - left.score || left.index - right.index);
+
+  const best = scored[0];
+  const runnerUp = scored[1];
+  if (!best) return undefined;
+
+  const isVagueSingleSelection = uniqueCandidates.length === 1;
+  const isDistinctSelection = best.score >= 18
+    && best.hasMeaningfulMatch
+    && (!runnerUp || best.score - runnerUp.score >= 6);
+
+  return isVagueSingleSelection || isDistinctSelection ? best.property : undefined;
+}
+
 export function resolveSearchDestination(destination: string, properties: Property[]): string {
   const cleanDestination = normalizeSearchText(destination);
   if (!cleanDestination) return '';
@@ -157,6 +310,7 @@ export function filterAndSortProperties({
   guestsCount = 0,
   budget,
   minBudget,
+  budgetOfferingMode,
   amenityCategories,
   viewTypeId,
   constructionAgeMin,
@@ -235,9 +389,15 @@ export function filterAndSortProperties({
 
     if (budget !== undefined && budget > 0) {
       const activeOfferings = getActiveOfferings(property);
-      const saleOffering = activeOfferings.find(o => o.mode === 'SALE');
-      const rentOffering = activeOfferings.find(o => o.mode === 'MONTHLY_RENT' || o.mode === 'SHORT_RENT');
-      const price = saleOffering?.priceAmount ?? rentOffering?.priceAmount ?? (property as any).price ?? 0;
+      const priceMode = budgetOfferingMode || offeringMode;
+      const selectedOffering = priceMode === 'SALE'
+        ? activeOfferings.find(o => o.mode === 'SALE')
+        : priceMode === 'RENT' || priceMode === 'MONTHLY_RENT' || priceMode === 'SHORT_RENT'
+          ? activeOfferings.find(o => o.mode === 'MONTHLY_RENT')
+            || activeOfferings.find(o => o.mode === 'SHORT_RENT')
+            || activeOfferings.find(o => o.mode === 'MONTHLY_RENT' || o.mode === 'SHORT_RENT')
+          : activeOfferings.find(o => o.mode === 'SALE') || activeOfferings[0];
+      const price = selectedOffering?.priceAmount ?? (property as any).price ?? 0;
       if (price > 0 && price > budget) {
         return false;
       }
@@ -245,9 +405,15 @@ export function filterAndSortProperties({
 
     if (minBudget !== undefined && minBudget > 0) {
       const activeOfferings = getActiveOfferings(property);
-      const saleOffering = activeOfferings.find(o => o.mode === 'SALE');
-      const rentOffering = activeOfferings.find(o => o.mode === 'MONTHLY_RENT' || o.mode === 'SHORT_RENT');
-      const price = saleOffering?.priceAmount ?? rentOffering?.priceAmount ?? (property as any).price ?? 0;
+      const priceMode = budgetOfferingMode || offeringMode;
+      const selectedOffering = priceMode === 'SALE'
+        ? activeOfferings.find(o => o.mode === 'SALE')
+        : priceMode === 'RENT' || priceMode === 'MONTHLY_RENT' || priceMode === 'SHORT_RENT'
+          ? activeOfferings.find(o => o.mode === 'MONTHLY_RENT')
+            || activeOfferings.find(o => o.mode === 'SHORT_RENT')
+            || activeOfferings.find(o => o.mode === 'MONTHLY_RENT' || o.mode === 'SHORT_RENT')
+          : activeOfferings.find(o => o.mode === 'SALE') || activeOfferings[0];
+      const price = selectedOffering?.priceAmount ?? (property as any).price ?? 0;
       if (price > 0 && price < minBudget) {
         return false;
       }

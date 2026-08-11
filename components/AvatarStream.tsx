@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import NextImage from "next/image";
 import { StreamStatus } from "../hooks/useWebSocketStream";
 
 interface AvatarStreamProps {
@@ -70,7 +71,7 @@ export function AvatarStream({ currentFrame, status }: AvatarStreamProps) {
   // Double-Buffered Canvas Rendering to eliminate browser flashes
   useEffect(() => {
     if (!currentFrame) {
-      setShowCanvas(false);
+      queueMicrotask(() => setShowCanvas(false));
       return;
     }
 
@@ -129,9 +130,11 @@ export function AvatarStream({ currentFrame, status }: AvatarStreamProps) {
 
         {/* High-quality Elegant Static Placeholder (Cross-fades smoothly under the canvas) */}
         <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-gradient-to-tr from-slate-900 via-slate-800 to-indigo-950">
-          <img
+          <NextImage
             src="/avatar.png"
             alt="Eterna Portrait Placeholder"
+            fill
+            sizes="430px"
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
               status === "disconnected" ? "opacity-40 grayscale" : "opacity-80"
             }`}

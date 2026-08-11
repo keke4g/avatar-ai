@@ -1,23 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Award, 
-  Coins, 
-  Building, 
-  CheckCircle, 
-  HelpCircle, 
-  XCircle, 
-  X, 
+import React from 'react';
+import {
+  BadgeDollarSign,
+  Building2,
+  CircleDashed,
+  HandCoins,
   Info,
-  ChevronRight,
-  TrendingUp,
-  Percent,
-  Users
+  Landmark,
+  WalletCards,
 } from 'lucide-react';
-import { Property } from '../../../lib/types';
-import { PropertyEligibilityEngine } from '../../../lib/services/PropertyEligibilityEngine';
+import type { Property } from '../../../lib/types';
 import { PropertySectionCard, PropertySubIcon } from '../PropertySectionCard';
 
 interface FinancingCompatibilityProps {
@@ -27,371 +20,98 @@ interface FinancingCompatibilityProps {
 
 export const FinancingCompatibility: React.FC<FinancingCompatibilityProps> = ({
   property,
-  language
+  language,
 }) => {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const credits = PropertyEligibilityEngine.calculateEligibleCredits(property);
+  const saleOfferings = (property.offerings || []).filter(
+    (offering) => offering.mode === 'SALE' && offering.status === 'ACTIVE' && offering.visibility === 'PUBLIC',
+  );
 
-  // Close drawer on ESC key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsDrawerOpen(false);
-      }
-    };
-    if (isDrawerOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-    }
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDrawerOpen]);
-
-  // Credit Tooltip Descriptions mapping
-  const creditDetailsEs: Record<string, { desc: string; icon: any }> = {
-    'Contado': {
-      desc: 'Adquisición inmediata mediante transferencia electrónica, cheque de caja o recursos propios.',
-      icon: Coins
+  const declaredMethods = [
+    {
+      key: 'cash',
+      label: language === 'es' ? 'Recursos propios' : 'Cash / own funds',
+      icon: HandCoins,
+      declared: saleOfferings.some((offering) => offering.acceptsCash === true),
     },
-    'Crédito Bancario': {
-      desc: 'Financiamiento hipotecario tradicional con cualquier institución bancaria comercial de tu elección.',
-      icon: Building
+    {
+      key: 'bank',
+      label: language === 'es' ? 'Crédito bancario' : 'Bank mortgage',
+      icon: Building2,
+      declared: saleOfferings.some((offering) => offering.acceptsBankCredit === true),
     },
-    'Crédito Hipotecario Bancario': {
-      desc: 'Financiamiento hipotecario tradicional con cualquier institución bancaria comercial de tu elección.',
-      icon: Building
+    {
+      key: 'infonavit',
+      label: 'Infonavit',
+      icon: Landmark,
+      declared: saleOfferings.some((offering) => offering.acceptsInfonavit === true),
     },
-    'Unamos Créditos': {
-      desc: 'Permite juntar el monto de tu crédito Infonavit con el de un familiar, pareja o amigo para mayor capacidad.',
-      icon: Users
+    {
+      key: 'fovissste',
+      label: 'FOVISSSTE',
+      icon: WalletCards,
+      declared: saleOfferings.some((offering) => offering.acceptsFovissste === true),
     },
-    'Cofinavit': {
-      desc: 'Esquema cofinanciado que une un crédito de Infonavit con un crédito de un banco comercial.',
-      icon: Percent
+    {
+      key: 'developer',
+      label: language === 'es' ? 'Financiamiento del desarrollador' : 'Developer financing',
+      icon: BadgeDollarSign,
+      declared: saleOfferings.some((offering) => offering.developerFinancing === true),
     },
-    'Infonavit Individual': {
-      desc: 'Crédito tradicional otorgado de forma individual por el Infonavit.',
-      icon: Award
-    },
-    'Infonavit Conyugal': {
-      desc: 'Permite unir tu capacidad crediticia de Infonavit con la de tu cónyuge legalmente casado.',
-      icon: Users
-    },
-    'FOVISSSTE': {
-      desc: 'Esquema tradicional para trabajadores del Estado, sujeto a precalificación y convocatorias anuales.',
-      icon: Award
-    },
-    'FOVISSSTE para Todos': {
-      desc: 'Crédito cofinanciado entre FOVISSSTE y una institución bancaria comercial.',
-      icon: Building
-    },
-    'Crédito Mixto': {
-      desc: 'Financiamiento que combina recursos de la subcuenta de vivienda y préstamos bancarios.',
-      icon: TrendingUp
-    },
-    'Crédito mixto Banco + Infonavit': {
-      desc: 'Financiamiento que combina recursos de la subcuenta de vivienda de Infonavit y préstamos bancarios.',
-      icon: TrendingUp
-    },
-    'Crédito mixto Banco + FOVISSSTE': {
-      desc: 'Financiamiento que combina recursos de la subcuenta de vivienda de FOVISSSTE y préstamos bancarios.',
-      icon: TrendingUp
-    }
-  };
-
-  const creditDetailsEn: Record<string, { desc: string; icon: any }> = {
-    'Contado': {
-      desc: 'Immediate purchase through electronic transfer, cashier check, or personal funds.',
-      icon: Coins
-    },
-    'Crédito Bancario': {
-      desc: 'Standard mortgage financing with any commercial banking institution of your choice.',
-      icon: Building
-    },
-    'Crédito Hipotecario Bancario': {
-      desc: 'Standard mortgage financing with any commercial banking institution of your choice.',
-      icon: Building
-    },
-    'Unamos Créditos': {
-      desc: 'Allows combining your Infonavit credit capacity with a relative, partner, or friend for higher capacity.',
-      icon: Users
-    },
-    'Cofinavit': {
-      desc: 'Co-financed scheme combining an Infonavit credit with a commercial bank mortgage credit.',
-      icon: Percent
-    },
-    'Infonavit Individual': {
-      desc: 'Traditional individual mortgage credit granted directly by Infonavit.',
-      icon: Award
-    },
-    'Infonavit Conyugal': {
-      desc: 'Allows combining your Infonavit credit capacity with your legally married spouse.',
-      icon: Users
-    },
-    'FOVISSSTE': {
-      desc: 'Traditional scheme for state workers, subject to pre-qualification and annual fund calls.',
-      icon: Award
-    },
-    'FOVISSSTE para Todos': {
-      desc: 'Co-financed credit between FOVISSSTE and a commercial banking institution.',
-      icon: Building
-    },
-    'Crédito Mixto': {
-      desc: 'Financing combining housing subaccount funds and bank loans.',
-      icon: TrendingUp
-    },
-    'Crédito mixto Banco + Infonavit': {
-      desc: 'Financing combining housing subaccount funds of Infonavit and bank loans.',
-      icon: TrendingUp
-    },
-    'Crédito mixto Banco + FOVISSSTE': {
-      desc: 'Financing combining housing subaccount funds of FOVISSSTE and bank loans.',
-      icon: TrendingUp
-    }
-  };
-
-  const getCreditDetails = (creditName: string) => {
-    const dict = language === 'es' ? creditDetailsEs : creditDetailsEn;
-    return dict[creditName] || {
-      desc: language === 'es' 
-        ? 'Financiamiento sujeto a precalificación y políticas internas de la institución.'
-        : 'Financing subject to pre-qualification and internal policies of the institution.',
-      icon: Award
-    };
-  };
-
-  // Animations configuration
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.08 }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 15 },
-    show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 100, damping: 15 } }
-  };
+  ].filter((method) => method.declared);
 
   return (
-    <>
-      <PropertySectionCard
-        icon={Award}
-        eyebrow={language === 'es' ? 'Opciones de adquisición' : 'Acquisition options'}
-        title={language === 'es' ? 'Financiamiento compatible' : 'Compatible financing'}
-        description={language === 'es'
-          ? 'Eterna analizó el expediente jurídico para identificar los métodos de adquisición compatibles.'
-          : 'Eterna analyzed the legal dossier to identify compatible acquisition and financing methods.'}
-        className="animate-in fade-in duration-300"
-      >
-      {/* Grid of Compatible Cards (Green status only) */}
-      <motion.div 
-        variants={containerVariants}
-        initial="hidden"
-        whileInView="show"
-        viewport={{ once: true, margin: '-50px' }}
-        className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3"
-      >
-        {credits.compatibles.map((c) => {
-          const details = getCreditDetails(c);
-          const Icon = details.icon;
-
-          return (
-            <motion.div
-              key={c}
-              variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.01, boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.03)' }}
-              className="group flex min-h-48 flex-col gap-3 rounded-2xl border border-neutral-200/80 bg-white p-5 transition-shadow duration-300"
-            >
-              <div className="flex items-center justify-between">
-                <PropertySubIcon icon={Icon} iconClassName="h-[18px] w-[18px]" />
-                <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/40">
-                  {language === 'es' ? 'Listo' : 'Eligible'}
-                </span>
-              </div>
-              
-              <div>
-                <h4 className="text-xs font-black text-neutral-900 tracking-tight">
-                  {c}
-                </h4>
-                <p className="text-[10px] text-neutral-400 font-semibold leading-normal mt-1">
-                  {details.desc}
-                </p>
-              </div>
-
-              <div className="mt-auto pt-2 border-t border-neutral-50 flex items-center gap-1.5 text-[9px] font-extrabold text-emerald-700">
-                <CheckCircle className="w-3.5 h-3.5" />
-                <span>{language === 'es' ? 'Compatible' : 'Compatible'}</span>
-              </div>
-            </motion.div>
-          );
-        })}
-      </motion.div>
-
-      {/* Elegant Drawer Trigger Button */}
-      <button
-        type="button"
-        onClick={() => setIsDrawerOpen(true)}
-        className="flex items-center gap-2 self-start py-2.5 px-4 rounded-xl border border-neutral-200 text-xs font-extrabold text-neutral-600 hover:text-neutral-950 hover:bg-neutral-50/50 hover:border-neutral-350 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-neutral-950 transition-all cursor-pointer"
-      >
-        <span>
-          {language === 'es' 
-            ? 'Ver todos los métodos de financiamiento' 
-            : 'View all financing methods'}
+    <PropertySectionCard
+      icon={WalletCards}
+      eyebrow={language === 'es' ? 'Adquisición' : 'Acquisition'}
+      title={language === 'es' ? 'Métodos de pago declarados' : 'Declared payment methods'}
+      description={declaredMethods.length > 0
+        ? (language === 'es'
+            ? 'El responsable indicó que considera estas opciones; aún requieren validación con la institución correspondiente.'
+            : 'The representative stated that these options may be considered; each still requires validation by the relevant institution.')
+        : (language === 'es'
+            ? 'El anuncio no documenta métodos de pago o financiamiento aceptados.'
+            : 'The listing does not document accepted payment or financing methods.')}
+      action={(
+        <span className="inline-flex self-start items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-amber-800">
+          <CircleDashed className="h-3 w-3" />
+          {language === 'es' ? 'Por confirmar' : 'To be confirmed'}
         </span>
-        <ChevronRight className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" />
-      </button>
-
-      {/* Info Footnote */}
-      <span className="text-[10px] text-neutral-400 font-semibold leading-normal flex items-start gap-2 border-t border-neutral-100 pt-4">
-        <Info className="w-3.5 h-3.5 text-neutral-400 shrink-0 mt-0.5" />
-        <span>
-          {language === 'es'
-            ? 'La aprobación final de cualquier crédito dependerá de la institución financiera y del perfil del comprador.'
-            : 'Final approval of any credit will depend on the financial institution and the buyer\'s credit profile.'}
-          </span>
-      </span>
-      </PropertySectionCard>
-
-      {/* Sliding Glassmorphic Slide-over Drawer (Sheet) */}
-      <AnimatePresence>
-        {isDrawerOpen && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsDrawerOpen(false)}
-              className="fixed inset-0 bg-neutral-950/20 backdrop-blur-xs z-100 cursor-pointer"
-            />
-
-            {/* Slide-over Drawer */}
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="drawer-title"
-              className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white/80 backdrop-blur-xl shadow-2xl z-101 border-l border-neutral-100 flex flex-col h-full overflow-hidden"
-            >
-              {/* Drawer Header */}
-              <div className="p-6 border-b border-neutral-100 flex items-center justify-between">
+      )}
+    >
+      {declaredMethods.length > 0 ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {declaredMethods.map((method) => {
+            const Icon = method.icon;
+            return (
+              <article key={method.key} className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-4">
+                <PropertySubIcon icon={Icon} />
                 <div>
-                  <h4 id="drawer-title" className="text-sm font-black text-neutral-900">
-                    {language === 'es' ? 'Análisis de Financiamiento' : 'Financing Analysis'}
-                  </h4>
-                  <p className="text-[10px] text-neutral-450 font-semibold mt-1">
-                    {language === 'es' ? 'Corrida de elegibilidad automática' : 'Automatic eligibility run'}
+                  <p className="text-xs font-black text-neutral-900">{method.label}</p>
+                  <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.11em] text-neutral-500">
+                    {language === 'es' ? 'Declarado por el anunciante' : 'Declared by the listing party'}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsDrawerOpen(false)}
-                  className="p-1.5 rounded-xl hover:bg-neutral-100 text-neutral-500 hover:text-neutral-800 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-neutral-950 cursor-pointer"
-                  aria-label={language === 'es' ? 'Cerrar panel' : 'Close panel'}
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex items-start gap-3 rounded-2xl border border-dashed border-neutral-300 bg-neutral-50/70 p-5">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" />
+          <p className="text-xs font-semibold leading-relaxed text-neutral-600">
+            {language === 'es'
+              ? 'Solicita las condiciones directamente al responsable cuando el anuncio tenga un perfil de contacto validado.'
+              : 'Request terms directly from the representative once the listing has a validated contact profile.'}
+          </p>
+        </div>
+      )}
 
-              {/* Drawer Content */}
-              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
-                
-                {/* 1. Compatibles (Green) */}
-                <div className="flex flex-col gap-3.5">
-                  <span className="text-[9px] font-black uppercase text-emerald-700 tracking-wider block">
-                    {language === 'es' ? 'Compatibles (Listos para uso)' : 'Compatible (Ready for use)'}
-                  </span>
-                  
-                  <div className="flex flex-col gap-3">
-                    {credits.compatibles.map((c) => {
-                      const details = getCreditDetails(c);
-                      const Icon = details.icon;
-                      return (
-                        <div key={c} className="p-4 bg-emerald-50/15 border border-emerald-100 rounded-2xl flex gap-3">
-                          <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 shrink-0 h-fit">
-                            <Icon className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <span className="text-xs font-black text-neutral-900 block">{c}</span>
-                            <p className="text-[10px] text-neutral-500 leading-normal font-semibold mt-1">{details.desc}</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 2. Sujetos a Evaluación (Yellow) */}
-                {credits.evaluables.length > 0 && (
-                  <div className="flex flex-col gap-3.5">
-                    <span className="text-[9px] font-black uppercase text-amber-700 tracking-wider block">
-                      {language === 'es' ? 'Sujetos a Evaluación' : 'Subject to Evaluation'}
-                    </span>
-                    
-                    <div className="flex flex-col gap-3">
-                      {credits.evaluables.map((c) => {
-                        const details = getCreditDetails(c);
-                        const Icon = details.icon;
-                        return (
-                          <div key={c} className="p-4 bg-amber-50/15 border border-amber-100 rounded-2xl flex gap-3">
-                            <div className="p-2 rounded-xl bg-amber-50 text-amber-600 shrink-0 h-fit">
-                              <Icon className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <span className="text-xs font-black text-neutral-900 block">{c}</span>
-                              <p className="text-[10px] text-neutral-500 leading-normal font-semibold mt-1">{details.desc}</p>
-                              <span className="inline-flex items-center gap-1 mt-2 text-[9px] font-extrabold text-amber-700">
-                                <HelpCircle className="w-3.5 h-3.5" />
-                                <span>{language === 'es' ? 'Compatible con validación' : 'Requires validation'}</span>
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. No Compatibles (Red) */}
-                {credits.noCompatibles.length > 0 && (
-                  <div className="flex flex-col gap-3.5 font-medium">
-                    <span className="text-[9px] font-black uppercase text-rose-700 tracking-wider block">
-                      {language === 'es' ? 'No Compatibles' : 'Not Eligible'}
-                    </span>
-                    
-                    <div className="flex flex-col gap-3">
-                      {credits.noCompatibles.map((item) => {
-                        const details = getCreditDetails(item.credit);
-                        const Icon = details.icon;
-                        return (
-                          <div key={item.credit} className="p-4 bg-rose-50/15 border border-rose-100 rounded-2xl flex gap-3">
-                            <div className="p-2 rounded-xl bg-rose-50 text-rose-600 shrink-0 h-fit">
-                              <Icon className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <span className="text-xs font-black text-neutral-900 block">{item.credit}</span>
-                              <p className="text-[10px] text-neutral-550 leading-normal font-semibold mt-1">
-                                {language === 'es' ? `Motivo: ${item.reason}` : `Reason: ${item.reason}`}
-                              </p>
-                              <span className="inline-flex items-center gap-1 mt-2 text-[9px] font-extrabold text-rose-700">
-                                <XCircle className="w-3.5 h-3.5" />
-                                <span>{language === 'es' ? 'No compatible' : 'Ineligible'}</span>
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </>
+      <p className="flex items-start gap-2 border-t border-neutral-100 pt-4 text-[10px] font-semibold leading-relaxed text-neutral-500">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        {language === 'es'
+          ? '“Declarado” no significa aprobado. La elegibilidad depende del inmueble, el expediente y el perfil del comprador.'
+          : '“Declared” does not mean approved. Eligibility depends on the property, its documentation, and the buyer profile.'}
+      </p>
+    </PropertySectionCard>
   );
 };

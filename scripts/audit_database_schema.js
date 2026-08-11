@@ -53,7 +53,7 @@ function request(path, method = 'OPTIONS') {
         let parsed = null;
         try {
           parsed = JSON.parse(data);
-        } catch (e) {
+        } catch {
           parsed = data;
         }
         resolve({ status: res.statusCode, body: parsed });

@@ -6,7 +6,7 @@ import { LanguageProvider } from "../lib/context/LanguageContext";
 import { LiveContextProvider } from "../lib/context/LiveContext";
 import { Suspense } from "react";
 import { LayoutProvider } from "../lib/context/LayoutContext";
-import LayoutContent from "../components/LayoutContent";
+import LayoutContent from "./_components/LayoutContent";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -16,10 +16,25 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AuraSwap — Premium Home Swapping for Homeowners",
+  metadataBase: new URL("https://towersmexico.com"),
+  title: {
+    default: "Towers México — Propiedades en México",
+    template: "%s | Towers México",
+  },
   description:
-    "Exchange properties with verified homeowners for vacations instead of renting. AuraSwap charges zero rent, connecting trusted hosts worldwide.",
-  keywords: ["home swap", "house exchange", "premium travel", "verified vacation", "homeowner network"],
+    "Descubre, publica, compra, vende, renta o intercambia propiedades verificadas con Towers México.",
+  keywords: ["propiedades en México", "inmuebles", "casas en venta", "departamentos", "renta", "Towers México"],
+  icons: {
+    icon: "/towers-mexico-logo-blue.png",
+    apple: "/towers-mexico-logo-blue.png",
+  },
+  openGraph: {
+    siteName: "Towers México",
+    title: "Towers México — Propiedades en México",
+    description: "Propiedades verificadas para comprar, vender, rentar o intercambiar en México.",
+    type: "website",
+    locale: "es_MX",
+  },
 };
 
 export default function RootLayout({
@@ -28,7 +43,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} scroll-smooth`}>
+    <html lang="es" className={`${inter.variable} scroll-smooth`}>
       <body className="font-sans antialiased bg-brand-gray-50 text-brand-black min-h-screen flex flex-col justify-between selection:bg-brand-accent/20 selection:text-brand-accent">
         <LanguageProvider>
           <SwapProvider>

@@ -26,14 +26,21 @@ export function searchProperties(properties: Property[], filters: PropertySearch
     // 1. City / Location Filter (case-insensitive NFD normalized)
     if (filters.city) {
       const cleanFilterCity = normalizeSearchText(filters.city);
-      const cleanPropLocation = normalizeSearchText(prop.location || '');
-      const cleanPropCity = normalizeSearchText(prop.city || '');
-      
-      const isCityMatch = 
-        (cleanPropLocation && cleanPropLocation.includes(cleanFilterCity)) || 
-        (cleanPropCity && cleanPropCity.includes(cleanFilterCity)) || 
-        (cleanPropCity && cleanFilterCity.includes(cleanPropCity)) ||
-        (cleanPropLocation && cleanFilterCity.includes(cleanPropLocation));
+      const searchablePlaces = [
+        prop.location,
+        prop.city,
+        prop.neighborhood,
+        prop.subdivisionName,
+        prop.developmentName,
+        prop.title,
+        prop.country,
+      ]
+        .map((value) => normalizeSearchText(value || ''))
+        .filter(Boolean);
+
+      const isCityMatch = searchablePlaces.some((place) => (
+        place.includes(cleanFilterCity) || cleanFilterCity.includes(place)
+      ));
 
       if (isCityMatch) {
         score += 10;
@@ -98,12 +105,11 @@ export function searchProperties(properties: Property[], filters: PropertySearch
           // Scale bonus: closer to budget is better
           const ratio = price / filters.budget;
           score += Math.round(ratio * 3);
-        } else if (price <= filters.budget * 1.25) {
-          // Within 25% margin
-          score += 1;
         } else {
-          score -= 10; // Penalty
-          isExcluded = true; // Exclude if exceeds 25% margin
+          // A budget expressed as “debajo de”/“hasta” is a hard ceiling.
+          // Returning listings above it made Eterna appear to ignore the
+          // requested price and mixed unrelated inventory into the results.
+          isExcluded = true;
         }
       }
     }
@@ -197,7 +203,7 @@ export function searchProperties(properties: Property[], filters: PropertySearch
   return candidates.map(r => r.prop);
 }
 
-export function parseBudgetToNumber(value: string, operation?: 'sale' | 'rent'): number {
+export function parseBudgetToNumber(value: string, _operation?: 'sale' | 'rent'): number {
   if (!value) return 0;
   
   let clean = value.toLowerCase()
@@ -320,14 +326,38 @@ export function parseBudgetRange(value: string): { min?: number, max?: number } 
     return { min: minVal, max: maxVal };
   }
 
-  // 2. Matches "menos de X", "hasta X", "maximo X", "bajo X"
-  if (clean.includes('menos de') || clean.includes('hasta') || clean.includes('maximo') || clean.includes('bajo')) {
+  // 2. Matches max-price language. Keep the complete family of natural
+  // Spanish expressions users commonly use with Eterna.
+  if (
+    clean.includes('menos de') ||
+    clean.includes('debajo de') ||
+    clean.includes('por debajo de') ||
+    clean.includes('menor de') ||
+    clean.includes('inferior a') ||
+    clean.includes('menos que') ||
+    clean.includes('hasta') ||
+    clean.includes('maximo') ||
+    clean.includes('maxima') ||
+    clean.includes('bajo')
+  ) {
     const maxVal = parseBudgetToNumber(clean);
     return { max: maxVal };
   }
 
-  // 3. Matches "mas de X", "desde X", "minimo X", "sobre X"
-  if (clean.includes('mas de') || clean.includes('desde') || clean.includes('minimo') || clean.includes('sobre')) {
+  // 3. Matches minimum-price language. Voice and typed queries commonly use
+  // "arriba de" or "por encima de"; these must never be collapsed into a
+  // maximum budget when the search memory is serialized between turns.
+  if (
+    clean.includes('mas de') ||
+    clean.includes('arriba de') ||
+    clean.includes('por encima de') ||
+    clean.includes('mayor de') ||
+    clean.includes('superior a') ||
+    clean.includes('a partir de') ||
+    clean.includes('desde') ||
+    clean.includes('minimo') ||
+    clean.includes('sobre')
+  ) {
     const minVal = parseBudgetToNumber(clean);
     return { min: minVal };
   }

@@ -1,4 +1,4 @@
-export type OperationMode = 'SWAP' | 'SALE' | 'RENT';
+export type OperationMode = 'ALL' | 'SWAP' | 'SALE' | 'RENT';
 
 export interface DropdownOption {
   value: string;
@@ -45,18 +45,23 @@ export const BUDGET_RENT_OPTIONS: DropdownOption[] = [
 ];
 
 export const SEARCH_CONFIG: Record<OperationMode, OperationSearchConfig> = {
+  ALL: {
+    placeholder: 'Ciudad, zona o folio Towers México',
+    submitLabel: 'Explorar todo',
+    budgetOptions: []
+  },
   SWAP: {
-    placeholder: 'Ciudad, zona o folio AuraSwap',
+    placeholder: 'Ciudad, zona o folio Towers México',
     submitLabel: 'Buscar Swaps',
     budgetOptions: []
   },
   SALE: {
-    placeholder: 'Ciudad, zona o folio AuraSwap',
+    placeholder: 'Ciudad, zona o folio Towers México',
     submitLabel: 'Buscar Propiedades',
     budgetOptions: BUDGET_SALE_OPTIONS
   },
   RENT: {
-    placeholder: 'Ciudad, zona o folio AuraSwap',
+    placeholder: 'Ciudad, zona o folio Towers México',
     submitLabel: 'Buscar Rentas',
     budgetOptions: BUDGET_RENT_OPTIONS
   }

@@ -9,24 +9,42 @@ import {
   KeyRound, UserPlus, HelpCircle, ArrowRight, CheckCircle2, 
   AlertTriangle, Mail, Lock, User, ShieldCheck
 } from 'lucide-react';
-
-import { useSupabase } from '../../lib/services/ServiceFactory';
+import { supabase } from '../../lib/supabaseClient';
 
 type TabType = 'login' | 'register' | 'forgot' | 'verify';
+
+function GoogleMark({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.55h3.24c1.9-1.75 2.98-4.33 2.98-7.42Z" />
+      <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.35l-3.24-2.55c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.05v2.63A10 10 0 0 0 12 22Z" />
+      <path fill="#FBBC05" d="M6.39 13.93A6.02 6.02 0 0 1 6.08 12c0-.67.11-1.32.31-1.93V7.44H3.05A10 10 0 0 0 2 12c0 1.61.38 3.14 1.05 4.56l3.34-2.63Z" />
+      <path fill="#EA4335" d="M12 5.94c1.47 0 2.79.51 3.83 1.5l2.87-2.87A9.62 9.62 0 0 0 12 2a10 10 0 0 0-8.95 5.44l3.34 2.63C7.18 7.7 9.39 5.94 12 5.94Z" />
+    </svg>
+  );
+}
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isVerifiedParam = searchParams.get('verified') === 'true';
   const isPasswordResetParam = searchParams.get('passwordReset') === 'true';
+  const oauthErrorParam = searchParams.get('oauthError');
   const requestedMode = searchParams.get('mode');
+  const intentPublish = searchParams.get('intent') === 'publish';
+  const requestedNext = searchParams.get('next');
+  const safeNext = requestedNext?.startsWith('/') && !requestedNext.startsWith('//')
+    ? requestedNext
+    : '/dashboard?tab=publish';
   const { t, language } = useTranslation();
   const { 
     loginMock, registerMock, resetPasswordMock, resendVerificationEmail
   } = useSwap();
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<TabType>('login');
+  const [activeTab, setActiveTab] = useState<TabType>(
+    requestedMode === 'register' || requestedMode === 'forgot' ? requestedMode : 'login',
+  );
 
   // Input Fields
   const [email, setEmail] = useState('');
@@ -49,19 +67,30 @@ function LoginForm() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const pendingEmail = localStorage.getItem('auraswap_pending_verification_email');
-      if (pendingEmail && !email) {
-        setEmail(pendingEmail);
+      if (pendingEmail) {
+        queueMicrotask(() => setEmail((currentEmail) => currentEmail || pendingEmail));
       }
     }
   }, []);
 
   useEffect(() => {
-    if (requestedMode === 'forgot') {
-      setActiveTab('forgot');
-      setForgotSuccess(false);
-      setErrorMsg(null);
+    if (requestedMode === 'forgot' || requestedMode === 'register') {
+      queueMicrotask(() => {
+        setActiveTab(requestedMode);
+        setForgotSuccess(false);
+        setErrorMsg(null);
+      });
     }
   }, [requestedMode]);
+
+  useEffect(() => {
+    if (!oauthErrorParam) return;
+    queueMicrotask(() => {
+      setErrorMsg(language === 'es'
+        ? 'No pudimos completar el acceso con Google. Intenta nuevamente.'
+        : 'We could not complete Google sign-in. Please try again.');
+    });
+  }, [language, oauthErrorParam]);
 
   // 2. Clear pending email from storage once successfully verified
   useEffect(() => {
@@ -89,10 +118,10 @@ function LoginForm() {
         }, 1000);
         return () => clearTimeout(timer);
       } else {
-        router.push('/onboarding');
+        router.push(intentPublish ? safeNext : '/onboarding');
       }
     }
-  }, [isVerifiedParam, redirectCountdown, router]);
+  }, [intentPublish, isVerifiedParam, redirectCountdown, router, safeNext]);
 
   // Form submission handlers
   const handleLogin = async (e: React.FormEvent) => {
@@ -106,7 +135,7 @@ function LoginForm() {
         const success = await loginMock(email, password);
         setLoading(false);
         if (success) {
-          router.push('/explore');
+          router.push(intentPublish ? safeNext : '/explore');
         }
       } catch (err: any) {
         setLoading(false);
@@ -145,19 +174,28 @@ function LoginForm() {
 
     setTimeout(async () => {
       try {
-        await registerMock(email, name, regPassword);
+        await registerMock(email, name, regPassword, intentPublish ? safeNext : undefined);
         setLoading(false);
-        if (useSupabase) {
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('auraswap_pending_verification_email', email);
-          }
-          setActiveTab('verify'); // Switch to beautiful verification screen!
-        } else {
-          router.push('/onboarding'); // Staging mock bypasses email checks
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auraswap_pending_verification_email');
         }
+        router.push(intentPublish ? safeNext : '/onboarding');
       } catch (err: any) {
         setLoading(false);
-        setErrorMsg(err.message || 'Error en el registro');
+        const message = String(err?.message || '');
+        if (message.toLowerCase().includes('already registered') || message.includes('Ya existe una cuenta')) {
+          setErrorMsg(language === 'es'
+            ? 'Ya existe una cuenta con este correo. Inicia sesión para continuar.'
+            : 'An account with this email already exists. Sign in to continue.');
+        } else if (message.toLowerCase().includes('rate limit')) {
+          setErrorMsg(language === 'es'
+            ? 'No pudimos completar el registro en este momento. Intenta nuevamente en unos minutos.'
+            : 'We could not complete the registration right now. Please try again in a few minutes.');
+        } else {
+          setErrorMsg(language === 'es'
+            ? 'No pudimos crear la cuenta. Revisa los datos e intenta nuevamente.'
+            : 'We could not create the account. Check your details and try again.');
+        }
       }
     }, 650);
   };
@@ -180,12 +218,84 @@ function LoginForm() {
     }, 600);
   };
 
+  const handleGoogleAuth = async () => {
+    setLoading(true);
+    setErrorMsg(null);
+
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      const isNative = Capacitor.isNativePlatform();
+      const destination = intentPublish
+        ? safeNext
+        : activeTab === 'register'
+          ? '/onboarding'
+          : '/explore';
+      const callback = isNative
+        ? `towersmexico://auth/callback?next=${encodeURIComponent(destination)}`
+        : `${window.location.origin}/auth/callback?next=${encodeURIComponent(destination)}`;
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: callback,
+          skipBrowserRedirect: isNative,
+          queryParams: {
+            prompt: 'select_account',
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      if (isNative) {
+        if (!data.url) throw new Error('Google OAuth URL was not returned.');
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({ url: data.url });
+      }
+    } catch (error) {
+      console.error('[Google Auth] Unable to start OAuth:', error);
+      setLoading(false);
+      setErrorMsg(language === 'es'
+        ? 'No pudimos abrir el acceso con Google. Intenta nuevamente.'
+        : 'We could not open Google sign-in. Please try again.');
+    }
+  };
+
+  const googleAuthButton = (
+    <>
+      <button
+        type="button"
+        onClick={handleGoogleAuth}
+        disabled={loading}
+        className="flex min-h-[52px] w-full items-center justify-center gap-3 rounded-2xl border border-brand-gray-200 bg-white px-5 py-3.5 text-xs font-extrabold text-brand-black shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-gray-300 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {loading ? (
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-gray-200 border-t-brand-black" />
+        ) : (
+          <GoogleMark className="h-5 w-5 shrink-0" />
+        )}
+        <span>
+          {language === 'es'
+            ? activeTab === 'register' ? 'Registrarme con Google' : 'Continuar con Google'
+            : activeTab === 'register' ? 'Sign up with Google' : 'Continue with Google'}
+        </span>
+      </button>
+      <div className="flex items-center gap-3" aria-hidden="true">
+        <span className="h-px flex-1 bg-brand-gray-200" />
+        <span className="text-[9px] font-black uppercase tracking-[0.16em] text-brand-gray-400">
+          {language === 'es' ? 'o usa tu correo' : 'or use your email'}
+        </span>
+        <span className="h-px flex-1 bg-brand-gray-200" />
+      </div>
+    </>
+  );
+
   const handleResend = async () => {
     if (!email || resendCooldown > 0) return;
     setLoading(true);
     setErrorMsg(null);
     try {
-      await resendVerificationEmail(email);
+      await resendVerificationEmail(email, intentPublish ? safeNext : undefined);
       setLoading(false);
       setIsResentSuccess(true);
       setResendCooldown(60); // 60s cooldown trigger
@@ -407,6 +517,10 @@ function LoginForm() {
                   </div>
                 )}
 
+                <div className="flex flex-col gap-4">
+                  {googleAuthButton}
+                </div>
+
                 <form onSubmit={handleLogin} className="flex flex-col gap-5">
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="login-email" className="text-[10px] font-black text-brand-black uppercase tracking-wider">
@@ -496,6 +610,10 @@ function LoginForm() {
                     <span>{errorMsg}</span>
                   </div>
                 )}
+
+                <div className="flex flex-col gap-4">
+                  {googleAuthButton}
+                </div>
 
                 <form onSubmit={handleRegister} className="flex flex-col gap-4">
                   <div className="flex flex-col gap-1.5">
@@ -668,7 +786,7 @@ function LoginForm() {
         </div>
 
         <div className="mt-8 flex flex-col items-center justify-between gap-2 border-t border-brand-gray-100 pt-5 text-center text-[9px] font-bold uppercase tracking-[0.12em] text-brand-gray-400 select-none min-[420px]:flex-row min-[420px]:text-left">
-          <span>AuraSwap Network</span>
+          <span>Towers México Network</span>
           <span className="inline-flex items-center gap-1.5 normal-case tracking-normal">
             <Lock className="h-3 w-3" />
             {language === 'es' ? 'Sesión cifrada y protegida' : 'Encrypted and protected session'}

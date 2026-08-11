@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 export type StreamStatus = "disconnected" | "connected" | "listening" | "thinking" | "talking" | "idle";
 
@@ -119,7 +119,7 @@ export function useWebSocketStream() {
     audioSourcesRef.current.forEach((source) => {
       try {
         source.stop();
-      } catch (e) {
+      } catch {
         // Source might have already stopped
       }
     });
@@ -244,6 +244,7 @@ export function useWebSocketStream() {
     setIsConnected(false);
     setStatus("disconnected");
   };
+  const disconnectEvent = useEffectEvent(disconnect);
 
   // Send message to the backend
   const sendMessage = async (text: string, history: any[], userId?: string) => {
@@ -292,7 +293,7 @@ export function useWebSocketStream() {
   // Handle window tab close/unload cleanup
   useEffect(() => {
     const handleBeforeUnload = () => {
-      disconnect();
+      disconnectEvent();
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {

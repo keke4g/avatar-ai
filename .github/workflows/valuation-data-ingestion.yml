@@ -1,0 +1,50 @@
+name: Valuation data ingestion
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Optional source id from the valuation registry
+        required: false
+        type: string
+  schedule:
+    - cron: '17 9 2 * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: valuation-data-ingestion
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Download, hash and store official sources
+        shell: bash
+        run: |
+          source_arg=""
+          if [ -n "${{ inputs.source }}" ]; then
+            source_arg="--source=${{ inputs.source }}"
+          fi
+          npx --yes tsx scripts/valuation/ingest-official-sources.ts "$source_arg"
+      - name: Preserve the audit manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: valuation-ingestion-manifest-${{ github.run_id }}
+          path: .valuation-cache/manifest.json
+          if-no-files-found: warn
+          retention-days: 90

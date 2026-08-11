@@ -11,7 +11,7 @@ import { Home, Search, Building2, Landmark, Globe, MessageSquare, Sun, Moon } fr
 
 export default function HomeExperience() {
   const { setHideHeader, setHideFooter } = useLayoutContext();
-  const { sendPrompt } = useLiveContext();
+  const { sendPrompt, startVoice } = useLiveContext();
   const { language } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [navbarHeight, setNavbarHeight] = useState(80);
@@ -112,15 +112,20 @@ export default function HomeExperience() {
   }, []);
 
   const actions = [
-    { icon: Home, text: "Quiero vender mi casa", sub: "Obtén una valoración con IA" },
-    { icon: Search, text: "Busco una propiedad", sub: "Encuentra tu hogar ideal" },
-    { icon: Building2, text: "Quiero invertir", sub: "Maximiza tus rendimientos" },
-    { icon: Landmark, text: "Valorar mi propiedad", sub: "Estima su valor de mercado" },
-    { icon: Globe, text: "Buscar propiedades internacionales", sub: "Explora opciones globales" },
-    { icon: MessageSquare, text: "Hablar con Eterna", sub: "Resuelve tus dudas en tiempo real" },
+    { icon: Home, text: "Quiero vender mi casa", sub: "Obtén una valoración con IA", action: 'prompt' as const },
+    { icon: Search, text: "Busco una propiedad", sub: "Encuentra tu hogar ideal", action: 'prompt' as const },
+    { icon: Building2, text: "Quiero invertir", sub: "Maximiza tus rendimientos", action: 'prompt' as const },
+    { icon: Landmark, text: "Valorar mi propiedad", sub: "Estima su valor de mercado", action: 'prompt' as const },
+    { icon: Globe, text: "Buscar propiedades internacionales", sub: "Explora opciones globales", action: 'prompt' as const },
+    { icon: MessageSquare, text: "Hablar con Eterna", sub: "Enciende el micrófono y conversa", action: 'voice' as const },
   ];
 
-  const handleCardClick = (text: string) => {
+  const handleCardClick = (text: string, action: 'prompt' | 'voice') => {
+    if (action === 'voice') {
+      startVoice();
+      return;
+    }
+
     sendPrompt(text);
   };
 
@@ -195,7 +200,7 @@ export default function HomeExperience() {
                   <button
                     key={act.text}
                     type="button"
-                    onClick={() => handleCardClick(act.text)}
+                    onClick={() => handleCardClick(act.text, act.action)}
                     className={`group relative w-full rounded-2xl p-3 lg:px-3 lg:py-2.5 cursor-pointer flex items-center gap-4 lg:gap-3 hover:-translate-y-[3px] transition-all duration-300 ${
                       isDark
                         ? "bg-white/[0.02] border border-white/5 hover:border-blue-500/15 hover:bg-white/[0.05] hover:shadow-[0_0_15px_rgba(59,130,246,0.04)]"

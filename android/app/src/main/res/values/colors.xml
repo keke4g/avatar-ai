@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#0E7490</color>
+    <color name="colorPrimaryDark">#071827</color>
+    <color name="colorAccent">#22D3EE</color>
+    <color name="brand_navy">#071827</color>
+    <color name="brand_navy_soft">#0B2435</color>
+    <color name="brand_cyan">#67E8F9</color>
+    <color name="brand_cyan_primary">#22D3EE</color>
+    <color name="brand_white">#F8FAFC</color>
+    <color name="brand_text_secondary">#CBD5E1</color>
+    <color name="brand_text_muted">#94A3B8</color>
+    <color name="brand_border">#264559</color>
+    <color name="permission_granted">#86EFAC</color>
+    <color name="permission_attention">#FCD34D</color>
+    <color name="onboarding_surface">#020711</color>
+    <color name="onboarding_surface_alt">#061A32</color>
+    <color name="onboarding_ink">#F6FBFF</color>
+    <color name="onboarding_blue">#2F7BFF</color>
+    <color name="onboarding_blue_dark">#126EB7</color>
+    <color name="onboarding_blue_mist">#142D46</color>
+    <color name="onboarding_text">#EAF5FF</color>
+    <color name="onboarding_muted">#C2CAD8</color>
+    <color name="onboarding_outline">#31536F</color>
+    <color name="onboarding_white">#FFFFFF</color>
+    <color name="onboarding_success">#6EE7B7</color>
+    <color name="onboarding_warning">#FFD074</color>
+</resources>

@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "inventoryCount": 12,
+  "markets": [
+    {
+      "id": "montebello-sale-house",
+      "targetPropertyIds": ["cd10081c-cbf1-4b4e-bd83-df8048f38d33"],
+      "city": "Culiacán Rosales",
+      "state": "Sinaloa",
+      "neighborhood": "Montebello",
+      "expectedOperation": "ASKING_SALE",
+      "expectedType": "HOUSE",
+      "excludeExternalReferences": ["150466847"],
+      "sources": [
+        {"portal": "inmuebles24", "seed": "https://www.inmuebles24.com/casas-en-venta-en-fraccionamiento-montebello-ciudad-de-culiacan.html", "renderJs": true, "maxPages": 1, "maxObservations": 60},
+        {"portal": "propiedades-com", "seed": "https://propiedades.com/montebello-culiacan/casas-venta", "maxPages": 1, "maxObservations": 80}
+      ]
+    },
+    {
+      "id": "lomas-angelopolis-sale-house",
+      "targetPropertyIds": ["a4e2fdb1-fb55-4e2f-b8f4-cdc7d5b57d4d"],
+      "city": "San Andrés Cholula",
+      "state": "Puebla",
+      "neighborhood": "Lomas de Angelópolis",
+      "expectedOperation": "ASKING_SALE",
+      "expectedType": "HOUSE",
+      "sources": [
+        {"portal": "inmuebles24", "seed": "https://www.inmuebles24.com/casas-en-venta-en-lomas-de-angelopolis-ciudad-de-san-andres-cholula.html", "renderJs": true, "maxPages": 1, "maxObservations": 100},
+        {"portal": "propiedades-com", "seed": "https://propiedades.com/lomas-de-angelopolis-san-andres-cholula/casas-venta", "maxPages": 1, "maxObservations": 100}
+      ]
+    },
+    {
+      "id": "torres-aeropuerto-sale-house",
+      "targetPropertyIds": ["f6753010-cd25-4534-86c2-7c10f0e73384"],
+      "city": "Culiacán Rosales",
+      "state": "Sinaloa",
+      "neighborhood": "Torres Aeropuerto",
+      "expectedOperation": "ASKING_SALE",
+      "expectedType": "HOUSE",
+      "sources": [
+        {"portal": "inmuebles24", "seed": "https://www.inmuebles24.com/casas-en-venta-en-culiacan.html", "renderJs": true, "maxPages": 1, "maxObservations": 80},
+        {"portal": "propiedades-com", "seed": "https://propiedades.com/torres-aeropuerto-culiacan/casas-venta", "maxPages": 1, "maxObservations": 40}
+      ]
+    },
+    {
+      "id": "tres-rios-sale-apartment",
+      "targetPropertyIds": ["322e2053-3778-4331-a268-f4e68e07ba3d"],
+      "city": "Culiacán Rosales",
+      "state": "Sinaloa",
+      "neighborhood": "Zona comercial Desarrollo Urbano 3 Ríos",
+      "expectedOperation": "ASKING_SALE",
+      "expectedType": "APARTMENT",
+      "sources": [
+        {"portal": "inmuebles24", "seed": "https://www.inmuebles24.com/departamentos-en-venta-en-zona-comercial-desarrollo-urbano-3-rios.html", "renderJs": true, "maxPages": 1, "maxObservations": 80},
+        {"portal": "propiedades-com", "seed": "https://propiedades.com/tres-rios-culiacan-sinaloa/departamentos-venta", "maxPages": 1, "maxObservations": 100}
+      ]
+    },
+    {
+      "id": "villas-rio-sale-house",
+      "targetPropertyIds": ["6784d8be-4dec-44a0-98b8-de6ad2726e56"],
+      "city": "Culiacán Rosales",
+      "state": "Sinaloa",
+      "neighborhood": "Villas del Río",
+      "expectedOperation": "ASKING_SALE",
+      "expectedType": "HOUSE",
+      "sources": [
+        {"portal": "inmuebles24", "seed": "https://www.inmuebles24.com/casas-en-venta-en-fraccionamiento-villas-del-rio.html", "renderJs": true, "maxPages": 1, "maxObservations": 60},
+        {"portal": "propiedades-com", "seed": "https://propiedades.com/villas-del-rio-culiacan/casas-venta", "maxPages": 1, "maxObservations": 80}
+      ]
+    },
+    {
+      "id": "tetlan-sale-apartment",
+      "targetPropertyIds": ["e83974de-bd16-4ccd-bba3-ffa31f381c48"],
+      "city": "Guadalajara",
+      "state": "Jalisco",
+      "neighborhood": "Tetlán",
+      "expectedOperation": "ASKING_SALE",
+      "expectedType": "APARTMENT",
+      "sources": [
+        {"portal": "inmuebles24", "seed": "https://www.inmuebles24.com/departamentos-en-venta-en-guadalajara.html", "renderJs": true, "maxPages": 1, "maxObservations": 80},
+        {"portal": "propiedades-com", "seed": "https://propiedades.com/tetlan-guadalajara/departamentos-venta", "maxPages": 1, "maxObservations": 40}
+      ]
+    },
+    {
+      "id": "villa-cedro-sale-house",
+      "targetPropertyIds": ["c71a9e86-0c81-4ba0-a487-5d78deb1c159", "175a4f7d-0153-4f76-98d1-964c63b828bc"],
+      "city": "Culiacán Rosales",
+      "state": "Sinaloa",
+      "neighborhood": "Villa del Cedro",
+      "expectedOperation": "ASKING_SALE",
+      "expectedType": "HOUSE",
+      "sources": [
+        {"portal": "inmuebles24", "seed": "https://www.inmuebles24.com/casas-en-venta-en-fraccionamiento-villa-del-cedro.html", "renderJs": true, "maxPages": 1, "maxObservations": 60},
+        {"portal": "propiedades-com", "seed": "https://propiedades.com/villa-del-cedro-culiacan/casas-venta", "maxPages": 1, "maxObservations": 60}
+      ]
+    },
+    {
+      "id": "zona-dorada-sale-apartment",
+      "targetPropertyIds": ["9659584a-b8f7-4a03-8ebb-d49b72b95605"],
+      "city": "Mazatlán",
+      "state": "Sinaloa",
+      "neighborhood": "Zona Dorada",
+      "expectedOperation": "ASKING_SALE",
+      "expectedType": "APARTMENT",
+      "sources": [
+        {"portal": "inmuebles24", "seed": "https://www.inmuebles24.com/departamentos-en-venta-en-mazatlan.html", "renderJs": true, "maxPages": 1, "maxObservations": 100},
+        {"portal": "propiedades-com", "seed": "https://propiedades.com/zona-dorada-mazatlan/departamentos-venta", "maxPages": 1, "maxObservations": 100}
+      ]
+    },
+    {
+      "id": "melchor-ocampo-sale-house",
+      "targetPropertyIds": ["41a54f14-4d15-4cff-bcb7-6f6017e9d43d"],
+      "city": "Culiacán Rosales",
+      "state": "Sinaloa",
+      "neighborhood": "Melchor Ocampo",
+      "expectedOperation": "ASKING_SALE",
+      "expectedType": "HOUSE",
+      "sources": [
+        {"portal": "inmuebles24", "seed": "https://www.inmuebles24.com/casas-en-venta-en-culiacan.html", "renderJs": true, "maxPages": 1, "maxObservations": 80},
+        {"portal": "propiedades-com", "seed": "https://propiedades.com/culiacan/casas-venta", "maxPages": 1, "maxObservations": 100}
+      ]
+    },
+    {
+      "id": "villa-universidad-rent-apartment",
+      "targetPropertyIds": ["6280c0b5-f3d0-4be6-b57b-363407af3b9b"],
+      "city": "Culiacán Rosales",
+      "state": "Sinaloa",
+      "neighborhood": "Villa Universidad",
+      "expectedOperation": "ASKING_RENT",
+      "expectedType": "APARTMENT",
+      "sources": [
+        {"portal": "inmuebles24", "seed": "https://www.inmuebles24.com/departamentos-en-renta-en-culiacan.html", "renderJs": true, "maxPages": 1, "maxObservations": 80},
+        {"portal": "propiedades-com", "seed": "https://propiedades.com/villa-universidad-culiacan/departamentos-renta", "maxPages": 1, "maxObservations": 60}
+      ]
+    },
+    {
+      "id": "villas-oriente-ii-sale-house",
+      "targetPropertyIds": ["bf28aec2-f369-48c0-a1cb-ab9878ecfbf9"],
+      "city": "Tonalá",
+      "state": "Jalisco",
+      "neighborhood": "Villas de Oriente II",
+      "expectedOperation": "ASKING_SALE",
+      "expectedType": "HOUSE",
+      "excludeExternalReferences": ["149332654"],
+      "sources": [
+        {"portal": "inmuebles24", "seed": "https://www.inmuebles24.com/inmuebles-en-venta-en-villas-de-oriente.html", "renderJs": true, "maxPages": 1, "maxObservations": 60},
+        {"portal": "propiedades-com", "seed": "https://propiedades.com/villas-de-oriente-tonala/casas-venta", "maxPages": 1, "maxObservations": 40}
+      ]
+    }
+  ]
+}

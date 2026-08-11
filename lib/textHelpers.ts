@@ -19,6 +19,11 @@ export function formatCount(
   const cleanCount = Math.floor(count);
 
   if (cleanCount === 1) {
+    // “Medio baño” is a fixed noun phrase. Adding an article produces the
+    // incorrect “un/una medio baño” that can leak into Eterna's summaries.
+    if (/^medio\s+/i.test(singular.trim())) {
+      return singular.trim();
+    }
     const prefix = gender === 'masculine' ? 'un' : 'una';
     return `${prefix} ${singular}`;
   }

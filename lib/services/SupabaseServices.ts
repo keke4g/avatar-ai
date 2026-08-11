@@ -1,104 +1,54 @@
 import { supabase } from '../supabaseClient';
-import { Property, PropertyOffering, PropertyMedia, User, SwapRequest, ChatMessage, Notification, SwapStatus, SwapTravelDetails, Lead } from '../types';
+import { Property, PropertyOffering, PropertyMedia, PropertyValuation } from '../types';
 import { ensurePropertyOfferings, normalizeOfferings, syncPropertyOfferings } from '../propertyOfferings';
-import { IPropertyService, IUserService, ISwapService, IMessageService, INotificationService, ILeadService } from './types';
+import { IPropertyService } from './types';
 import { PropertyMapper } from './PropertyMapper';
 import { PropertyValidator } from './PropertyValidator';
 import { searchProperties } from '../search/SearchEngine';
 import { PropertySearchFilters, SearchResult, ProviderCapabilities } from '../search/types';
-import { PROPERTY_TYPE_MAPPING } from '../searchFilters';
 import { searchCache } from '../search/SearchCache';
 import { measureExecution } from '../search/measureExecution';
 import { searchLogger } from '../search/searchLogger';
 
 import { SupabasePropertyMediaService } from './SupabasePropertyMediaService';
 
-const HYBRID_PROPERTY_SELECT = '*, property_media(*), profiles:public_profiles_view!host_id(name, avatar_url, is_verified), property_offerings(*, property_offering_availability(*), property_offering_pricing_rules(*))';
-const LEGACY_PROPERTY_SELECT = '*, property_media(*), profiles:public_profiles_view!host_id(name, avatar_url, is_verified)';
-
-// Compatibility bridge while older Supabase projects still expose the original,
-// reduced public_properties_view. Only public, non-contact property details are
-// selected from the base table and merged into the sanitized view response.
-const PUBLIC_PROPERTY_DETAILS_SELECT = [
-  'id',
-  'internal_code',
-  'published_at',
-  'primary_operation',
-  'development_name',
-  'subdivision_name',
-  'private_neighborhood',
-  'phase_stage',
-  'lot_number',
-  'block_number',
-  'condominium_regime',
-  'maintenance_fee_amount',
-  'neighborhood',
-  'postal_code',
-  'street_name',
-  'street_number',
-  'location_reference',
-  'show_public_address',
-  'half_bathrooms',
-  'parking_spaces',
-  'levels_count',
-  'construction_age',
-  'conservation_state_id',
-  'construction_type_id',
-  'surface_total',
-  'surface_built',
-  'surface_front',
-  'surface_depth',
-  'surface_garden',
-  'surface_terrace',
-  'surface_roof_garden',
-  'surface_patio',
-  'services_water',
-  'services_electricity',
-  'services_sewerage',
-  'services_nat_gas',
-  'services_lp_gas',
-  'services_internet',
-  'services_garbage',
-  'security_cctv',
-  'security_guardhouse',
-  'security_24_7',
-  'security_biometric',
-  'view_type_id',
-  'orientation_id',
-].join(',');
-
 type PublicPropertyRow = Record<string, unknown> & { id?: string };
 
-const enrichPublicPropertyRows = async <T extends PublicPropertyRow>(rows: T[]): Promise<T[]> => {
-  const propertyIds = rows
-    .map((row) => row.id)
-    .filter((id): id is string => typeof id === 'string' && id.length > 0);
-
-  if (propertyIds.length === 0) return rows;
-
-  const { data: details, error } = await supabase
-    .from('properties')
-    .select(PUBLIC_PROPERTY_DETAILS_SELECT)
-    .in('id', propertyIds)
-    .eq('is_published', true);
-
-  if (error) {
-    if (error.code !== '42501') {
-      console.warn('[SupabasePropertyService] Public property details enrichment unavailable:', error.message);
-    }
-    return rows;
-  }
-
-  const detailRows = (details || []) as unknown as PublicPropertyRow[];
-  const detailsById = new Map(
-    detailRows.map((detail) => [detail.id, detail]),
-  );
-
-  return rows.map((row) => ({
-    ...row,
-    ...(row.id ? detailsById.get(row.id) : undefined),
-  } as T));
-};
+const mapPublicValuationRow = (row: any): PropertyValuation => ({
+  id: row.id,
+  propertyId: row.property_id,
+  currency: row.currency || 'MXN',
+  estimatedSaleValue: row.estimated_sale_value == null ? null : Number(row.estimated_sale_value),
+  saleRangeLow: row.sale_range_low == null ? null : Number(row.sale_range_low),
+  saleRangeHigh: row.sale_range_high == null ? null : Number(row.sale_range_high),
+  salePricePerM2: row.sale_price_per_m2 == null ? null : Number(row.sale_price_per_m2),
+  estimatedMonthlyRent: row.estimated_monthly_rent == null ? null : Number(row.estimated_monthly_rent),
+  rentRangeLow: row.rent_range_low == null ? null : Number(row.rent_range_low),
+  rentRangeHigh: row.rent_range_high == null ? null : Number(row.rent_range_high),
+  rentPricePerM2: row.rent_price_per_m2 == null ? null : Number(row.rent_price_per_m2),
+  estimatedCapRate: row.estimated_cap_rate == null ? null : Number(row.estimated_cap_rate),
+  grossRentalYield: row.gross_rental_yield == null ? null : Number(row.gross_rental_yield),
+  listingPrice: row.listing_price == null ? null : Number(row.listing_price),
+  listingVsEstimatePct: row.listing_vs_estimate_pct == null ? null : Number(row.listing_vs_estimate_pct),
+  areaReferenceValue: row.area_reference_value == null ? null : Number(row.area_reference_value),
+  areaRangeLow: row.area_range_low == null ? null : Number(row.area_range_low),
+  areaRangeHigh: row.area_range_high == null ? null : Number(row.area_range_high),
+  areaPricePerM2: row.area_price_per_m2 == null ? null : Number(row.area_price_per_m2),
+  areaReferenceOperation: row.area_reference_operation || null,
+  areaLocationBasis: row.area_location_basis || null,
+  confidence: row.confidence || 'INSUFFICIENT',
+  evidenceTier: row.evidence_tier || 'INSUFFICIENT',
+  confidenceScore: Number(row.confidence_score || 0),
+  comparableCount: Number(row.comparable_count || 0),
+  saleComparableCount: Number(row.sale_comparable_count || 0),
+  rentComparableCount: Number(row.rent_comparable_count || 0),
+  dataAsOf: row.data_as_of,
+  modelVersion: row.model_version,
+  methodology: row.methodology,
+  sourceLabels: Array.isArray(row.source_labels) ? row.source_labels : [],
+  warnings: Array.isArray(row.warnings) ? row.warnings : [],
+  comparables: Array.isArray(row.comparables) ? row.comparables : [],
+});
 
 const fetchSanitizedPublicPropertyRows = async (propertyId?: string): Promise<PublicPropertyRow[]> => {
   let propertyQuery = supabase
@@ -120,7 +70,7 @@ const fetchSanitizedPublicPropertyRows = async (propertyId?: string): Promise<Pu
   const propertyIds = propertyRows.map((row) => row.id);
   const hostIds = Array.from(new Set(propertyRows.map((row) => row.host_id).filter(Boolean)));
 
-  const [mediaResult, offeringsResult, profilesResult] = await Promise.all([
+  const [mediaResult, offeringsResult, profilesResult, publisherContactsResult, valuationsResult] = await Promise.all([
     supabase
       .from('public_property_media_view')
       .select('*')
@@ -135,6 +85,14 @@ const fetchSanitizedPublicPropertyRows = async (propertyId?: string): Promise<Pu
           .select('id,name,avatar_url,is_verified')
           .in('id', hostIds)
       : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from('public_property_publisher_contacts_view')
+      .select('property_id,user_id,representative_type,full_name,organization_name,phone,whatsapp,contact_email,completed_at')
+      .in('property_id', propertyIds),
+    supabase
+      .from('public_property_valuations_view')
+      .select('*')
+      .in('property_id', propertyIds),
   ]);
 
   if (mediaResult.error) {
@@ -142,6 +100,12 @@ const fetchSanitizedPublicPropertyRows = async (propertyId?: string): Promise<Pu
   }
   if (offeringsResult.error) {
     console.warn('[SupabasePropertyService] Public offerings view unavailable:', offeringsResult.error.message);
+  }
+  if (publisherContactsResult.error) {
+    console.warn('[SupabasePropertyService] Public publisher contacts view unavailable:', publisherContactsResult.error.message);
+  }
+  if (valuationsResult.error && valuationsResult.error.code !== 'PGRST205') {
+    console.warn('[SupabasePropertyService] Public valuation view unavailable:', valuationsResult.error.message);
   }
 
   const mediaByProperty = new Map<string, any[]>();
@@ -165,12 +129,101 @@ const fetchSanitizedPublicPropertyRows = async (propertyId?: string): Promise<Pu
   const profilesById = new Map(
     (profilesResult.data || []).map((profile) => [profile.id, profile]),
   );
+  const publisherContactsByProperty = new Map(
+    (publisherContactsResult.data || []).map((contact) => [contact.property_id, contact]),
+  );
+  const valuationsByProperty = new Map(
+    (valuationsResult.data || []).map((valuation) => [
+      valuation.property_id,
+      mapPublicValuationRow(valuation),
+    ]),
+  );
 
   return propertyRows.map((row) => ({
     ...row,
     property_media: mediaByProperty.get(row.id) || [],
     property_offerings: offeringsByProperty.get(row.id) || [],
     profiles: profilesById.get(row.host_id) || null,
+    publisher_contact: publisherContactsByProperty.get(row.id) || null,
+    valuation: valuationsByProperty.get(row.id) || null,
+  }));
+};
+
+const fetchAccessiblePropertyRows = async ({
+  propertyId,
+  hostId,
+  includeAll,
+}: {
+  propertyId?: string;
+  hostId?: string;
+  includeAll?: boolean;
+}): Promise<PublicPropertyRow[]> => {
+  let propertyQuery = supabase.from('properties').select('*');
+  if (propertyId) propertyQuery = propertyQuery.eq('id', propertyId);
+  if (!includeAll && hostId) propertyQuery = propertyQuery.eq('host_id', hostId);
+
+  const { data: propertyRows, error: propertyError } = await propertyQuery;
+  if (propertyError || !propertyRows?.length) {
+    if (propertyError) {
+      console.warn('[SupabasePropertyService] Accessible inventory query unavailable:', propertyError.message);
+    }
+    return [];
+  }
+
+  const propertyIds = propertyRows.map((row) => row.id);
+  const hostIds = Array.from(new Set(propertyRows.map((row) => row.host_id).filter(Boolean)));
+  const [mediaResult, offeringsResult, profilesResult, publisherProfilesResult] = await Promise.all([
+    supabase.from('property_media').select('*').in('property_id', propertyIds),
+    supabase.from('property_offerings').select('*').in('property_id', propertyIds),
+    hostIds.length > 0
+      ? supabase.from('public_profiles_view').select('id,name,avatar_url,is_verified').in('id', hostIds)
+      : Promise.resolve({ data: [], error: null }),
+    hostIds.length > 0
+      ? supabase
+          .from('publisher_profiles')
+          .select('user_id,representative_type,full_name,organization_name,phone,whatsapp,contact_email,completed_at')
+          .in('user_id', hostIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (mediaResult.error) {
+    console.warn('[SupabasePropertyService] Accessible media query unavailable:', mediaResult.error.message);
+  }
+  if (offeringsResult.error) {
+    console.warn('[SupabasePropertyService] Accessible offerings query unavailable:', offeringsResult.error.message);
+  }
+
+  const mediaByProperty = new Map<string, any[]>();
+  (mediaResult.data || []).forEach((row) => {
+    const current = mediaByProperty.get(row.property_id) || [];
+    current.push(row);
+    mediaByProperty.set(row.property_id, current);
+  });
+
+  const offeringsByProperty = new Map<string, any[]>();
+  (offeringsResult.data || []).forEach((row) => {
+    const current = offeringsByProperty.get(row.property_id) || [];
+    current.push({
+      ...row,
+      property_offering_availability: [],
+      property_offering_pricing_rules: [],
+    });
+    offeringsByProperty.set(row.property_id, current);
+  });
+
+  const profilesById = new Map(
+    (profilesResult.data || []).map((profile) => [profile.id, profile]),
+  );
+  const publisherProfilesById = new Map(
+    (publisherProfilesResult.data || []).map((profile) => [profile.user_id, profile]),
+  );
+
+  return propertyRows.map((row) => ({
+    ...row,
+    property_media: mediaByProperty.get(row.id) || [],
+    property_offerings: offeringsByProperty.get(row.id) || [],
+    profiles: profilesById.get(row.host_id) || null,
+    publisher_contact: publisherProfilesById.get(row.host_id) || null,
   }));
 };
 
@@ -286,49 +339,12 @@ export class SupabasePropertyService implements IPropertyService {
     }
 
     const { result: searchResult, executionTime } = await measureExecution(async () => {
-      let query = supabase.from('public_properties_view').select(HYBRID_PROPERTY_SELECT);
-      
-      if (filters.type) {
-        const allowedTypes = PROPERTY_TYPE_MAPPING[filters.type] || [filters.type];
-        const capitalizedTypes = allowedTypes.map(t => {
-          return t.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-        });
-        const dbTypes = Array.from(new Set([...allowedTypes, ...capitalizedTypes]));
-        query = query.in('type', dbTypes);
-      }
-
-      query = query.eq('is_published', true);
-
-      let { data, error } = await query;
-
-      if (error?.code === '42501') {
-        data = await fetchSanitizedPublicPropertyRows();
-        error = null;
-      }
-
-      if (error && isMissingOfferingsRelationError(error)) {
-        let legacyQuery = supabase.from('public_properties_view').select(LEGACY_PROPERTY_SELECT);
-        if (filters.type) {
-          const allowedTypes = PROPERTY_TYPE_MAPPING[filters.type] || [filters.type];
-          const capitalizedTypes = allowedTypes.map(t => {
-            return t.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-          });
-          const dbTypes = Array.from(new Set([...allowedTypes, ...capitalizedTypes]));
-          legacyQuery = legacyQuery.in('type', dbTypes);
-        }
-        legacyQuery = legacyQuery.eq('is_published', true);
-        const legacy = await legacyQuery;
-        data = legacy.data;
-        error = legacy.error;
-      }
-
-      if (error) {
-        searchLogger.error('[SupabasePropertyService] Error during search pre-filter:', error);
-        return { results: [], total: 0, filters, provider: 'supabase', executionTime: 0 };
-      }
-
-      const enrichedData = await enrichPublicPropertyRows((data || []) as PublicPropertyRow[]);
-      const candidates = enrichedData.map(mapPostgresProperty);
+      // The public views are the only source used for discovery. Asking PostgREST
+      // to traverse from the view into private tables causes a 42501 for signed-in
+      // members and made the Explorer appear empty even though public inventory
+      // existed.
+      const data = await fetchSanitizedPublicPropertyRows();
+      const candidates = data.map(mapPostgresProperty);
       const results = searchProperties(candidates, filters);
       return { results, total: results.length, filters, provider: 'supabase', executionTime: 0 };
     });
@@ -362,31 +378,8 @@ export class SupabasePropertyService implements IPropertyService {
     return all.filter(p => p.hostId !== userId).slice(0, 4);
   }
   async getAll(): Promise<Property[]> {
-    let { data, error } = await supabase
-      .from('public_properties_view')
-      .select(HYBRID_PROPERTY_SELECT);
-
-    if (error?.code === '42501') {
-      data = await fetchSanitizedPublicPropertyRows();
-      error = null;
-    }
-
-    if (error && isMissingOfferingsRelationError(error)) {
-      console.warn('[SupabasePropertyService] property_offerings relation not available yet. Falling back to legacy property select.');
-      const legacy = await supabase
-        .from('public_properties_view')
-        .select(LEGACY_PROPERTY_SELECT);
-      data = legacy.data;
-      error = legacy.error;
-    }
-
-    if (error) {
-      console.error('[SupabasePropertyService] Error fetching properties:', error);
-      return [];
-    }
-
-    const enrichedData = await enrichPublicPropertyRows((data || []) as PublicPropertyRow[]);
-    const publicProperties = enrichedData.map(mapPostgresProperty);
+    const publicRows = await fetchSanitizedPublicPropertyRows();
+    const publicProperties = publicRows.map(mapPostgresProperty);
 
     const { data: authData } = await supabase.auth.getUser();
     const user = authData.user;
@@ -398,99 +391,54 @@ export class SupabasePropertyService implements IPropertyService {
       .eq('id', user.id)
       .maybeSingle();
 
-    let accessibleQuery = supabase
-      .from('properties')
-      .select(HYBRID_PROPERTY_SELECT);
-
-    if (profile?.role !== 'ADMIN') {
-      accessibleQuery = accessibleQuery.eq('host_id', user.id);
-    }
-
-    let { data: accessibleData, error: accessibleError } = await accessibleQuery;
-    if (accessibleError && isMissingOfferingsRelationError(accessibleError)) {
-      let legacyQuery = supabase
-        .from('properties')
-        .select(LEGACY_PROPERTY_SELECT);
-      if (profile?.role !== 'ADMIN') {
-        legacyQuery = legacyQuery.eq('host_id', user.id);
-      }
-      const legacy = await legacyQuery;
-      accessibleData = legacy.data;
-      accessibleError = legacy.error;
-    }
-
-    if (accessibleError) {
-      console.warn('[SupabasePropertyService] Could not load moderated properties:', accessibleError.message);
-      return publicProperties;
-    }
+    const accessibleData = await fetchAccessiblePropertyRows({
+      hostId: user.id,
+      includeAll: profile?.role === 'ADMIN',
+    });
 
     const merged = new Map(publicProperties.map((property) => [property.id, property]));
-    (accessibleData || []).map(mapPostgresProperty).forEach((property) => {
+    accessibleData.map(mapPostgresProperty).forEach((property) => {
       merged.set(property.id, property);
     });
     return Array.from(merged.values());
   }
 
   async getById(id: string): Promise<Property | null> {
-    let { data, error } = await supabase
-      .from('public_properties_view')
-      .select(HYBRID_PROPERTY_SELECT)
-      .eq('id', id)
-      .single();
-
-    if (error?.code === '42501') {
-      const [sanitizedRow] = await fetchSanitizedPublicPropertyRows(id);
-      data = sanitizedRow || null;
-      error = sanitizedRow ? null : error;
-    }
-
-    if (error && isMissingOfferingsRelationError(error)) {
-      console.warn('[SupabasePropertyService] property_offerings relation not available yet. Falling back to legacy property select.');
-      const legacy = await supabase
-        .from('public_properties_view')
-        .select(LEGACY_PROPERTY_SELECT)
-        .eq('id', id)
-        .single();
-      data = legacy.data;
-      error = legacy.error;
-    }
-
-    if (error) {
+    const [publicRow] = await fetchSanitizedPublicPropertyRows(id);
+    if (!publicRow) {
       const { data: authData } = await supabase.auth.getUser();
       if (!authData.user) return null;
 
-      let fallback = await supabase
-        .from('properties')
-        .select(HYBRID_PROPERTY_SELECT)
-        .eq('id', id)
-        .maybeSingle();
-
-      if (fallback.error && isMissingOfferingsRelationError(fallback.error)) {
-        fallback = await supabase
-          .from('properties')
-          .select(LEGACY_PROPERTY_SELECT)
-          .eq('id', id)
-          .maybeSingle();
-      }
-
-      if (fallback.error || !fallback.data) {
-        console.error(`[SupabasePropertyService] Error fetching property ${id}:`, fallback.error || error);
+      const [accessibleProperty] = await fetchAccessiblePropertyRows({ propertyId: id });
+      if (!accessibleProperty) {
+        console.error(`[SupabasePropertyService] Error fetching accessible property ${id}.`);
         return null;
       }
 
-      return mapPostgresProperty(fallback.data);
+      return mapPostgresProperty(accessibleProperty);
     }
 
-    if (!data) return null;
-
-    const [enrichedProperty] = await enrichPublicPropertyRows([data as PublicPropertyRow]);
-    return enrichedProperty ? mapPostgresProperty(enrichedProperty) : null;
+    return mapPostgresProperty(publicRow);
   }
 
   async create(property: Partial<Property> & { title: string; hostId: string }): Promise<Property> {
+    property = {
+      ...property,
+      description: property.description?.trim()
+        || 'Información pendiente de revisión por Towers México.',
+      type: property.type || 'Apartment',
+      valueRating: property.valueRating || 'Premium',
+      country: property.country?.trim() || 'México',
+      isPublished: false,
+      folderStatus: 'UNDER_REVIEW',
+      offerings: (property.offerings || []).map((offering) => ({
+        ...offering,
+        status: 'DRAFT',
+      })),
+    };
     // Auditar campos obligatorios antes de insertar
     const missingFields: string[] = [];
-    const notNullFields = ['hostId', 'title', 'description', 'location', 'country', 'latitude', 'longitude', 'type', 'valueRating'];
+    const notNullFields = ['hostId', 'title', 'location', 'latitude', 'longitude'];
     notNullFields.forEach(field => {
       const val = property[field as keyof Property];
       if (val == null || (typeof val === 'string' && !val.trim())) {
@@ -521,7 +469,7 @@ export class SupabasePropertyService implements IPropertyService {
     console.groupEnd();
 
     const tStartVal = performance.now();
-    const validation = PropertyValidator.validatePropertyBeforeInsert(property);
+    const validation = PropertyValidator.validatePropertyBeforeInsert(property, 'REVIEW');
     const tEndVal = performance.now();
 
     if (!validation.success) {
@@ -597,7 +545,11 @@ export class SupabasePropertyService implements IPropertyService {
       price_amount: offering.priceAmount,
       currency: offering.currency || 'USD',
       billing_period: offering.billingPeriod,
+      deposit_amount: offering.depositAmount,
       security_deposit_amount: offering.securityDepositAmount,
+      advance_months: offering.advanceMonths,
+      requires_guarantor: offering.requiresGuarantor,
+      requires_legal_policy: offering.requiresLegalPolicy,
       cleaning_fee_amount: offering.cleaningFeeAmount,
       service_fee_percent: offering.serviceFeePercent,
       commission_percent: offering.commissionPercent,
@@ -614,7 +566,7 @@ export class SupabasePropertyService implements IPropertyService {
       allow_instant_request: offering.allowInstantRequest,
       swap_preferences: offering.swapPreferences || {},
       swap_value_tier: offering.swapValueTier || property.valueRating,
-      aura_score_override: offering.auraScoreOverride || property.auraScore,
+      aura_score_override: offering.auraScoreOverride ?? property.auraScore ?? null,
       available_from: offering.availableFrom,
       available_until: offering.availableUntil,
       is_featured: offering.isFeatured,
@@ -625,6 +577,13 @@ export class SupabasePropertyService implements IPropertyService {
       accepts_fovissste: offering.acceptsFovissste,
       accepts_cash: offering.acceptsCash,
       developer_financing: offering.developerFinancing,
+      swap_min_value: offering.swapMinValue,
+      swap_max_value: offering.swapMaxValue,
+      swap_cash_difference_allowed: offering.swapCashDifferenceAllowed,
+      annual_property_tax: offering.annualPropertyTax,
+      water_monthly_avg: offering.waterMonthlyAvg,
+      electricity_monthly_avg: offering.electricityMonthlyAvg,
+      gas_monthly_avg: offering.gasMonthlyAvg,
       estimated_delivery_date: offering.estimatedDeliveryDate,
       metadata: offering.metadata || {}
     }));
@@ -644,11 +603,38 @@ export class SupabasePropertyService implements IPropertyService {
 
   async update(id: string, property: Partial<Property>): Promise<Property> {
     const current = await this.getById(id);
-    const merged = current ? { ...current, ...property } : property;
+    const sensitiveFields: Array<keyof Property> = [
+      'title', 'description', 'type', 'location', 'country', 'address',
+      'latitude', 'longitude', 'bedrooms', 'bathrooms', 'parkingSpaces',
+      'surfaceTotal', 'surfaceBuilt', 'images', 'media', 'offerings',
+      'legalDebtFree', 'legalPublicDeed', 'legalTaxCurrent', 'legalServicesPaid',
+    ];
+    const requiresReview = current?.isPublished === true
+      && sensitiveFields.some((key) => (
+        property[key] !== undefined
+        && JSON.stringify(property[key]) !== JSON.stringify(current[key])
+      ));
+    if (requiresReview) {
+      property = {
+        ...property,
+        isPublished: false,
+        folderStatus: 'UNDER_REVIEW',
+      };
+    }
+    const merged = {
+      ...(current || {}),
+      ...property,
+      description: property.description?.trim()
+        || current?.description?.trim()
+        || 'Información pendiente de revisión por Towers México.',
+      type: property.type || current?.type || 'Apartment',
+      valueRating: property.valueRating || current?.valueRating || 'Premium',
+      country: property.country?.trim() || current?.country?.trim() || 'México',
+    };
 
     // Auditar campos obligatorios en el objeto fusionado antes de actualizar
     const missingFields: string[] = [];
-    const notNullFields = ['hostId', 'title', 'description', 'location', 'country', 'latitude', 'longitude', 'type', 'valueRating'];
+    const notNullFields = ['hostId', 'title', 'location', 'latitude', 'longitude'];
     notNullFields.forEach(field => {
       const val = merged[field as keyof Property];
       if (val == null || (typeof val === 'string' && !val.trim())) {
@@ -679,7 +665,14 @@ export class SupabasePropertyService implements IPropertyService {
     console.groupEnd();
 
     const tStartVal = performance.now();
-    const validation = PropertyValidator.validatePropertyBeforeInsert(merged);
+    const validation = PropertyValidator.validatePropertyBeforeInsert(
+      merged,
+      merged.isPublished
+        ? 'PUBLICATION'
+        : merged.folderStatus === 'DRAFT'
+          ? 'DRAFT'
+          : 'REVIEW',
+    );
     const tEndVal = performance.now();
 
     if (!validation.success) {
@@ -755,6 +748,7 @@ export class SupabasePropertyService implements IPropertyService {
 
       if (getOfferingsError && !isMissingOfferingsRelationError(getOfferingsError)) {
         console.error('[SupabasePropertyService] Error fetching offerings for update:', getOfferingsError.message);
+        throw new Error(`[SupabasePropertyService] Error loading property offerings: ${getOfferingsError.message}`);
       }
 
       const existingOfferings = (dbOfferings || []).map(mapPostgresOffering);
@@ -771,6 +765,7 @@ export class SupabasePropertyService implements IPropertyService {
 
         if (deleteOfferingsError && !isMissingOfferingsRelationError(deleteOfferingsError)) {
           console.error('[SupabasePropertyService] Error deleting removed offerings:', deleteOfferingsError.message);
+          throw new Error(`[SupabasePropertyService] Error removing property offerings: ${deleteOfferingsError.message}`);
         }
       } else {
         await supabase
@@ -793,7 +788,11 @@ export class SupabasePropertyService implements IPropertyService {
           price_amount: offering.priceAmount,
           currency: offering.currency || 'USD',
           billing_period: offering.billingPeriod,
+          deposit_amount: offering.depositAmount,
           security_deposit_amount: offering.securityDepositAmount,
+          advance_months: offering.advanceMonths,
+          requires_guarantor: offering.requiresGuarantor,
+          requires_legal_policy: offering.requiresLegalPolicy,
           cleaning_fee_amount: offering.cleaningFeeAmount,
           service_fee_percent: offering.serviceFeePercent,
           commission_percent: offering.commissionPercent,
@@ -810,7 +809,7 @@ export class SupabasePropertyService implements IPropertyService {
           allow_instant_request: offering.allowInstantRequest,
           swap_preferences: offering.swapPreferences || {},
           swap_value_tier: offering.swapValueTier || property.valueRating,
-          aura_score_override: offering.auraScoreOverride || property.auraScore,
+          aura_score_override: offering.auraScoreOverride ?? property.auraScore ?? null,
           available_from: offering.availableFrom,
           available_until: offering.availableUntil,
           is_featured: offering.isFeatured,
@@ -821,6 +820,13 @@ export class SupabasePropertyService implements IPropertyService {
           accepts_fovissste: offering.acceptsFovissste,
           accepts_cash: offering.acceptsCash,
           developer_financing: offering.developerFinancing,
+          swap_min_value: offering.swapMinValue,
+          swap_max_value: offering.swapMaxValue,
+          swap_cash_difference_allowed: offering.swapCashDifferenceAllowed,
+          annual_property_tax: offering.annualPropertyTax,
+          water_monthly_avg: offering.waterMonthlyAvg,
+          electricity_monthly_avg: offering.electricityMonthlyAvg,
+          gas_monthly_avg: offering.gasMonthlyAvg,
           estimated_delivery_date: offering.estimatedDeliveryDate,
           metadata: offering.metadata || {}
         };
@@ -832,6 +838,7 @@ export class SupabasePropertyService implements IPropertyService {
 
       if (upsertErr && !isMissingOfferingsRelationError(upsertErr)) {
         console.error('[SupabasePropertyService] Error upserting synced offerings:', upsertErr.message);
+        throw new Error(`[SupabasePropertyService] Error updating property offerings: ${upsertErr.message}`);
       }
     } else {
       await this.syncLegacySwapOffering(id, property);
@@ -858,12 +865,43 @@ export class SupabasePropertyService implements IPropertyService {
   async togglePublish(id: string): Promise<Property> {
     const property = await this.getById(id);
     if (!property) throw new Error('Property not found');
+    const nextPublished = property.isPublished !== true;
+    const nextOfferings = (property.offerings || []).map((offering) => ({
+      ...offering,
+      status: (nextPublished ? 'ACTIVE' : 'PAUSED') as PropertyOffering['status'],
+    }));
+
+    if (nextPublished) {
+      const validation = PropertyValidator.validateForPublication({
+        ...property,
+        isPublished: true,
+        folderStatus: 'PUBLISHED',
+        offerings: nextOfferings,
+      });
+      if (!validation.success) {
+        throw new Error(`[Property Publication Gate] ${JSON.stringify(validation.errors)}`);
+      }
+
+      const { error: approvalError } = await supabase.rpc('approve_property_publication', {
+        target_property_id: id,
+      });
+      if (approvalError) {
+        throw new Error(`[SupabasePropertyService] Error approving property: ${approvalError.message}`);
+      }
+
+      searchCache.clear();
+      const approvedProperty = await this.getById(id);
+      if (!approvedProperty) {
+        throw new Error('[SupabasePropertyService] The approved property could not be reloaded.');
+      }
+      return approvedProperty;
+    }
 
     const { data, error } = await supabase
       .from('properties')
       .update({
-        is_published: !property.isPublished,
-        folder_status: property.isPublished === false ? 'PUBLISHED' : 'PAUSED',
+        is_published: false,
+        folder_status: 'PAUSED',
       })
       .eq('id', id)
       .select()
@@ -875,9 +913,9 @@ export class SupabasePropertyService implements IPropertyService {
 
     const { error: offeringError } = await supabase
       .from('property_offerings')
-      .update({ status: property.isPublished === false ? 'ACTIVE' : 'PAUSED' })
+      .update({ status: 'PAUSED' })
       .eq('property_id', id)
-      .eq('mode', 'SWAP');
+      .in('mode', nextOfferings.map((offering) => offering.mode));
 
     if (offeringError && !isMissingOfferingsRelationError(offeringError)) {
       console.error('[SupabasePropertyService] Error syncing SWAP offering publish status:', offeringError.message);
@@ -944,632 +982,8 @@ export class SupabasePropertyService implements IPropertyService {
   }
 }
 
-export class SupabaseUserService implements IUserService {
-  async getAll(): Promise<User[]> {
-    console.log('[SupabaseUserService] Querying public_profiles_view.getAll()...');
-    const { data, error } = await supabase
-      .from('public_profiles_view')
-      .select('*');
-
-    if (error) {
-      console.error('[SupabaseUserService] Error fetching profiles. Code:', error.code, 'Message:', error.message, 'Full Error:', error);
-      return [];
-    }
-
-    console.log('[SupabaseUserService] Query public_profiles_view.getAll() success. Row count:', data?.length, 'Exact Data Result:', data);
-    return (data || []).map((row) => ({
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      avatar: row.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-      role: row.role,
-      isVerified: row.is_verified,
-      kycStatus: row.kyc_status,
-      joinDate: row.created_at?.split('T')[0] || '2026-05-01',
-      swapsCount: 0,
-      isSuspended: false,
-      favorites: [],
-      companyId: row.company_id,
-      officeId: row.office_id,
-      profileType: row.profile_type
-    }));
-  }
-
-  async getById(id: string): Promise<User | null> {
-    console.log(`[SupabaseUserService] Querying profile.getById(${id})...`);
-    
-    // Dynamically query profiles table for self to see email, or public_profiles_view for others
-    const currentUser = (await supabase.auth.getUser()).data.user;
-    const isSelf = currentUser?.id === id;
-    const targetSource = isSelf ? 'profiles' : 'public_profiles_view';
-
-    const { data, error } = await supabase
-      .from(targetSource)
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      console.error(`[SupabaseUserService] Error fetching profile ${id} from ${targetSource}. Code:`, error.code, 'Message:', error.message, 'Full Error:', error);
-      return null;
-    }
-
-    console.log(`[SupabaseUserService] Query profile.getById(${id}) from ${targetSource} success. Exact Data Result:`, data);
-
-
-    return data ? {
-      id: data.id,
-      name: data.name,
-      email: data.email,
-      avatar: data.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-      role: data.role,
-      isVerified: data.is_verified,
-      kycStatus: data.kyc_status,
-      joinDate: data.created_at?.split('T')[0] || '2026-05-01',
-      swapsCount: 0,
-      isSuspended: false,
-      favorites: [],
-      companyId: data.company_id,
-      officeId: data.office_id,
-      profileType: data.profile_type
-    } : null;
-  }
-
-  async update(id: string, userData: Partial<User>): Promise<User> {
-    const payload: any = {};
-    if (userData.name !== undefined) payload.name = userData.name;
-    if (userData.avatar !== undefined) payload.avatar_url = userData.avatar;
-    if (userData.role !== undefined) payload.role = userData.role;
-    if (userData.kycStatus !== undefined) {
-      payload.kyc_status = userData.kycStatus;
-      payload.is_verified = userData.kycStatus === 'VERIFIED';
-    }
-    if (userData.isVerified !== undefined) payload.is_verified = userData.isVerified;
-    if (userData.companyId !== undefined) payload.company_id = userData.companyId;
-    if (userData.officeId !== undefined) payload.office_id = userData.officeId;
-    if (userData.profileType !== undefined) payload.profile_type = userData.profileType;
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(payload)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`[SupabaseUserService] Error updating profile ${id}: ${error.message}`);
-    }
-
-    return this.getById(data.id) as Promise<User>;
-  }
-
-  async updateVerification(id: string, isVerified: boolean, kycStatus: 'VERIFIED' | 'FAILED' | 'PENDING'): Promise<User> {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ is_verified: isVerified, kyc_status: kycStatus })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`[SupabaseUserService] Error updating profile verification: ${error.message}`);
-    }
-
-    return this.getById(data.id) as Promise<User>;
-  }
-}
-
-export class SupabaseSwapService implements ISwapService {
-  async getAll(): Promise<SwapRequest[]> {
-    const { data, error } = await supabase
-      .from('swaps')
-      .select('*');
-
-    if (error) {
-      console.error('[SupabaseSwapService] Error fetching swaps:', error);
-      return [];
-    }
-
-    return (data || []).map((row) => ({
-      id: row.id,
-      senderId: row.sender_id,
-      senderPropertyId: row.sender_property_id,
-      receiverId: row.receiver_id,
-      receiverPropertyId: row.receiver_property_id,
-      startDate: row.start_date,
-      endDate: row.end_date,
-      status: row.status,
-      message: row.message || '',
-      createdAt: row.created_at,
-      isDisputed: row.is_disputed,
-      disputeReason: row.dispute_reason,
-      senderConfirmedComplete: row.sender_confirmed_complete,
-      receiverConfirmedComplete: row.receiver_confirmed_complete,
-    }));
-  }
-
-  async getById(id: string): Promise<SwapRequest | null> {
-    const { data, error } = await supabase
-      .from('swaps')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      console.error(`[SupabaseSwapService] Error fetching swap request ${id}:`, error);
-      return null;
-    }
-
-    return data ? {
-      id: data.id,
-      senderId: data.sender_id,
-      senderPropertyId: data.sender_property_id,
-      receiverId: data.receiver_id,
-      receiverPropertyId: data.receiver_property_id,
-      startDate: data.start_date,
-      endDate: data.end_date,
-      status: data.status,
-      message: data.message || '',
-      createdAt: data.created_at,
-      isDisputed: data.is_disputed,
-      disputeReason: data.dispute_reason,
-      senderConfirmedComplete: data.sender_confirmed_complete,
-      receiverConfirmedComplete: data.receiver_confirmed_complete,
-    } : null;
-  }
-
-  async create(swap: Omit<SwapRequest, 'id' | 'createdAt' | 'status'>): Promise<SwapRequest> {
-    const { data, error } = await supabase
-      .from('swaps')
-      .insert({
-        sender_id: swap.senderId,
-        sender_property_id: swap.senderPropertyId,
-        receiver_id: swap.receiverId,
-        receiver_property_id: swap.receiverPropertyId,
-        start_date: swap.startDate,
-        end_date: swap.endDate,
-        status: 'PENDING',
-        message: swap.message || ''
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`[SupabaseSwapService] Error creating swap request: ${error.message}`);
-    }
-
-    return this.getById(data.id) as Promise<SwapRequest>;
-  }
-
-  async updateStatus(id: string, status: SwapStatus): Promise<SwapRequest> {
-    const { data, error } = await supabase
-      .from('swaps')
-      .update({ status })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`[SupabaseSwapService] Error updating swap status: ${error.message}`);
-    }
-
-    return this.getById(data.id) as Promise<SwapRequest>;
-  }
-
-  async confirmCompletion(id: string, userId: string): Promise<SwapRequest> {
-    const swap = await this.getById(id);
-    if (!swap) throw new Error('Swap request not found');
-
-    const updateFields: any = {};
-    if (swap.senderId === userId) {
-      updateFields.sender_confirmed_complete = true;
-    } else if (swap.receiverId === userId) {
-      updateFields.receiver_confirmed_complete = true;
-    } else {
-      throw new Error('No estás autorizado para finalizar este intercambio.');
-    }
-
-    const { data: updatedData, error } = await supabase
-      .from('swaps')
-      .update(updateFields)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`[SupabaseSwapService] Error confirming completion: ${error.message}`);
-    }
-
-    // If both sender and receiver confirmed completion, transition state to COMPLETED
-    if (updatedData.sender_confirmed_complete && updatedData.receiver_confirmed_complete) {
-      return this.updateStatus(id, 'COMPLETED');
-    }
-
-    return this.getById(id) as Promise<SwapRequest>;
-  }
-
-  async delete(id: string): Promise<boolean> {
-    const { error } = await supabase
-      .from('swaps')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error(`[SupabaseSwapService] Error deleting swap ${id}:`, error);
-      return false;
-    }
-    return true;
-  }
-
-  async createDispute(swapId: string, reason: string): Promise<SwapRequest> {
-    // 1. Insert row in disputes
-    const { error: disputeErr } = await supabase
-      .from('disputes')
-      .insert({
-        swap_id: swapId,
-        reason,
-        status: 'OPEN'
-      });
-
-    if (disputeErr) {
-      throw new Error(`[SupabaseSwapService] Error creating dispute: ${disputeErr.message}`);
-    }
-
-    // 2. Update swaps table is_disputed flag
-    const { data, error: swapErr } = await supabase
-      .from('swaps')
-      .update({ is_disputed: true })
-      .eq('id', swapId)
-      .select()
-      .single();
-
-    if (swapErr) {
-      throw new Error(`[SupabaseSwapService] Error updating swap flag: ${swapErr.message}`);
-    }
-
-    return this.getById(data.id) as Promise<SwapRequest>;
-  }
-
-  async resolveDispute(swapId: string): Promise<SwapRequest> {
-    // 1. Update dispute record to RESOLVED
-    const { error: disputeErr } = await supabase
-      .from('disputes')
-      .update({ status: 'RESOLVED' })
-      .eq('swap_id', swapId);
-
-    if (disputeErr) {
-      console.warn('[SupabaseSwapService] Dispute record resolve failed or not found:', disputeErr.message);
-    }
-
-    // 2. Update swaps table is_disputed flag
-    const { data, error: swapErr } = await supabase
-      .from('swaps')
-      .update({ is_disputed: false })
-      .eq('id', swapId)
-      .select()
-      .single();
-
-    if (swapErr) {
-      throw new Error(`[SupabaseSwapService] Error resolving swap flag: ${swapErr.message}`);
-    }
-
-    return this.getById(data.id) as Promise<SwapRequest>;
-  }
-
-  async getTravelDetails(swapId: string, travelerId: string): Promise<SwapTravelDetails | null> {
-    const { data, error } = await supabase
-      .from('swap_travel_details')
-      .select('*')
-      .eq('swap_id', swapId)
-      .eq('traveler_id', travelerId)
-      .maybeSingle();
-
-    if (error) {
-      console.error(`[SupabaseSwapService] Error fetching travel details for swap ${swapId}:`, error);
-      return null;
-    }
-
-    if (!data) return null;
-
-    return {
-      id: data.id,
-      swapId: data.swap_id,
-      travelerId: data.traveler_id,
-      propertyId: data.property_id,
-      wifiName: data.wifi_name || '',
-      wifiPassword: data.wifi_password || '',
-      accessCode: data.access_code || '',
-      checkinInstructions: data.checkin_instructions || '',
-      checkinTime: data.checkin_time || '15:00',
-      checkoutTime: data.checkout_time || '11:00',
-      emergencyContactName: data.emergency_contact_name || '',
-      emergencyContactPhone: data.emergency_contact_phone || '',
-      hostNotes: data.host_notes || '',
-      createdAt: data.created_at
-    };
-  }
-
-  async upsertTravelDetails(details: Partial<SwapTravelDetails> & { swapId: string; travelerId: string; propertyId: string }): Promise<SwapTravelDetails> {
-    const payload = {
-      swap_id: details.swapId,
-      traveler_id: details.travelerId,
-      property_id: details.propertyId,
-      wifi_name: details.wifiName,
-      wifi_password: details.wifiPassword,
-      access_code: details.accessCode,
-      checkin_instructions: details.checkinInstructions,
-      checkin_time: details.checkinTime || '15:00',
-      checkout_time: details.checkoutTime || '11:00',
-      emergency_contact_name: details.emergencyContactName,
-      emergency_contact_phone: details.emergencyContactPhone,
-      host_notes: details.hostNotes
-    };
-
-    const { data, error } = await supabase
-      .from('swap_travel_details')
-      .upsert(payload, { onConflict: 'swap_id,traveler_id' })
-      .select()
-      .single();
-
-    if (error) {
-      console.error(`[SupabaseSwapService] Error upserting travel details:`, error);
-      throw new Error(`[SupabaseSwapService] Error upserting travel details: ${error.message}`);
-    }
-
-    return {
-      id: data.id,
-      swapId: data.swap_id,
-      travelerId: data.traveler_id,
-      propertyId: data.property_id,
-      wifiName: data.wifi_name || '',
-      wifiPassword: data.wifi_password || '',
-      accessCode: data.access_code || '',
-      checkinInstructions: data.checkin_instructions || '',
-      checkinTime: data.checkin_time || '15:00',
-      checkoutTime: data.checkout_time || '11:00',
-      emergencyContactName: data.emergency_contact_name || '',
-      emergencyContactPhone: data.emergency_contact_phone || '',
-      hostNotes: data.host_notes || '',
-      createdAt: data.created_at
-    };
-  }
-
-  async getAllTravelDetails(): Promise<SwapTravelDetails[]> {
-    const { data, error } = await supabase
-      .from('swap_travel_details')
-      .select('*');
-
-    if (error) {
-      console.error('[SupabaseSwapService] Error fetching all travel details:', error);
-      return [];
-    }
-
-    return (data || []).map((row) => ({
-      id: row.id,
-      swapId: row.swap_id,
-      travelerId: row.traveler_id,
-      propertyId: row.property_id,
-      wifiName: row.wifi_name || '',
-      wifiPassword: row.wifi_password || '',
-      accessCode: row.access_code || '',
-      checkinInstructions: row.checkin_instructions || '',
-      checkinTime: row.checkin_time || '15:00',
-      checkoutTime: row.checkout_time || '11:00',
-      emergencyContactName: row.emergency_contact_name || '',
-      emergencyContactPhone: row.emergency_contact_phone || '',
-      hostNotes: row.host_notes || '',
-      createdAt: row.created_at
-    }));
-  }
-}
-
-export class SupabaseMessageService implements IMessageService {
-  async getAllForUser(userId: string): Promise<ChatMessage[]> {
-    // Fetch all messages. RLS guarantees only matching messages are returned
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*, profiles:sender_id(name)');
-
-    if (error) {
-      console.error('[SupabaseMessageService] Error fetching messages:', error);
-      return [];
-    }
-
-    return (data || []).map(row => {
-      const senderProfile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-      return {
-        id: row.id,
-        swapRequestId: row.swap_id,
-        senderId: row.sender_id || 'system',
-        senderName: row.sender_id ? (senderProfile?.name || 'Host') : 'AuraSwap',
-        content: row.content,
-        createdAt: row.created_at,
-        isRead: row.is_read ?? false
-      };
-    });
-  }
-
-  async send(swapRequestId: string, content: string, senderId: string): Promise<ChatMessage> {
-    const isSystem = senderId === 'system';
-    // 1. Insert message row into messages
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({
-        swap_id: swapRequestId,
-        sender_id: isSystem ? null : senderId,
-        content,
-        is_read: false
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`[SupabaseMessageService] Error sending message: ${error.message}`);
-    }
-
-    // 2. Fetch profiles join to map back senderName
-    let senderName = 'AuraSwap';
-    if (!isSystem) {
-      const { data: profile } = await supabase
-        .from('public_profiles_view')
-        .select('name')
-        .eq('id', senderId)
-        .single();
-      senderName = profile?.name || 'Host';
-    }
-
-    return {
-      id: data.id,
-      swapRequestId: data.swap_id,
-      senderId: data.sender_id || 'system',
-      senderName,
-      content: data.content,
-      createdAt: data.created_at,
-      isRead: data.is_read ?? false
-    };
-  }
-
-  async markAsRead(swapRequestId: string, userId: string): Promise<void> {
-    // Mark all messages as read for this swap thread where the sender is NOT the active user
-    const { error } = await supabase
-      .from('messages')
-      .update({ is_read: true })
-      .eq('swap_id', swapRequestId)
-      .neq('sender_id', userId);
-
-    if (error) {
-      console.error(`[SupabaseMessageService] Error marking messages as read for swap ${swapRequestId}:`, error.message);
-    }
-  }
-}
-
-export class SupabaseLeadService implements ILeadService {
-  async getAllForUser(userId: string): Promise<Lead[]> {
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('[SupabaseLeadService] Error fetching leads:', error);
-      return [];
-    }
-
-    return (data || []).map((row) => ({
-      id: row.id,
-      propertyId: row.property_id,
-      offeringId: row.offering_id,
-      userId: row.user_id,
-      leadType: row.lead_type,
-      message: row.message || '',
-      status: row.status || 'NEW',
-      createdAt: row.created_at,
-    }));
-  }
-
-  async create(lead: Omit<Lead, 'id' | 'createdAt' | 'status'>): Promise<Lead> {
-    const { data, error } = await supabase
-      .from('leads')
-      .insert({
-        property_id: lead.propertyId,
-        offering_id: lead.offeringId,
-        user_id: lead.userId,
-        lead_type: lead.leadType,
-        message: lead.message,
-        status: 'NEW',
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`[SupabaseLeadService] Error creating lead: ${error.message}`);
-    }
-
-    return {
-      id: data.id,
-      propertyId: data.property_id,
-      offeringId: data.offering_id,
-      userId: data.user_id,
-      leadType: data.lead_type,
-      message: data.message || '',
-      status: data.status || 'NEW',
-      createdAt: data.created_at,
-    };
-  }
-}
-
-export class SupabaseNotificationService implements INotificationService {
-  async getAllForUser(userId: string): Promise<Notification[]> {
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('[SupabaseNotificationService] Error fetching notifications:', error);
-      return [];
-    }
-
-    return (data || []).map(row => ({
-      id: row.id,
-      userId: row.user_id,
-      title: row.title,
-      content: row.content,
-      isRead: row.is_read,
-      createdAt: row.created_at
-    }));
-  }
-
-  async create(notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>): Promise<Notification> {
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert({
-        user_id: notification.userId,
-        title: notification.title,
-        content: notification.content,
-        is_read: false
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`[SupabaseNotificationService] Error creating notification: ${error.message}`);
-    }
-
-    return {
-      id: data.id,
-      userId: data.user_id,
-      title: data.title,
-      content: data.content,
-      isRead: data.is_read,
-      createdAt: data.created_at
-    };
-  }
-
-  async markAsRead(id: string): Promise<boolean> {
-    const { error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', id);
-
-    if (error) {
-      console.error(`[SupabaseNotificationService] Error marking notification ${id} as read:`, error);
-      return false;
-    }
-    return true;
-  }
-
-  async markAllAsRead(userId: string): Promise<boolean> {
-    const { error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('user_id', userId);
-
-    if (error) {
-      console.error(`[SupabaseNotificationService] Error marking all notifications as read for user ${userId}:`, error);
-      return false;
-    }
-    return true;
-  }
-}
+export { SupabaseUserService } from './supabase/SupabaseUserService';
+export { SupabaseSwapService } from './supabase/SupabaseSwapService';
+export { SupabaseMessageService } from './supabase/SupabaseMessageService';
+export { SupabaseLeadService } from './supabase/SupabaseLeadService';
+export { SupabaseNotificationService } from './supabase/SupabaseNotificationService';

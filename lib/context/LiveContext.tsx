@@ -74,6 +74,8 @@ export interface ChatMessage {
 export interface EternaChatState {
   isOpen: boolean;
   isListening: boolean;
+  voiceMode: boolean;
+  isVoiceStarting: boolean;
   status: string;
   chatHistory: ChatMessage[];
 }
@@ -134,6 +136,8 @@ export function LiveContextProvider({ children }: { children: React.ReactNode })
   const [eternaChatState, setEternaChatStateInternal] = useState<EternaChatState>({
     isOpen: false,
     isListening: false,
+    voiceMode: false,
+    isVoiceStarting: false,
     status: 'disconnected',
     chatHistory: []
   });
@@ -155,6 +159,17 @@ export function LiveContextProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const startVoice = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const voiceWindow = window as Window & {
+        __eternaStartVoice?: () => void | Promise<void>;
+      };
+
+      if (voiceWindow.__eternaStartVoice) {
+        void voiceWindow.__eternaStartVoice();
+        return;
+      }
+    }
+
     setEternaCommand({ type: 'startVoice', timestamp: Date.now() });
   }, []);
 
@@ -189,11 +204,11 @@ export function LiveContextProvider({ children }: { children: React.ReactNode })
         try {
           const parsed = JSON.parse(storedIntent);
           if (parsed && Date.now() - parsed.timestamp < 10 * 60 * 1000) {
-            setPendingIntentState(parsed);
+            queueMicrotask(() => setPendingIntentState(parsed));
           } else {
             localStorage.removeItem('pending_eterna_intent');
           }
-        } catch (e) {
+        } catch {
           localStorage.removeItem('pending_eterna_intent');
         }
       }
@@ -201,7 +216,7 @@ export function LiveContextProvider({ children }: { children: React.ReactNode })
       // Restore active guided flow
       const storedFlow = localStorage.getItem('active_guided_flow');
       if (storedFlow) {
-        setActiveGuidedFlowState(storedFlow);
+        queueMicrotask(() => setActiveGuidedFlowState(storedFlow));
       }
     }
   }, []);

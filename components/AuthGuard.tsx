@@ -1,21 +1,42 @@
 "use client";
 
-import React from 'react';
+import React, { useSyncExternalStore } from 'react';
 import { useSwap } from '../lib/context/SwapContext';
 import { useTranslation } from '../lib/context/LanguageContext';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Lock, AlertOctagon, ArrowLeft, KeyRound } from 'lucide-react';
+import { Lock, AlertOctagon, ArrowLeft, KeyRound } from 'lucide-react';
 import { motion } from 'framer-motion';
+import type { UserRole } from '../lib/types';
 
 interface AuthGuardProps {
   children?: React.ReactNode;
   requireAdmin?: boolean;
+  allowedRoles?: UserRole[];
 }
 
-export default function AuthGuard({ children, requireAdmin = false }: AuthGuardProps) {
+const subscribeToHydration = () => () => {};
+
+export default function AuthGuard({
+  children,
+  requireAdmin = false,
+  allowedRoles,
+}: AuthGuardProps) {
   const { currentUser, isLoggingOut } = useSwap();
   const { t } = useTranslation();
   const router = useRouter();
+  const isHydrated = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
+  );
+
+  if (!isHydrated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-brand-gray-50/50 px-6">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-brand-gray-200 border-t-brand-accent" />
+      </div>
+    );
+  }
 
   // 0. TRANSITIONAL LOGOUT STATE
   if (isLoggingOut) {
@@ -92,7 +113,11 @@ export default function AuthGuard({ children, requireAdmin = false }: AuthGuardP
   }
 
   // 2. 403 FORBIDDEN CHECK
-  if (requireAdmin && currentUser.role !== 'ADMIN') {
+  const roleDenied = requireAdmin
+    ? currentUser.role !== 'ADMIN'
+    : Boolean(allowedRoles && !allowedRoles.includes(currentUser.role));
+
+  if (roleDenied) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-brand-gray-50/50 px-6 relative overflow-hidden">
         {/* Glow ambient background lights */}

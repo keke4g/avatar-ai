@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Building2,
   CalendarDays,
   Check,
   ChevronDown,
@@ -79,6 +78,8 @@ const RELATIONSHIP_LABELS: Record<string, string> = {
   EXECUTOR: 'Albacea',
   DEVELOPER: 'Desarrollador(a)',
   PROPERTY_MANAGER: 'Administrador(a) del inmueble',
+  MANAGER: 'Gerente',
+  FLOOR_ADVISOR: 'Asesor(a) de piso',
   OTHER: 'Otro',
 };
 
@@ -142,8 +143,10 @@ export default function InternalAdvisorMarketplacePanel({
     let retryTimer: number | null = null;
 
     if (!isStaff) {
-      setDossier(null);
-      setLoadFailed(false);
+      queueMicrotask(() => {
+        setDossier(null);
+        setLoadFailed(false);
+      });
       return;
     }
 
@@ -193,8 +196,10 @@ export default function InternalAdvisorMarketplacePanel({
     let cancelled = false;
 
     if (!isAdmin) {
-      setOwnerContact(null);
-      setOwnerContactLoading(false);
+      queueMicrotask(() => {
+        setOwnerContact(null);
+        setOwnerContactLoading(false);
+      });
       return;
     }
 
@@ -241,7 +246,7 @@ export default function InternalAdvisorMarketplacePanel({
       `${Number(property.bedrooms) || 0} recámaras · ${bathrooms} baños${Number(property.parkingSpaces) >= 0 ? ` · ${Number(property.parkingSpaces) || 0} estacionamientos` : ''}`,
       squareMeters > 0 ? `${squareMeters} m²` : '',
       amenities.length > 0 ? `Amenidades: ${amenities.join(', ')}.` : '',
-      property.internalCode ? `Folio AuraSwap: ${property.internalCode}` : '',
+      property.internalCode ? `Folio Towers México: ${property.internalCode}` : '',
     ].filter(Boolean);
 
     return [
@@ -348,14 +353,6 @@ export default function InternalAdvisorMarketplacePanel({
     );
   }
 
-  const priceLabel = dossier.capturedPriceAmount === null
-    ? (isSpanish ? 'No definido' : 'Not set')
-    : new Intl.NumberFormat('es-MX', {
-        style: 'currency',
-        currency: dossier.currency || 'MXN',
-        maximumFractionDigits: 0,
-      }).format(dossier.capturedPriceAmount);
-
   return (
     <section
       data-eterna-section="internal-marketplace"
@@ -394,10 +391,15 @@ export default function InternalAdvisorMarketplacePanel({
         <dl className="mt-5 grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4">
             <dt className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
-              <Building2 className="h-3.5 w-3.5 text-violet-300" aria-hidden="true" />
-              {isSpanish ? 'Precio de captación' : 'Captured price'}
+              <Percent className="h-3.5 w-3.5 text-violet-300" aria-hidden="true" />
+              {isSpanish ? 'Captación total' : 'Total acquisition commission'}
             </dt>
-            <dd className="mt-2 text-2xl font-black tracking-[-0.04em] text-white">{priceLabel}</dd>
+            <dd className="mt-2 text-2xl font-black tracking-[-0.04em] text-white">
+              {formatPercent(dossier.commissionTotalPct)}
+            </dd>
+            <p className="mt-1 text-[10px] font-semibold text-slate-500">
+              {isSpanish ? 'Porcentaje pactado con el propietario.' : 'Commission agreed with the owner.'}
+            </p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4">
             <dt className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
@@ -407,6 +409,9 @@ export default function InternalAdvisorMarketplacePanel({
             <dd className="mt-2 text-2xl font-black tracking-[-0.04em] text-white">
               {formatPercent(dossier.commissionSharedPct)}
             </dd>
+            <p className="mt-1 text-[10px] font-semibold text-slate-500">
+              {isSpanish ? 'Porcentaje ofrecido al asesor cooperador.' : 'Percentage offered to the cooperating advisor.'}
+            </p>
           </div>
         </dl>
       </div>

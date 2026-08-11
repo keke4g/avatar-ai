@@ -1,19 +1,35 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import Image from 'next/image';
 import { useSwap } from '../../lib/context/SwapContext';
 import { useTranslation } from '../../lib/context/LanguageContext';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { 
-  Send, Calendar, ArrowRightLeft, ShieldCheck, Check, X, 
-  MapPin, ExternalLink, MessageCircleCode, ChevronRight, MessageSquare,
+import {
+  Send, ArrowRightLeft, ShieldCheck, Check, X,
+  MessageCircleCode, ChevronRight, MessageSquare,
   Bot, Sparkles, Mic, MicOff, Wifi, WifiOff, Volume2, VolumeX,
-  Activity, Award, ArrowUpRight, AlertCircle, Info, Landmark, Minimize2
+  Activity, Award, ArrowUpRight, AlertCircle, Landmark, Minimize2
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { VideoAvatar } from '../../components/VideoAvatar';
 import { useWebSocketStream, StreamStatus } from '../../hooks/useWebSocketStream';
+import {
+  DEFAULT_ETERNA_VOICE_ENGINE,
+  ETERNA_VOICE_ENGINE_EVENT,
+  ETERNA_VOICE_ENGINE_STORAGE_KEY,
+  EternaVoiceEngine,
+  getEternaVoiceEngine,
+  loadGlobalEternaVoiceSettings,
+} from '../../lib/eterna/voiceConfig';
+import { normalizeEternaSpeechText } from '../../lib/eterna/speechText';
+import {
+  createBrowserAudioContext,
+  ETERNA_FIRST_AUDIO_TIMEOUT_MS,
+  getPcmSampleRate,
+  playPcmStream,
+  stopPcmSources,
+} from '@/features/eterna/audio/pcmStreamPlayer';
 
 import AuthGuard from '../../components/AuthGuard';
 
@@ -56,15 +72,17 @@ function MessagesPageContent() {
 
   // Sync initial Eterna welcome message when language changes
   useEffect(() => {
-    setEternaChatMessages(prev => {
-      return prev.map(msg => {
-        if (msg.id === 'eterna-msg-init') {
-          return {
-            ...msg,
-            content: t('messages.initialWelcome', { name: currentUser?.name ? currentUser.name.split(' ')[0] : 'Viajero' })
-          };
-        }
-        return msg;
+    queueMicrotask(() => {
+      setEternaChatMessages(prev => {
+        return prev.map(msg => {
+          if (msg.id === 'eterna-msg-init') {
+            return {
+              ...msg,
+              content: t('messages.initialWelcome', { name: currentUser?.name ? currentUser.name.split(' ')[0] : 'Viajero' })
+            };
+          }
+          return msg;
+        });
       });
     });
   }, [t, currentUser?.name]);
@@ -87,14 +105,124 @@ function MessagesPageContent() {
   const [speechRecognitionSupported, setSpeechRecognitionSupported] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const messagesVoiceEngineRef = useRef<EternaVoiceEngine>(DEFAULT_ETERNA_VOICE_ENGINE);
+  const messagesVoiceRequestRef = useRef<AbortController | null>(null);
+  const messagesPcmContextRef = useRef<AudioContext | null>(null);
+  const messagesPcmSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+
+  const stopMessagesVoice = useCallback(() => {
+    messagesVoiceRequestRef.current?.abort();
+    messagesVoiceRequestRef.current = null;
+    stopPcmSources(messagesPcmSourcesRef.current);
+    if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
+  }, []);
+
+  const speakMessagesReply = useCallback(async (reply: string, onEnd: () => void) => {
+    if (typeof window === 'undefined' || isMuted || !reply.trim()) {
+      onEnd();
+      return;
+    }
+
+    stopMessagesVoice();
+    const engine = messagesVoiceEngineRef.current;
+    const speechText = normalizeEternaSpeechText(reply, language === 'es' ? 'es' : 'en');
+
+    const playWithBrowser = () => {
+      const utterance = new SpeechSynthesisUtterance(speechText);
+      utterance.lang = 'es-MX';
+      utterance.rate = 1.02;
+      utterance.onend = onEnd;
+      utterance.onerror = onEnd;
+      window.speechSynthesis.speak(utterance);
+    };
+
+    if (engine === 'browser') {
+      playWithBrowser();
+      return;
+    }
+
+    const controller = new AbortController();
+    messagesVoiceRequestRef.current = controller;
+    let firstAudioTimedOut = false;
+    let fallbackStarted = false;
+    const firstAudioTimer = window.setTimeout(() => {
+      firstAudioTimedOut = true;
+      controller.abort();
+    }, ETERNA_FIRST_AUDIO_TIMEOUT_MS);
+    try {
+      const response = await fetch('/api/voz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          texto: speechText,
+          engine,
+        }),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`El motor ${engine} respondió ${response.status}`);
+
+      if (getPcmSampleRate(response)) {
+        const context = messagesPcmContextRef.current || createBrowserAudioContext();
+        messagesPcmContextRef.current = context;
+        await context.resume().catch(() => {});
+        await playPcmStream({
+          response,
+          context,
+          signal: controller.signal,
+          sources: messagesPcmSourcesRef.current,
+          onFirstAudioScheduled: () => {
+            window.clearTimeout(firstAudioTimer);
+            console.log(`[Messages Voice] reproducción progresiva confirmada con ${engine}`);
+          },
+          onPlaybackEnded: onEnd,
+        });
+        return;
+      }
+
+      throw new Error(`El motor ${engine} no devolvió audio PCM progresivo`);
+    } catch (error) {
+      if (controller.signal.aborted && !firstAudioTimedOut) return;
+      if (fallbackStarted) return;
+      fallbackStarted = true;
+      console.error(`[Messages Voice] ${engine} no disponible; usando navegador:`, error);
+      playWithBrowser();
+    } finally {
+      window.clearTimeout(firstAudioTimer);
+      if (messagesVoiceRequestRef.current === controller) messagesVoiceRequestRef.current = null;
+    }
+  }, [isMuted, language, stopMessagesVoice]);
+
+  useEffect(() => {
+    const syncEngine = (event?: Event | StorageEvent) => {
+      if (event instanceof StorageEvent && event.key !== ETERNA_VOICE_ENGINE_STORAGE_KEY) return;
+      const selected = event instanceof CustomEvent
+        ? (event as CustomEvent<{ engine?: EternaVoiceEngine }>).detail?.engine
+        : undefined;
+      messagesVoiceEngineRef.current = selected || getEternaVoiceEngine();
+    };
+
+    syncEngine();
+    void loadGlobalEternaVoiceSettings().then((settings) => {
+      messagesVoiceEngineRef.current = settings.engine;
+    }).catch((error) => {
+      console.warn('[Messages Voice] No se pudo cargar la configuración global.', error);
+    });
+    window.addEventListener(ETERNA_VOICE_ENGINE_EVENT, syncEngine);
+    window.addEventListener('storage', syncEngine);
+    return () => {
+      window.removeEventListener(ETERNA_VOICE_ENGINE_EVENT, syncEngine);
+      window.removeEventListener('storage', syncEngine);
+      stopMessagesVoice();
+    };
+  }, [stopMessagesVoice]);
+
+  useEffect(() => {
+    if (isMuted) stopMessagesVoice();
+  }, [isMuted, stopMessagesVoice]);
 
   // Sync activeSwapId with search query param on load (default to Eterna Concierge for the wow factor!)
   useEffect(() => {
-    if (activeSwapParam) {
-      setActiveSwapId(activeSwapParam);
-    } else {
-      setActiveSwapId('eterna-concierge');
-    }
+    queueMicrotask(() => setActiveSwapId(activeSwapParam || 'eterna-concierge'));
   }, [activeSwapParam]);
 
   // Mark messages as read when activeSwapId changes or new messages are loaded
@@ -196,30 +324,6 @@ function MessagesPageContent() {
     return list;
   }, [swaps, messages, properties, currentUser, isConnected, textResponse, simulatedText, t, language, users, archivedSwapIds, activeFolder]);
 
-  // Web Speech API Voice Recognition inside Messages Console
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        setSpeechRecognitionSupported(true);
-        const rec = new SpeechRecognition();
-        rec.continuous = false;
-        rec.interimResults = false;
-        rec.lang = 'es-MX'; // Mexican / Neuter Spanish
-
-        rec.onstart = () => setIsListening(true);
-        rec.onend = () => setIsListening(false);
-        rec.onresult = (event: any) => {
-          const resultText = event.results[0][0].transcript;
-          if (resultText) {
-            handleSendPrompt(resultText);
-          }
-        };
-        recognitionRef.current = rec;
-      }
-    }
-  }, [eternaChatMessages, isConnected]);
-
   const toggleListening = () => {
     if (!recognitionRef.current) return;
     
@@ -228,7 +332,7 @@ function MessagesPageContent() {
       if (isConnected) {
         wsInterrupt();
       } else {
-        if (typeof window !== 'undefined') window.speechSynthesis.cancel();
+        stopMessagesVoice();
         setSimulatedStatus('idle');
       }
     }
@@ -257,7 +361,7 @@ function MessagesPageContent() {
   const systemPrompt = useMemo(() => {
     return {
       role: 'system',
-      content: `Eres Eterna, la Concierge IA de Lujo oficial de AuraSwap.
+      content: `Eres Eterna, la Concierge IA de Lujo oficial de Towers México.
 Estás en la pantalla del "Messages Consulting Dashboard" conversando cara a cara con Mateo Valenzuela.
 Instrucciones lingüísticas:
 1. Responde strictly en ESPAÑOL neutro, cálido, formal y sofisticado.
@@ -272,7 +376,7 @@ REGLAS DE INTERCAMBIO:
   }, []);
 
   // Offline Conversation Simulator for Messages console
-  const runMessagesSimulator = (prompt: string) => {
+  const runMessagesSimulator = useCallback((prompt: string) => {
     setSimulatedStatus('thinking');
     setSimulatedText('Pensando...');
 
@@ -287,7 +391,7 @@ REGLAS DE INTERCAMBIO:
       } else if (clean.includes('recomiend') || clean.includes('casa') || clean.includes('villa') || clean.includes('cancun') || clean.includes('paris') || clean.includes('bali')) {
         reply = 'Te recomiendo la "Modernist Concrete Villa" en Cancún (98% Match, Luxury) con piscina infinita y playa privada, o el romántico "17th-Century Marais Loft" en París. Haz clic en las tarjetas de recomendación abajo a la derecha para verlas.';
       } else if (clean.includes('gratis') || clean.includes('comision') || clean.includes('tarifa') || clean.includes('precio') || clean.includes('costo')) {
-        reply = 'En AuraSwap el coste de alquiler es exactamente de 0€. Cobramos un fee fijo del 1% por swap completado para financiar tu seguro premium contra daños de 1 millón de euros y la validación de perfiles.';
+        reply = 'En Towers México el coste de alquiler es exactamente de 0€. Cobramos un fee fijo del 1% por swap completado para financiar tu seguro premium contra daños de 1 millón de euros y la validación de perfiles.';
       } else if (clean.includes('llaves') || clean.includes('llegar') || clean.includes('check')) {
         reply = 'Los check-ins son autónomos mediante códigos digitales que el anfitrión te enviará en una guía en formato PDF unos días antes de tu viaje.';
       } else if (clean.includes('wifi') || clean.includes('internet') || clean.includes('velocidad')) {
@@ -303,38 +407,35 @@ REGLAS DE INTERCAMBIO:
         createdAt: new Date().toISOString()
       }]);
 
-      if (typeof window !== 'undefined' && window.speechSynthesis && !isMuted) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(reply);
-        utterance.lang = 'es-MX';
-        utterance.rate = 1.02;
-        utterance.onend = () => {
+      if (!isMuted) {
+        void speakMessagesReply(reply, () => {
           setSimulatedStatus('idle');
           setSimulatedText('');
-        };
-        window.speechSynthesis.speak(utterance);
+        });
       } else {
         setSimulatedStatus('idle');
         setSimulatedText('');
       }
     }, 1200);
-  };
+  }, [isMuted, speakMessagesReply]);
 
   // Sync streaming WebSocket chunk to chat history when WS ends speaking
   useEffect(() => {
     if (isConnected && textResponse && wsStatus === 'idle') {
-      setEternaChatMessages(prev => [...prev, {
-        id: `eterna-msg-${Date.now()}`,
-        senderId: 'eterna',
-        senderName: 'Eterna IA',
-        content: textResponse,
-        createdAt: new Date().toISOString()
-      }]);
+      queueMicrotask(() => {
+        setEternaChatMessages(prev => [...prev, {
+          id: `eterna-msg-${crypto.randomUUID()}`,
+          senderId: 'eterna',
+          senderName: 'Eterna IA',
+          content: textResponse,
+          createdAt: new Date().toISOString()
+        }]);
+      });
     }
-  }, [wsStatus, isConnected]);
+  }, [wsStatus, isConnected, textResponse]);
 
   // Handle Send Prompt
-  const handleSendPrompt = (textToSend?: string) => {
+  const handleSendPrompt = useCallback((textToSend?: string) => {
     const prompt = textToSend || typedMessage;
     if (!prompt.trim()) return;
 
@@ -343,7 +444,7 @@ REGLAS DE INTERCAMBIO:
       if (isConnected) {
         wsInterrupt();
       } else {
-        if (typeof window !== 'undefined') window.speechSynthesis.cancel();
+        stopMessagesVoice();
         setSimulatedStatus('idle');
       }
     }
@@ -369,7 +470,42 @@ REGLAS DE INTERCAMBIO:
       // Offline fallback
       runMessagesSimulator(prompt);
     }
-  };
+  }, [
+    activeStatus,
+    currentUser.id,
+    currentUser.name,
+    eternaChatMessages,
+    isConnected,
+    runMessagesSimulator,
+    stopMessagesVoice,
+    systemPrompt,
+    typedMessage,
+    wsInterrupt,
+    wsSendMessage,
+  ]);
+
+  // Web Speech API Voice Recognition inside Messages Console. This lives
+  // after handleSendPrompt so the callback always closes over the current handler.
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        queueMicrotask(() => setSpeechRecognitionSupported(true));
+        const rec = new SpeechRecognition();
+        rec.continuous = false;
+        rec.interimResults = false;
+        rec.lang = 'es-MX';
+
+        rec.onstart = () => setIsListening(true);
+        rec.onend = () => setIsListening(false);
+        rec.onresult = (event: any) => {
+          const resultText = event.results[0][0].transcript;
+          if (resultText) handleSendPrompt(resultText);
+        };
+        recognitionRef.current = rec;
+      }
+    }
+  }, [handleSendPrompt]);
 
   // Standard Messages handler
   const handleSendMessage = (e: React.FormEvent) => {
@@ -389,7 +525,6 @@ REGLAS DE INTERCAMBIO:
 
     // Simulate standard host response
     const partnerId = activeSwap.senderId === currentUser.id ? activeSwap.receiverId : activeSwap.senderId;
-    const partnerProperty = properties.find((p) => p.id === (activeSwap.senderId === currentUser.id ? activeSwap.receiverPropertyId : activeSwap.senderPropertyId));
     
     setTimeout(() => {
       let mockReply = language === 'es'
@@ -529,9 +664,13 @@ REGLAS DE INTERCAMBIO:
                         </span>
                       </div>
                     ) : (
-                      <img
-                        src={conv.partnerAvatar}
+                      <Image
+                        src={conv.partnerAvatar || '/avatar-placeholder.svg'}
                         alt={conv.partnerName}
+                        width={40}
+                        height={40}
+                        sizes="40px"
+                        unoptimized
                         className="w-10 h-10 rounded-full object-cover shrink-0 border border-brand-gray-200 shadow-sm"
                       />
                     )}
@@ -713,9 +852,13 @@ REGLAS DE INTERCAMBIO:
               {/* Active Conversation Partner Banner */}
               <div className="p-4 border-b border-brand-gray-200/80 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <img
-                    src={conversationList.find((c) => c.swapId === activeSwapId)?.partnerAvatar}
+                  <Image
+                    src={conversationList.find((c) => c.swapId === activeSwapId)?.partnerAvatar || '/avatar-placeholder.svg'}
                     alt="Active Partner"
+                    width={36}
+                    height={36}
+                    sizes="36px"
+                    unoptimized
                     className="w-9 h-9 rounded-full object-cover border border-brand-gray-100 shadow-sm"
                   />
                   <div>
@@ -927,9 +1070,13 @@ REGLAS DE INTERCAMBIO:
                       className="bg-white border border-brand-gray-200 hover:border-brand-accent p-2.5 rounded-2xl flex gap-2.5 cursor-pointer shadow-xs hover:shadow-sm transition-all"
                       title={t('messages.openInNewTab')}
                     >
-                      <img
-                        src={prop.images[0]}
+                      <Image
+                        src={prop.images[0] || '/property-placeholder.svg'}
                         alt={prop.title}
+                        width={40}
+                        height={40}
+                        sizes="40px"
+                        unoptimized
                         className="w-10 h-10 rounded-xl object-cover"
                       />
                       <div className="overflow-hidden flex-1 relative">
@@ -981,9 +1128,13 @@ REGLAS DE INTERCAMBIO:
                 <div className="p-3 bg-white border border-brand-gray-200 rounded-2xl">
                   <p className="text-[8px] uppercase tracking-widest text-brand-gray-400 font-bold mb-1">{t('messages.checklistHost')}</p>
                   <div className="flex gap-2.5 items-center">
-                    <img
-                      src={activeSwapDetails.partnerProp?.images[0]}
+                    <Image
+                      src={activeSwapDetails.partnerProp?.images[0] || '/property-placeholder.svg'}
                       alt="Partner Home"
+                      width={40}
+                      height={40}
+                      sizes="40px"
+                      unoptimized
                       className="w-10 h-10 rounded-xl object-cover border border-brand-gray-100"
                     />
                     <div className="overflow-hidden">
@@ -1002,9 +1153,13 @@ REGLAS DE INTERCAMBIO:
                 <div className="p-3 bg-white border border-brand-gray-200 rounded-2xl">
                   <p className="text-[8px] uppercase tracking-widest text-brand-gray-400 font-bold mb-1">{t('messages.checklistGuest')}</p>
                   <div className="flex gap-2.5 items-center">
-                    <img
-                      src={activeSwapDetails.userProp?.images[0]}
+                    <Image
+                      src={activeSwapDetails.userProp?.images[0] || '/property-placeholder.svg'}
                       alt="User Home"
+                      width={40}
+                      height={40}
+                      sizes="40px"
+                      unoptimized
                       className="w-10 h-10 rounded-xl object-cover border border-brand-gray-100"
                     />
                     <div className="overflow-hidden">

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="onboarding_header_height">54dp</dimen>
+    <dimen name="onboarding_page_padding_top">0dp</dimen>
+    <dimen name="onboarding_title_size">30sp</dimen>
+    <dimen name="onboarding_body_size">15sp</dimen>
+    <dimen name="onboarding_title_margin_top">2dp</dimen>
+    <dimen name="onboarding_body_margin_top">7dp</dimen>
+    <dimen name="onboarding_visual_margin_top">0dp</dimen>
+    <dimen name="onboarding_immersive_visual_height">236dp</dimen>
+    <dimen name="onboarding_eterna_visual_height">216dp</dimen>
+    <dimen name="onboarding_permission_visual_height">204dp</dimen>
+    <dimen name="onboarding_explore_search_height">46dp</dimen>
+    <dimen name="onboarding_explore_steps_height">82dp</dimen>
+    <dimen name="onboarding_explore_card_padding_bottom">8dp</dimen>
+    <dimen name="onboarding_footer_padding_top">6dp</dimen>
+    <dimen name="onboarding_primary_margin_top">10dp</dimen>
+    <dimen name="onboarding_simple_title_size">36sp</dimen>
+</resources>

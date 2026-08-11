@@ -1,44 +1,53 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { translations, TranslationDictionary } from '../translations';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { translations } from '../translations';
 
 export type LanguageType = 'es' | 'en';
 
 interface LanguageContextType {
   language: LanguageType;
   setLanguage: (lang: LanguageType) => void;
-  t: (path: string, replacements?: Record<string, string | number>) => string;
+  t: (
+    path: string,
+    replacements?: Record<string, string | number>,
+    fallback?: string,
+  ) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+const reportedMissingTranslations = new Set<string>();
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguageState] = useState<LanguageType>('es'); // Default to Latin American Spanish
-  const [isLoaded, setIsLoaded] = useState(false);
-
   // Initialize language from localStorage or default
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('auraswap_language') as LanguageType;
-      if (stored === 'es' || stored === 'en') {
-        setLanguageState(stored);
-      }
-      setIsLoaded(true);
+      queueMicrotask(() => {
+        if (stored === 'es' || stored === 'en') {
+          setLanguageState(stored);
+        }
+      });
     }
   }, []);
 
   // Update localStorage when state changes
-  const setLanguage = (lang: LanguageType) => {
+  const setLanguage = useCallback((lang: LanguageType) => {
     setLanguageState(lang);
     if (typeof window !== 'undefined') {
       localStorage.setItem('auraswap_language', lang);
     }
-  };
+  }, []);
 
   // Advanced type-safe key retriever supporting nested paths (e.g. "details.requestSwapBtn")
-  // and dynamic parameter replacements (e.g. {count} or {host})
-  const t = (path: string, replacements?: Record<string, string | number>): string => {
+  // and dynamic parameter replacements (e.g. {count} or {host}). User-generated
+  // content can provide a fallback so it is never mistaken for a static key.
+  const t = useCallback((
+    path: string,
+    replacements?: Record<string, string | number>,
+    fallback?: string,
+  ): string => {
     const keys = path.split('.');
     const dictionary = translations[language] as any;
     
@@ -47,13 +56,21 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (result && Object.prototype.hasOwnProperty.call(result, key)) {
         result = result[key];
       } else {
-        console.warn(`[i18n] Translation path not found: "${path}" in language "${language}"`);
-        return path; // Fallback to raw key
+        const warningKey = `${language}:${path}`;
+        if (
+          fallback === undefined
+          && process.env.NODE_ENV !== 'production'
+          && !reportedMissingTranslations.has(warningKey)
+        ) {
+          reportedMissingTranslations.add(warningKey);
+          console.warn(`[i18n] Translation path not found: "${path}" in language "${language}"`);
+        }
+        return fallback ?? path;
       }
     }
 
     if (typeof result !== 'string') {
-      return path;
+      return fallback ?? path;
     }
 
     // Apply parameter replacements if provided
@@ -65,10 +82,15 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     return translatedString;
-  };
+  }, [language]);
+
+  const contextValue = useMemo(
+    () => ({ language, setLanguage, t }),
+    [language, setLanguage, t],
+  );
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={contextValue}>
       {children}
     </LanguageContext.Provider>
   );

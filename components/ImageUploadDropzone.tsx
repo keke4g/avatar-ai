@@ -1,8 +1,10 @@
 "use client";
 import React, { useState, useRef, useEffect } from 'react';
+import NextImage from 'next/image';
+import { createPortal } from 'react-dom';
 import { useTranslation } from '../lib/context/LanguageContext';
 import { ServiceFactory } from '../lib/services/ServiceFactory';
-import { Upload, X, Image as ImageIcon, Loader2, Sparkles, Film, Star } from 'lucide-react';
+import { Upload, X, Loader2, Star, Maximize2, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 
@@ -13,6 +15,7 @@ export interface ImageMetadata {
   height: number;
   uploadedAt: string;
   thumbnailUrl: string;
+  contentHash?: string;
   imageAnalysis?: {
     qualityScore?: number;
     brightness?: number;
@@ -48,7 +51,7 @@ export default function ImageUploadDropzone({
   imagesMetadata = {},
   onMetadataChange
 }: ImageUploadDropzoneProps) {
-  const { t, language } = useTranslation();
+  const { language } = useTranslation();
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Store all active Object URLs to guarantee clean up on unmount
@@ -58,32 +61,50 @@ export default function ImageUploadDropzone({
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isOrganizerOpen, setIsOrganizerOpen] = useState(false);
 
   // Sync completed images from parent with our local items
   useEffect(() => {
-    setItems(prev => {
-      const activeUploads = prev.filter(item => item.type === 'uploading' || item.type === 'processing');
-      const completedItems = images.map(url => {
-        const existing = prev.find(item => item.url === url);
-        return existing || { id: url, type: 'completed' as const, url };
+    queueMicrotask(() => {
+      setItems(prev => {
+        const activeUploads = prev.filter(item => item.type === 'uploading' || item.type === 'processing');
+        const completedItems = images.map(url => {
+          const existing = prev.find(item => item.url === url);
+          return existing || { id: url, type: 'completed' as const, url };
+        });
+        return [...completedItems, ...activeUploads];
       });
-      return [...completedItems, ...activeUploads];
     });
   }, [images]);
 
   // Clean up all active ObjectURLs on unmount
   useEffect(() => {
+    const activeObjectURLs = activeObjectURLsRef.current;
     return () => {
-      activeObjectURLsRef.current.forEach(url => {
+      activeObjectURLs.forEach(url => {
         URL.revokeObjectURL(url);
       });
-      activeObjectURLsRef.current.clear();
+      activeObjectURLs.clear();
     };
   }, []);
 
+  useEffect(() => {
+    if (!isOrganizerOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsOrganizerOpen(false);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOrganizerOpen]);
+
   // Toast notifier helper
   const showToast = (message: string, type: 'success' | 'error') => {
-    const id = Math.random().toString(36).substring(2, 9);
+    const id = crypto.randomUUID();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
@@ -94,8 +115,65 @@ export default function ImageUploadDropzone({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const touchStartIndexRef = useRef<number | null>(null);
+  const organizerScrollRef = useRef<HTMLDivElement | null>(null);
+  const organizerAutoScrollFrameRef = useRef<number | null>(null);
+  const organizerAutoScrollSpeedRef = useRef(0);
+
+  const stopOrganizerAutoScroll = () => {
+    organizerAutoScrollSpeedRef.current = 0;
+    if (organizerAutoScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(organizerAutoScrollFrameRef.current);
+      organizerAutoScrollFrameRef.current = null;
+    }
+  };
+
+  const runOrganizerAutoScroll = () => {
+    const scroller = organizerScrollRef.current;
+    if (!scroller || organizerAutoScrollSpeedRef.current === 0) {
+      organizerAutoScrollFrameRef.current = null;
+      return;
+    }
+    scroller.scrollTop += organizerAutoScrollSpeedRef.current;
+    organizerAutoScrollFrameRef.current = window.requestAnimationFrame(runOrganizerAutoScroll);
+  };
+
+  const updateOrganizerAutoScroll = (clientY: number) => {
+    const scroller = organizerScrollRef.current;
+    if (!scroller) return;
+    const rect = scroller.getBoundingClientRect();
+    const edgeZone = Math.min(96, Math.max(56, rect.height * 0.16));
+    let nextSpeed = 0;
+
+    if (clientY < rect.top + edgeZone) {
+      const intensity = Math.min(1, Math.max(0, (rect.top + edgeZone - clientY) / edgeZone));
+      nextSpeed = -(5 + intensity * 15);
+    } else if (clientY > rect.bottom - edgeZone) {
+      const intensity = Math.min(1, Math.max(0, (clientY - (rect.bottom - edgeZone)) / edgeZone));
+      nextSpeed = 5 + intensity * 15;
+    }
+
+    organizerAutoScrollSpeedRef.current = nextSpeed;
+    if (nextSpeed === 0) {
+      stopOrganizerAutoScroll();
+    } else if (organizerAutoScrollFrameRef.current === null) {
+      organizerAutoScrollFrameRef.current = window.requestAnimationFrame(runOrganizerAutoScroll);
+    }
+  };
+
+  useEffect(() => () => {
+    if (organizerAutoScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(organizerAutoScrollFrameRef.current);
+    }
+  }, []);
 
   const storageService = ServiceFactory.getStorageService();
+
+  const hashFile = async (file: File): Promise<string> => {
+    const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+    return Array.from(new Uint8Array(digest))
+      .map((value) => value.toString(16).padStart(2, '0'))
+      .join('');
+  };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -108,7 +186,15 @@ export default function ImageUploadDropzone({
   };
 
   // Optimization helper utilizing HTML5 Canvas client-side
-  const processAndOptimizeImage = (file: File): Promise<{ galleryFile: File; thumbFile: File; width: number; height: number }> => {
+  const processAndOptimizeImage = (file: File): Promise<{
+    galleryFile: File;
+    thumbFile: File;
+    width: number;
+    height: number;
+    brightness: number;
+    qualityScore: number;
+    recommendations: string[];
+  }> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const objectUrl = URL.createObjectURL(file);
@@ -120,10 +206,37 @@ export default function ImageUploadDropzone({
         const width = img.width;
         const height = img.height;
 
-        // Protection against extreme resolutions (> 10000px)
-        if (width > 10000 || height > 10000) {
-          return reject(new Error('RESOLUTION_TOO_LARGE'));
+        const analysisCanvas = document.createElement('canvas');
+        analysisCanvas.width = 64;
+        analysisCanvas.height = 64;
+        const analysisContext = analysisCanvas.getContext('2d', { willReadFrequently: true });
+        let brightness = 50;
+        let contrast = 0;
+        if (analysisContext) {
+          analysisContext.drawImage(img, 0, 0, 64, 64);
+          const pixels = analysisContext.getImageData(0, 0, 64, 64).data;
+          const luminance: number[] = [];
+          for (let index = 0; index < pixels.length; index += 4) {
+            luminance.push(
+              (0.2126 * pixels[index] + 0.7152 * pixels[index + 1] + 0.0722 * pixels[index + 2]) / 255,
+            );
+          }
+          const mean = luminance.reduce((sum, value) => sum + value, 0) / luminance.length;
+          const variance = luminance.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / luminance.length;
+          brightness = Math.round(mean * 100);
+          contrast = Math.min(100, Math.round(Math.sqrt(variance) * 250));
         }
+
+        const recommendations: string[] = [];
+        if (brightness < 25) recommendations.push('La fotografía está oscura; mejora la iluminación.');
+        if (brightness > 88) recommendations.push('La fotografía parece sobreexpuesta.');
+        if (contrast < 12) recommendations.push('La fotografía tiene poco contraste o detalle.');
+        if (width < 1600 && height < 1600) recommendations.push('Usa una fotografía de mayor resolución.');
+
+        const resolutionScore = Math.min(40, Math.round((Math.max(width, height) / 1920) * 40));
+        const exposureScore = Math.max(0, 30 - Math.round(Math.abs(brightness - 58) * 0.75));
+        const contrastScore = Math.min(30, Math.round(contrast * 1.5));
+        const qualityScore = Math.max(0, Math.min(100, resolutionScore + exposureScore + contrastScore));
 
         const resizeToBlob = (maxDim: number, quality: number): Promise<Blob> => {
           return new Promise((resBlob, rejBlob) => {
@@ -173,7 +286,15 @@ export default function ImageUploadDropzone({
 
         Promise.all([galleryPromise, thumbPromise])
           .then(([galleryFile, thumbFile]) => {
-            resolve({ galleryFile, thumbFile, width, height });
+            resolve({
+              galleryFile,
+              thumbFile,
+              width,
+              height,
+              brightness,
+              qualityScore,
+              recommendations,
+            });
           })
           .catch(reject);
       };
@@ -192,18 +313,14 @@ export default function ImageUploadDropzone({
     let skippedCount = 0;
     const filesArray = Array.from(files);
 
-    // Filter format and size
+    // Accept every pixel dimension and file size. Images are normalized to a
+    // gallery WEBP and thumbnail before upload, so only the source format
+    // needs to be validated here.
     let validFiles = filesArray.filter(file => {
       const ext = file.name.split('.').pop()?.toLowerCase() || '';
       const isValidFormat = allowedTypes.includes(file.type) || allowedExtensions.includes(ext);
-      const isTooLarge = file.size > 10 * 1024 * 1024; // 10MB limit
 
       if (!isValidFormat) {
-        skippedCount++;
-        return false;
-      }
-
-      if (isTooLarge) {
         skippedCount++;
         return false;
       }
@@ -276,14 +393,38 @@ export default function ImageUploadDropzone({
       }))
     ]);
 
-    let newMetadataItems: Record<string, ImageMetadata> = {};
+    const newMetadataItems: Record<string, ImageMetadata> = {};
+    const seenContentHashes = new Set(
+      Object.values(imagesMetadata)
+        .map((metadata) => metadata.contentHash)
+        .filter((hash): hash is string => Boolean(hash)),
+    );
 
     const uploadPromises = uploadJobs.map(async (job) => {
+      let reservedContentHash: string | null = null;
       try {
         // Transition state to 'processing' (client optimization)
         setItems(prev => prev.map(item => item.id === job.jobId ? { ...item, type: 'processing' as const } : item));
 
-        const { galleryFile, thumbFile, width, height } = await processAndOptimizeImage(job.file);
+        const [processed, contentHash] = await Promise.all([
+          processAndOptimizeImage(job.file),
+          hashFile(job.file),
+        ]);
+        const {
+          galleryFile,
+          thumbFile,
+          width,
+          height,
+          brightness,
+          qualityScore,
+          recommendations,
+        } = processed;
+
+        if (seenContentHashes.has(contentHash)) {
+          throw new Error('DUPLICATE_IMAGE');
+        }
+        seenContentHashes.add(contentHash);
+        reservedContentHash = contentHash;
 
         // Upload optimized pair
         const { galleryUrl, thumbnailUrl } = await storageService.uploadImagePair(galleryFile, thumbFile);
@@ -303,17 +444,19 @@ export default function ImageUploadDropzone({
           height,
           uploadedAt: new Date().toISOString(),
           thumbnailUrl,
+          contentHash,
           imageAnalysis: {
-            qualityScore: undefined,
-            brightness: undefined,
-            duplicate: undefined,
-            recommendations: []
+            qualityScore,
+            brightness,
+            duplicate: false,
+            recommendations,
           }
         };
 
         newMetadataItems[galleryUrl] = metadataItem;
         return galleryUrl;
       } catch (err: any) {
+        if (reservedContentHash) seenContentHashes.delete(reservedContentHash);
         console.error('[ImageUploadDropzone] Error in upload job:', job.file.name, err);
         
         // Remove failed upload slot
@@ -321,11 +464,11 @@ export default function ImageUploadDropzone({
         URL.revokeObjectURL(job.tempUrl);
         activeObjectURLsRef.current.delete(job.tempUrl);
 
-        if (err.message === 'RESOLUTION_TOO_LARGE') {
+        if (err.message === 'DUPLICATE_IMAGE') {
           showToast(
             language === 'es'
-              ? 'La resolución de la imagen es demasiado grande.'
-              : 'The image resolution is too large.',
+              ? 'Esta fotografía ya forma parte de la galería.'
+              : 'This photo is already in the gallery.',
             'error'
           );
         } else {
@@ -435,14 +578,30 @@ export default function ImageUploadDropzone({
     );
   };
 
+  const moveImage = (fromIndex: number, toIndex: number) => {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= images.length ||
+      toIndex >= images.length
+    ) return;
+
+    const reordered = [...images];
+    const [movedImage] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, movedImage);
+    onChange(reordered);
+  };
+
   // Drag and Drop completed items reordering
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+  const handleDragStart = (e: React.DragEvent<HTMLElement>, index: number) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+  const handleDragOver = (e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
+    updateOrganizerAutoScroll(e.clientY);
   };
 
   const handleDragEnter = (index: number) => {
@@ -450,11 +609,13 @@ export default function ImageUploadDropzone({
   };
 
   const handleDragEnd = () => {
+    stopOrganizerAutoScroll();
     setDraggedIndex(null);
     setDragOverIndex(null);
   };
 
   const handleDropImage = (index: number) => {
+    stopOrganizerAutoScroll();
     if (draggedIndex === null || draggedIndex === index) {
       setDragOverIndex(null);
       return;
@@ -472,15 +633,16 @@ export default function ImageUploadDropzone({
   };
 
   // Touch Event reordering
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>, index: number) => {
+  const handleTouchStart = (e: React.TouchEvent<HTMLElement>, index: number) => {
     touchStartIndexRef.current = index;
     setDraggedIndex(index);
   };
 
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+  const handleTouchMove = (e: React.TouchEvent<HTMLElement>) => {
     if (touchStartIndexRef.current === null) return;
     
     const touch = e.touches[0];
+    updateOrganizerAutoScroll(touch.clientY);
     const element = document.elementFromPoint(touch.clientX, touch.clientY);
     if (!element) return;
     
@@ -496,6 +658,7 @@ export default function ImageUploadDropzone({
   };
 
   const handleTouchEnd = () => {
+    stopOrganizerAutoScroll();
     if (touchStartIndexRef.current !== null && dragOverIndex !== null) {
       const reordered = [...images];
       const item = reordered[touchStartIndexRef.current];
@@ -518,7 +681,7 @@ export default function ImageUploadDropzone({
         ref={fileInputRef}
         type="file"
         multiple
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp"
         onChange={handleFileInputChange}
         className="hidden"
       />
@@ -574,8 +737,8 @@ export default function ImageUploadDropzone({
               </p>
               <p className="text-[10px] text-brand-gray-500 mt-0.5 font-semibold">
                 {language === 'es' 
-                  ? 'o haz clic para explorar tus archivos locales (JPG, PNG, WEBP)' 
-                  : 'or click to browse your local files (JPG, PNG, WEBP)'
+                  ? 'Cualquier tamaño o resolución · JPG, PNG o WEBP'
+                  : 'Any file size or resolution · JPG, PNG or WEBP'
                 }
               </p>
             </div>
@@ -589,13 +752,30 @@ export default function ImageUploadDropzone({
       {/* Grid of uploaded images */}
       {items.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-brand-gray-500 uppercase tracking-wider">
-              {language === 'es' ? 'Galería de Imágenes (Arrastra para reordenar)' : 'Image Gallery (Drag to reorder)'}
-            </span>
-            <span className="text-[10px] text-brand-gray-500 font-black bg-brand-gray-100 px-2.5 py-0.5 rounded-md animate-pulse">
-              {images.length} {language === 'es' ? 'fotos cargadas' : 'uploaded photos'} / 40
-            </span>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-brand-gray-500">
+                {language === 'es' ? 'Galería de imágenes' : 'Image gallery'}
+              </span>
+              <span className="mt-0.5 block text-[10px] font-semibold text-brand-gray-400">
+                {language === 'es' ? 'La primera foto será la portada.' : 'The first photo will be the cover.'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {images.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setIsOrganizerOpen(true)}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-brand-black bg-white px-3 text-[10px] font-black uppercase tracking-wide text-brand-black transition hover:bg-brand-black hover:text-white"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                  {language === 'es' ? 'Organizar fotos' : 'Organize photos'}
+                </button>
+              )}
+              <span className="rounded-md bg-brand-gray-100 px-2.5 py-1 text-[10px] font-black text-brand-gray-500">
+                {images.length} / 40
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 p-2 bg-brand-gray-50/50 border border-brand-gray-100 rounded-2xl max-h-56 overflow-y-auto no-scrollbar">
@@ -612,9 +792,12 @@ export default function ImageUploadDropzone({
                       className="relative aspect-[4/3] rounded-xl overflow-hidden bg-brand-gray-100 border border-brand-gray-200/50 flex flex-col justify-between group shadow-sm select-none"
                     >
                       {item.tempUrl && (
-                        <img
+                        <NextImage
                           src={item.tempUrl}
                           alt="Preview"
+                          fill
+                          sizes="(max-width: 768px) 50vw, 25vw"
+                          unoptimized
                           className="absolute inset-0 w-full h-full object-cover opacity-45 blur-[0.5px]"
                           loading="lazy"
                           decoding="async"
@@ -652,7 +835,7 @@ export default function ImageUploadDropzone({
                     data-index={index}
                     onDragStart={(e) => handleDragStart(e, index)}
                     onDragEnd={handleDragEnd}
-                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragOver={handleDragOver}
                     onDragEnter={() => handleDragEnter(index)}
                     onDrop={() => handleDropImage(index)}
                     onTouchStart={(e) => handleTouchStart(e, index)}
@@ -676,13 +859,16 @@ export default function ImageUploadDropzone({
                       }}
                       exit={{ opacity: 0, scale: 0.9 }}
                       layout
-                      className={`w-full h-full rounded-xl overflow-hidden group shadow-sm bg-brand-gray-200 cursor-grab active:cursor-grabbing transition-all duration-200 ${
+                      className={`relative w-full h-full rounded-xl overflow-hidden group shadow-sm bg-brand-gray-200 cursor-grab active:cursor-grabbing transition-all duration-200 ${
                         isDragTarget ? 'ring-2 ring-brand-accent shadow-premium scale-105' : 'hover:scale-[1.01] border border-brand-gray-200/40'
                       }`}
                     >
-                      <img
+                      <NextImage
                         src={displayUrl}
                         alt={`Listing photo ${index + 1}`}
+                        fill
+                        sizes="(max-width: 768px) 50vw, 25vw"
+                        unoptimized
                         className="w-full h-full object-cover pointer-events-none"
                         loading="lazy"
                         decoding="async"
@@ -737,6 +923,152 @@ export default function ImageUploadDropzone({
             </AnimatePresence>
           </div>
         </div>
+      )}
+
+      {isOrganizerOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[180] flex items-end justify-center bg-black/65 backdrop-blur-sm sm:items-center sm:p-6">
+          <button
+            type="button"
+            aria-label={language === 'es' ? 'Cerrar organizador' : 'Close organizer'}
+            className="absolute inset-0 cursor-default"
+            onClick={() => setIsOrganizerOpen(false)}
+          />
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gallery-organizer-title"
+            className="relative z-10 flex h-[92dvh] w-full max-w-[1380px] flex-col overflow-hidden rounded-t-[30px] bg-[#f8f7f3] shadow-2xl sm:h-[84dvh] sm:rounded-[30px]"
+          >
+            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-black/5 bg-white px-5 py-4 sm:px-7 sm:py-5">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-accent">
+                  {language === 'es' ? 'Orden de publicación' : 'Listing order'}
+                </span>
+                <h3 id="gallery-organizer-title" className="mt-1 text-xl font-black tracking-tight text-brand-black sm:text-2xl">
+                  {language === 'es' ? 'Organiza tus fotografías' : 'Organize your photos'}
+                </h3>
+                <p className="mt-1 max-w-2xl text-xs font-semibold text-brand-gray-500">
+                  {language === 'es'
+                    ? 'Arrastra las fotos o usa las flechas. La posición 1 será la portada del anuncio.'
+                    : 'Drag photos or use the arrows. Position 1 will be the listing cover.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsOrganizerOpen(false)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-brand-gray-200 bg-white text-brand-gray-500 transition hover:border-brand-black hover:text-brand-black"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </header>
+
+            <div
+              ref={organizerScrollRef}
+              onDragOver={(event) => {
+                event.preventDefault();
+                updateOrganizerAutoScroll(event.clientY);
+              }}
+              onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  stopOrganizerAutoScroll();
+                }
+              }}
+              className="select-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4"
+            >
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
+                {images.map((url, index) => {
+                  const displayUrl = imagesMetadata[url]?.thumbnailUrl || url;
+                  const isBeingDragged = draggedIndex === index;
+                  const isDragTarget = dragOverIndex === index && draggedIndex !== index;
+                  return (
+                    <article
+                      key={url}
+                      draggable
+                      data-index={index}
+                      onDragStart={(event) => handleDragStart(event, index)}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={handleDragOver}
+                      onDragEnter={() => handleDragEnter(index)}
+                      onDrop={() => handleDropImage(index)}
+                      onTouchStart={(event) => handleTouchStart(event, index)}
+                      onTouchMove={handleTouchMove}
+                      onTouchEnd={handleTouchEnd}
+                      className={`overflow-hidden rounded-xl border bg-white shadow-sm transition ${
+                        isBeingDragged ? 'opacity-40' : ''
+                      } ${isDragTarget ? 'border-brand-accent ring-2 ring-brand-accent/30' : 'border-brand-gray-200'}`}
+                    >
+                      <div className="relative aspect-[4/3] cursor-grab touch-none overflow-hidden bg-brand-gray-100 active:cursor-grabbing">
+                        <NextImage
+                          src={displayUrl}
+                          alt={`${language === 'es' ? 'Fotografía' : 'Photo'} ${index + 1}`}
+                          fill
+                          sizes="(max-width: 768px) 50vw, 25vw"
+                          unoptimized
+                          className="h-full w-full object-cover pointer-events-none"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                        <div className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-black/72 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-white backdrop-blur">
+                          <GripVertical className="h-3 w-3" />
+                          {index === 0 ? (language === 'es' ? 'Portada' : 'Cover') : `#${index + 1}`}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-1 p-1.5">
+                        <button
+                          type="button"
+                          disabled={index === 0}
+                          onClick={() => moveImage(index, index - 1)}
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-brand-gray-200 text-brand-black transition hover:border-brand-black disabled:cursor-not-allowed disabled:opacity-25"
+                          aria-label={language === 'es' ? 'Mover una posición atrás' : 'Move one position back'}
+                        >
+                          <ChevronLeft className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetCover(index)}
+                          disabled={index === 0}
+                          className={`flex min-h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg px-1 text-[8px] font-black uppercase tracking-wide transition ${
+                            index === 0
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-brand-gray-100 text-brand-black hover:bg-brand-black hover:text-white'
+                          }`}
+                        >
+                          <Star className={`h-3 w-3 shrink-0 ${index === 0 ? 'fill-current' : ''}`} />
+                          {index === 0
+                            ? (language === 'es' ? 'Portada' : 'Cover')
+                            : (language === 'es' ? 'Elegir' : 'Choose')}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={index === images.length - 1}
+                          onClick={() => moveImage(index, index + 1)}
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-brand-gray-200 text-brand-black transition hover:border-brand-black disabled:cursor-not-allowed disabled:opacity-25"
+                          aria-label={language === 'es' ? 'Mover una posición adelante' : 'Move one position forward'}
+                        >
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+
+            <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-black/5 bg-white px-5 py-4 sm:px-7">
+              <span className="text-xs font-bold text-brand-gray-500">
+                {images.length} {language === 'es' ? 'fotografías ordenadas' : 'photos organized'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsOrganizerOpen(false)}
+                className="min-h-11 rounded-full bg-brand-black px-6 text-[10px] font-black uppercase tracking-wider text-white shadow-lg transition hover:-translate-y-0.5"
+              >
+                {language === 'es' ? 'Guardar orden' : 'Save order'}
+              </button>
+            </footer>
+          </section>
+        </div>,
+        document.body,
       )}
 
       {/* Premium Toast Notifications portal inside component */}

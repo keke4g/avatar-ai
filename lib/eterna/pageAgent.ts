@@ -20,6 +20,7 @@ export type PageAgentActionType =
   | 'click_element'
   | 'search_properties'
   | 'open_property_contact'
+  | 'open_property_location'
   | 'open_property_wizard';
 
 export interface PageAgentAction {
@@ -63,6 +64,7 @@ const ACTIONS = new Set<PageAgentActionType>([
   'click_element',
   'search_properties',
   'open_property_contact',
+  'open_property_location',
   'open_property_wizard',
 ]);
 
@@ -194,7 +196,7 @@ export const PAGE_AGENT_RESPONSE_SCHEMA = {
       properties: {
         type: {
           type: 'string',
-          enum: ['none', 'navigate', 'go_back', 'scroll_to', 'click_element', 'search_properties', 'open_property_contact', 'open_property_wizard'],
+          enum: ['none', 'navigate', 'go_back', 'scroll_to', 'click_element', 'search_properties', 'open_property_contact', 'open_property_location', 'open_property_wizard'],
         },
         route: { type: 'string' },
         target: { type: 'string' },
@@ -212,7 +214,7 @@ export const PAGE_AGENT_RESPONSE_SCHEMA = {
     contactIntent: { type: 'boolean' },
     preferredContact: { type: 'string', enum: ['message', 'call', 'none'] },
     leadSummary: { type: 'string' },
-    suggestedReplies: { type: 'array', items: { type: 'string' }, minItems: 0, maxItems: 3 },
+    suggestedReplies: { type: 'array', items: { type: 'string' }, minItems: 2, maxItems: 3 },
     understoodGoal: { type: 'string' },
   },
   required: [

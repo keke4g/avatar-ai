@@ -9,6 +9,12 @@ export interface PropertyReview {
 
 export type PropertyOfferingMode = 'SWAP' | 'SHORT_RENT' | 'MONTHLY_RENT' | 'SALE';
 
+/**
+ * Legal facts are nullable on purpose: null/undefined means "not verified".
+ * A missing value must never be interpreted as a positive verification.
+ */
+export type PropertyEvidenceState = boolean | null;
+
 export type PropertyOfferingStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ARCHIVED' | 'SOLD' | 'RENTED';
 
 export type PropertyOfferingVisibility = 'PUBLIC' | 'PRIVATE' | 'UNLISTED';
@@ -110,6 +116,70 @@ export interface PropertyOffering {
   updatedAt?: string;
 }
 
+export type PropertyValuationConfidence = 'HIGH' | 'MEDIUM' | 'LOW' | 'INSUFFICIENT';
+export type PropertyValuationEvidenceTier = 'STRICT_ESTIMATE' | 'AREA_REFERENCE' | 'INSUFFICIENT';
+
+export interface PropertyValuationComparable {
+  propertyId: string;
+  marketObservationId?: string;
+  sourceCode?: string;
+  title: string;
+  location: string;
+  operation: 'SALE' | 'MONTHLY_RENT';
+  price: number;
+  currency: string;
+  surfaceM2: number;
+  pricePerM2: number;
+  /** Null when the source only identifies the exact neighborhood/market area. */
+  distanceMeters: number | null;
+  weight: number;
+}
+
+/**
+ * Reproducible automated estimate. Nullable amounts mean that the available
+ * evidence did not meet the engine's minimum threshold; they must never be
+ * rendered as zero or replaced with an AI-generated guess.
+ */
+export interface PropertyValuation {
+  id?: string;
+  propertyId: string;
+  currency: string;
+  estimatedSaleValue: number | null;
+  saleRangeLow: number | null;
+  saleRangeHigh: number | null;
+  salePricePerM2: number | null;
+  estimatedMonthlyRent: number | null;
+  rentRangeLow: number | null;
+  rentRangeHigh: number | null;
+  rentPricePerM2: number | null;
+  estimatedCapRate: number | null;
+  grossRentalYield: number | null;
+  listingPrice: number | null;
+  listingVsEstimatePct: number | null;
+  /**
+   * A lower-confidence reference derived from asking prices in the exact
+   * micromarket. It is deliberately separate from an estimated market value.
+   */
+  areaReferenceValue: number | null;
+  areaRangeLow: number | null;
+  areaRangeHigh: number | null;
+  areaPricePerM2: number | null;
+  areaReferenceOperation: 'SALE' | 'MONTHLY_RENT' | null;
+  areaLocationBasis: 'NEIGHBORHOOD' | null;
+  confidence: PropertyValuationConfidence;
+  evidenceTier: PropertyValuationEvidenceTier;
+  confidenceScore: number;
+  comparableCount: number;
+  saleComparableCount: number;
+  rentComparableCount: number;
+  dataAsOf: string;
+  modelVersion: string;
+  methodology: string;
+  sourceLabels?: string[];
+  warnings: string[];
+  comparables: PropertyValuationComparable[];
+}
+
 export interface PropertyDocument {
   id: string;
   propertyId: string;
@@ -204,6 +274,7 @@ export interface Property {
   isDemo?: boolean;
   is_demo?: boolean;
   media?: PropertyMedia[];
+  valuation?: PropertyValuation | null;
 
   // Development info
   developmentName?: string | null;
@@ -242,12 +313,12 @@ export interface Property {
   surfacePatio?: number;
 
   // Legal
-  legalDebtFree?: boolean;
-  legalPublicDeed?: boolean;
-  legalTaxCurrent?: boolean;
-  legalServicesPaid?: boolean;
+  legalDebtFree?: PropertyEvidenceState;
+  legalPublicDeed?: PropertyEvidenceState;
+  legalTaxCurrent?: PropertyEvidenceState;
+  legalServicesPaid?: PropertyEvidenceState;
   legalOwnerType?: string | null;
-  legalIsMortgaged?: boolean;
+  legalIsMortgaged?: PropertyEvidenceState;
 
   // Services
   servicesWater?: boolean;
@@ -305,7 +376,7 @@ export interface Property {
   legalRegime?: 'Condominal' | 'Propiedad Privada' | 'Ejidal' | 'Fideicomiso' | 'Otro';
   legalLandUse?: 'Residencial' | 'Comercial' | 'Mixto' | 'Industrial' | 'Otro';
   legalRestrictions?: string;
-  legalDocumentationComplete?: boolean;
+  legalDocumentationComplete?: PropertyEvidenceState;
   legalJuridicalResponsible?: string;
   legalLastUpdate?: string;
   
@@ -329,6 +400,7 @@ export interface Property {
     name: string;
     company: string;
     position: string;
+    representativeType?: 'REAL_ESTATE_ADVISOR' | 'INDEPENDENT_ADVISOR' | 'REAL_ESTATE_AGENCY' | 'CONSTRUCTION_COMPANY' | 'DEVELOPER' | 'OWNER' | 'PROPERTY_MANAGER';
     responseTime: string;
     phone: string;
     whatsapp: string;
@@ -434,6 +506,7 @@ export interface User {
   joinDate?: string;
   isSuspended?: boolean;
   bio?: string;
+  location?: string;
   email?: string;
   companyId?: string | null;
   officeId?: string | null;

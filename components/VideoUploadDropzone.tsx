@@ -1,13 +1,15 @@
 "use client";
-import React, { useState, useRef, useEffect } from 'react';
+
+import React, { useRef, useState } from 'react';
+import { Film, Loader2, Play, Plus, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useTranslation } from '../lib/context/LanguageContext';
 import { ServiceFactory } from '../lib/services/ServiceFactory';
-import { Upload, X, Loader2, Play, Film } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface VideoUploadDropzoneProps {
-  videoUrl: string;
-  onChange: (url: string) => void;
+  videoUrls: string[];
+  onChange: (urls: string[]) => void;
+  maxVideos?: number;
 }
 
 interface Toast {
@@ -16,149 +18,146 @@ interface Toast {
   message: string;
 }
 
-export default function VideoUploadDropzone({ 
-  videoUrl, 
-  onChange
+const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024;
+const ALLOWED_EXTENSIONS = new Set(['mp4', 'mov', 'webm']);
+const ALLOWED_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm']);
+
+export default function VideoUploadDropzone({
+  videoUrls,
+  onChange,
+  maxVideos = 5,
 }: VideoUploadDropzoneProps) {
-  const { t, language } = useTranslation();
+  const { language } = useTranslation();
   const [isDragActive, setIsDragActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
   const storageService = ServiceFactory.getStorageService();
+  const remainingSlots = Math.max(0, maxVideos - videoUrls.length);
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
+  const showToast = (message: string, type: Toast['type']) => {
+    const id = crypto.randomUUID();
+    setToasts((current) => [...current, { id, message, type }]);
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
     }, 4000);
   };
 
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setIsDragActive(true);
-    } else if (e.type === "dragleave") {
-      setIsDragActive(false);
+  const validateVideo = (file: File) => {
+    const extension = file.name.split('.').pop()?.toLowerCase() || '';
+    if (!ALLOWED_TYPES.has(file.type) && !ALLOWED_EXTENSIONS.has(extension)) {
+      showToast(
+        language === 'es'
+          ? `“${file.name}” no es MP4, MOV o WEBM.`
+          : `“${file.name}” is not MP4, MOV, or WEBM.`,
+        'error',
+      );
+      return false;
     }
+    if (file.size > MAX_VIDEO_SIZE_BYTES) {
+      showToast(
+        language === 'es'
+          ? `“${file.name}” supera el límite de 50 MB.`
+          : `“${file.name}” exceeds the 50 MB limit.`,
+        'error',
+      );
+      return false;
+    }
+    return true;
   };
 
-  const uploadVideoFile = async (file: File) => {
-    const allowedExtensions = ['mp4', 'mov', 'webm'];
-    const allowedTypes = ['video/mp4', 'video/quicktime', 'video/webm'];
+  const uploadVideoFiles = async (incomingFiles: File[]) => {
+    if (isUploading || remainingSlots === 0 || incomingFiles.length === 0) return;
 
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    const isValidFormat = allowedTypes.includes(file.type) || allowedExtensions.includes(ext);
-    const isTooLarge = file.size > 50 * 1024 * 1024; // 50MB limit
-
-    if (!isValidFormat) {
+    if (incomingFiles.length > remainingSlots) {
       showToast(
         language === 'es'
-          ? 'Formato no permitido. Utiliza MP4, MOV o WEBM.'
-          : 'Unsupported format. Please use MP4, MOV or WEBM.',
-        'error'
+          ? `Puedes agregar ${remainingSlots} video${remainingSlots === 1 ? '' : 's'} más.`
+          : `You can add ${remainingSlots} more video${remainingSlots === 1 ? '' : 's'}.`,
+        'error',
       );
-      return;
     }
 
-    if (isTooLarge) {
-      showToast(
-        language === 'es'
-          ? 'El video supera el límite de 50MB.'
-          : 'The video exceeds the 50MB limit.',
-        'error'
-      );
-      return;
-    }
+    const validFiles = incomingFiles.slice(0, remainingSlots).filter(validateVideo);
+    if (validFiles.length === 0) return;
 
     setIsUploading(true);
-    setUploadProgress(10);
+    setUploadProgress(5);
+    const uploadedUrls: string[] = [];
+    let failedUploads = 0;
 
-    const progressInterval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 90) return prev;
-        return prev + Math.floor(Math.random() * 8) + 2;
-      });
-    }, 400);
+    for (let index = 0; index < validFiles.length; index += 1) {
+      try {
+        const publicUrl = await storageService.uploadImage(validFiles[index]);
+        uploadedUrls.push(publicUrl);
+      } catch (error) {
+        failedUploads += 1;
+        console.error('[VideoUploadDropzone] Upload error:', error);
+      }
+      setUploadProgress(Math.round(((index + 1) / validFiles.length) * 100));
+    }
 
-    try {
-      // Direct file upload to Supabase storage preserving correct MIME type
-      const publicUrl = await storageService.uploadImage(file);
-      
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-      setTimeout(() => {
-        setIsUploading(false);
-        setUploadProgress(0);
-      }, 500);
-
-      onChange(publicUrl);
+    if (uploadedUrls.length > 0) {
+      onChange([...videoUrls, ...uploadedUrls].slice(0, maxVideos));
       showToast(
-        language === 'es' ? 'Video subido correctamente.' : 'Video uploaded successfully.',
-        'success'
-      );
-    } catch (err) {
-      console.error('[VideoUploadDropzone] Upload error:', err);
-      clearInterval(progressInterval);
-      setIsUploading(false);
-      setUploadProgress(0);
-      showToast(
-        language === 'es' ? 'Error al subir el video.' : 'Failed to upload video.',
-        'error'
+        language === 'es'
+          ? `${uploadedUrls.length} video${uploadedUrls.length === 1 ? '' : 's'} subido${uploadedUrls.length === 1 ? '' : 's'} correctamente.`
+          : `${uploadedUrls.length} video${uploadedUrls.length === 1 ? '' : 's'} uploaded successfully.`,
+        'success',
       );
     }
+    if (failedUploads > 0) {
+      showToast(
+        language === 'es'
+          ? `${failedUploads} video${failedUploads === 1 ? '' : 's'} no se pudieron subir.`
+          : `${failedUploads} video${failedUploads === 1 ? '' : 's'} could not be uploaded.`,
+        'error',
+      );
+    }
+
+    setIsUploading(false);
+    setUploadProgress(0);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleDrag = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragActive(event.type === 'dragenter' || event.type === 'dragover');
+  };
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
     setIsDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      await uploadVideoFile(e.dataTransfer.files[0]);
-    }
+    void uploadVideoFiles(Array.from(event.dataTransfer.files || []));
   };
 
-  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      await uploadVideoFile(e.target.files[0]);
-    }
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    void uploadVideoFiles(Array.from(event.target.files || []));
   };
 
-  const triggerFileInput = () => {
-    if (isUploading || videoUrl) return;
-    fileInputRef.current?.click();
-  };
-
-  const handleDeleteVideo = async () => {
-    if (!videoUrl) return;
-    const success = await storageService.deleteImage(videoUrl);
+  const handleDeleteVideo = async (url: string) => {
+    const success = await storageService.deleteImage(url);
     if (!success) {
       console.warn('[VideoUploadDropzone] Physical video delete failed, clearing reference.');
     }
-    onChange('');
-    showToast(
-      language === 'es' ? 'Video eliminado.' : 'Video removed.',
-      'success'
-    );
+    onChange(videoUrls.filter((videoUrl) => videoUrl !== url));
+    showToast(language === 'es' ? 'Video eliminado.' : 'Video removed.', 'success');
   };
 
   return (
-    <div className="flex flex-col gap-2 w-full">
-      {/* Toast notifications */}
+    <div className="flex w-full flex-col gap-3">
       <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2">
         <AnimatePresence>
-          {toasts.map(toast => (
+          {toasts.map((toast) => (
             <motion.div
               key={toast.id}
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className={`px-4 py-3 rounded-2xl shadow-premium text-xs font-bold text-white flex items-center gap-2 ${
+              className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-xs font-bold text-white shadow-premium ${
                 toast.type === 'success' ? 'bg-brand-accent' : 'bg-brand-rose'
               }`}
             >
@@ -169,100 +168,93 @@ export default function VideoUploadDropzone({
         </AnimatePresence>
       </div>
 
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-brand-gray-500">
+          {language === 'es' ? 'Videos de la propiedad' : 'Property videos'}
+        </p>
+        <span className="rounded-full bg-brand-gray-100 px-2.5 py-1 text-[9px] font-black text-brand-gray-600">
+          {videoUrls.length} / {maxVideos}
+        </span>
+      </div>
+
       <input
-        type="file"
         ref={fileInputRef}
-        accept="video/*"
+        type="file"
+        multiple
+        accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
         onChange={handleFileInputChange}
         className="hidden"
       />
 
-      {!videoUrl ? (
-        /* Dropzone area */
-        <div
+      {videoUrls.length > 0 && (
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+          {videoUrls.map((videoUrl, index) => (
+            <article key={videoUrl} className="group overflow-hidden rounded-2xl border border-brand-gray-200 bg-brand-black shadow-sm">
+              <div className="relative aspect-video">
+                <video src={videoUrl} className="h-full w-full object-cover" muted playsInline controls preload="metadata" />
+                <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-black/65 px-2 py-1 text-[8px] font-black uppercase tracking-wider text-white backdrop-blur">
+                  Video {index + 1}
+                </span>
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10 transition group-hover:bg-black/25">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-brand-black shadow-md">
+                    <Play className="h-3.5 w-3.5 translate-x-px fill-current" />
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteVideo(videoUrl)}
+                  className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-brand-rose text-white shadow-md transition hover:scale-105 hover:bg-brand-rose/90"
+                  aria-label={language === 'es' ? `Eliminar video ${index + 1}` : `Remove video ${index + 1}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {remainingSlots > 0 && (
+        <button
+          type="button"
           onDragEnter={handleDrag}
           onDragOver={handleDrag}
           onDragLeave={handleDrag}
           onDrop={handleDrop}
-          onClick={triggerFileInput}
-          className={`border-2 border-dashed rounded-3xl p-6 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center gap-3 relative overflow-hidden bg-brand-gray-50 min-h-[160px] ${
-            isDragActive 
-              ? 'border-brand-accent bg-brand-accent/5 scale-[1.01]' 
-              : 'border-brand-gray-200 hover:border-brand-black hover:bg-white hover:shadow-floating'
+          onClick={() => !isUploading && fileInputRef.current?.click()}
+          className={`relative flex min-h-[128px] w-full cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-3xl border-2 border-dashed p-5 text-center transition ${
+            isDragActive
+              ? 'scale-[1.01] border-brand-accent bg-brand-accent/5'
+              : 'border-brand-gray-200 bg-brand-gray-50 hover:border-brand-accent hover:bg-white'
           }`}
         >
           {isUploading ? (
-            <div className="flex flex-col items-center gap-2 animate-in fade-in duration-200">
-              <Loader2 className="w-8 h-8 text-brand-accent animate-spin" />
-              <p className="text-xs font-bold text-brand-black">
-                {language === 'es' ? 'Subiendo video local...' : 'Uploading local video...'}
+            <>
+              <Loader2 className="h-7 w-7 animate-spin text-brand-accent" />
+              <p className="text-xs font-black text-brand-black">
+                {language === 'es' ? 'Subiendo videos…' : 'Uploading videos…'}
               </p>
-              <p className="text-[10px] text-brand-gray-400 font-medium">
-                {language === 'es' ? 'Almacenando archivo en Supabase Storage' : 'Storing file in Supabase Storage'}
-              </p>
-              {uploadProgress > 0 && (
-                <div className="flex flex-col items-center gap-1.5 w-full max-w-[200px] mt-1.5">
-                  <div className="w-full bg-brand-gray-200 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-brand-accent h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
-                  </div>
-                  <span className="text-[9px] font-black text-brand-accent">{uploadProgress}%</span>
-                </div>
-              )}
-            </div>
+              <div className="h-1.5 w-full max-w-[220px] overflow-hidden rounded-full bg-brand-gray-200">
+                <div className="h-full bg-brand-accent transition-all" style={{ width: `${uploadProgress}%` }} />
+              </div>
+              <span className="text-[9px] font-black text-brand-accent">{uploadProgress}%</span>
+            </>
           ) : (
-            <div className="flex flex-col items-center gap-2">
-              <div className="p-3 bg-white rounded-2xl shadow-premium text-brand-gray-500 hover:scale-105 transition-transform duration-200">
-                <Film className="w-5 h-5 text-brand-black" />
-              </div>
-              <div className="text-center px-4">
-                <p className="text-xs font-bold text-brand-black">
-                  {language === 'es' 
-                    ? 'Arrastra y suelta tu video local aquí' 
-                    : 'Drag & drop your local video here'
-                  }
-                </p>
-                <p className="text-[10px] text-brand-gray-500 mt-0.5 font-semibold">
-                  {language === 'es' 
-                    ? 'o haz clic para explorar tus archivos (MP4, MOV, WEBM hasta 50MB)' 
-                    : 'or click to browse your files (MP4, MOV, WEBM up to 50MB)'
-                  }
-                </p>
-              </div>
-            </div>
+            <>
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-black shadow-sm">
+                {videoUrls.length === 0 ? <Film className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+              </span>
+              <p className="text-xs font-black text-brand-black">
+                {language === 'es'
+                  ? `Arrastra o selecciona hasta ${remainingSlots} video${remainingSlots === 1 ? '' : 's'}`
+                  : `Drop or select up to ${remainingSlots} video${remainingSlots === 1 ? '' : 's'}`}
+              </p>
+              <p className="text-[10px] font-semibold text-brand-gray-500">
+                MP4, MOV o WEBM · 50 MB máximo por archivo
+              </p>
+            </>
           )}
-          <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full bg-brand-accent/5 filter blur-xl pointer-events-none" />
-        </div>
-      ) : (
-        /* Video thumbnail preview card */
-        <div className="flex flex-col gap-2">
-          <span className="text-[10px] font-bold text-brand-gray-500 uppercase tracking-wider">
-            {language === 'es' ? 'Video cargado' : 'Uploaded Video'}
-          </span>
-          <div className="relative rounded-2xl overflow-hidden bg-brand-black aspect-video max-w-sm border border-brand-gray-200 group">
-            <video 
-              src={videoUrl} 
-              className="w-full h-full object-cover" 
-              muted 
-              playsInline 
-              controls
-            />
-            {/* Play Button Overlay */}
-            <div className="absolute inset-0 bg-brand-black/20 flex items-center justify-center pointer-events-none group-hover:bg-brand-black/40 transition-colors">
-              <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center text-brand-black shadow-md">
-                <Play className="w-4 h-4 text-brand-black fill-brand-black translate-x-[1px]" />
-              </div>
-            </div>
-            {/* Close action */}
-            <button
-              type="button"
-              onClick={handleDeleteVideo}
-              className="absolute top-2 right-2 p-1.5 bg-brand-rose hover:bg-brand-rose/90 text-white rounded-full transition-transform hover:scale-110 shadow-md cursor-pointer z-10"
-              title={language === 'es' ? 'Eliminar video' : 'Remove video'}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        </button>
       )}
     </div>
   );

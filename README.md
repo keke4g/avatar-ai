@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Towers México
 
-## Getting Started
+Plataforma inmobiliaria en Next.js para publicar, buscar y comparar propiedades, con Eterna como asistente conversacional y Supabase como capa de datos.
 
-First, run the development server:
+## Desarrollo local
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre [http://localhost:3000](http://localhost:3000). Las variables requeridas están documentadas en `.env.example`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Comandos principales
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm test
+npm run lint
+npm run build
+```
 
-## Learn More
+## Organización
 
-To learn more about Next.js, take a look at the following resources:
+- `app/`: rutas, layouts y endpoints de Next.js.
+- `features/`: experiencias completas del producto, como Eterna y publicación de propiedades.
+- `components/`: componentes visuales compartidos por varias funciones.
+- `lib/`: dominio, servicios, adaptadores y utilidades sin dependencia de la interfaz.
+- `supabase/migrations/`: única fuente oficial para cambios de esquema.
+- `scrapers/`: adquisición y normalización de comparables de mercado.
+- `tests/`: pruebas unitarias y de integración, separadas por alcance.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Consulta [docs/architecture.md](docs/architecture.md) antes de agregar una función nueva o mover responsabilidades entre capas.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Base de datos
 
-## Deploy on Vercel
+Cada cambio debe agregarse como una migración nueva y fechada dentro de `supabase/migrations/`. Los scripts en `scripts/sql/legacy/` se conservan sólo como referencia histórica y no deben ejecutarse automáticamente.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Despliegue
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+El despliegue es una operación separada de la refactorización local. Ejecuta primero pruebas, lint y build, y después usa el flujo de release del proyecto.

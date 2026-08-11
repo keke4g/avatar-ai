@@ -7,6 +7,7 @@ import { PropertySearchFilters, SearchResult, ProviderCapabilities } from '../se
 import { searchCache } from '../search/SearchCache';
 import { measureExecution } from '../search/measureExecution';
 import { searchLogger } from '../search/searchLogger';
+import { PropertyValidator } from './PropertyValidator';
 
 // Helper to handle localStorage caching
 const getStorageItem = <T>(key: string, defaultValue: T): T => {
@@ -18,7 +19,7 @@ const getStorageItem = <T>(key: string, defaultValue: T): T => {
   }
   try {
     return JSON.parse(stored) as T;
-  } catch (e) {
+  } catch {
     return defaultValue;
   }
 };
@@ -29,134 +30,22 @@ const setStorageItem = <T>(key: string, value: T): void => {
 };
 
 function enrichMockPropertiesWithLegalInfo(p: Property): Property {
-  p.legalJuridicalResponsible = p.legalJuridicalResponsible || 'Lic. Alejandro Ruiz';
-  p.legalLastUpdate = p.legalLastUpdate || '2026-06-25';
-
-  if (p.id === 'prop-1' || p.id === 'user-prop-1') {
-    p.legalDebtFree = p.legalDebtFree ?? true;
-    p.legalPublicDeed = p.legalPublicDeed ?? true;
-    p.legalTaxCurrent = p.legalTaxCurrent ?? true;
-    p.legalServicesPaid = p.legalServicesPaid ?? true;
-    p.legalDocumentationComplete = p.legalDocumentationComplete ?? true;
-    p.legalRegime = p.legalRegime || 'Propiedad Privada';
-    p.legalLandUse = p.legalLandUse || 'Residencial';
-    p.legalRestrictions = p.legalRestrictions || 'Ninguna. Libre de afectaciones viales.';
-    p.appraisalAmount = p.appraisalAmount || 8900000;
-    p.appraisalDate = p.appraisalDate || '2026-05-12';
-    p.appraisalExpert = p.appraisalExpert || 'Ing. Carlos Mendoza (Reg. 3942)';
-    p.appraisalValidity = p.appraisalValidity || '2026-11-12';
-    p.appreciationLevel = p.appreciationLevel || 'Alta';
-    p.commercialStatus = p.commercialStatus || 'Disponible';
-    p.priceHistory = p.priceHistory || {
-      initialPrice: 9200000,
-      currentPrice: 8900000,
-      lastModificationDate: '2026-06-19',
-      trend: 'DOWN'
-    };
-  } else if (p.id === 'prop-2') {
-    p.legalDebtFree = p.legalDebtFree ?? false;
-    p.legalLienType = p.legalLienType || 'Banco';
-    p.legalLienObservations = p.legalLienObservations || 'Crédito hipotecario activo con saldo pendiente por liquidar de $1,200,000 MXN.';
-    p.legalPublicDeed = p.legalPublicDeed ?? true;
-    p.legalTaxCurrent = p.legalTaxCurrent ?? true;
-    p.legalServicesPaid = p.legalServicesPaid ?? true;
-    p.legalDocumentationComplete = p.legalDocumentationComplete ?? true;
-    p.legalRegime = p.legalRegime || 'Condominal';
-    p.legalLandUse = p.legalLandUse || 'Residencial';
-    p.legalRestrictions = p.legalRestrictions || 'Sujeto a reglamento del condominio histórico.';
-    p.appraisalAmount = p.appraisalAmount || 6500000;
-    p.appraisalDate = p.appraisalDate || '2026-04-18';
-    p.appraisalExpert = p.appraisalExpert || 'Arq. Marie Dubois';
-    p.appraisalValidity = p.appraisalValidity || '2026-10-18';
-    p.appreciationLevel = p.appreciationLevel || 'Media';
-    p.commercialStatus = p.commercialStatus || 'En negociación';
-    p.priceHistory = p.priceHistory || {
-      initialPrice: 6500000,
-      currentPrice: 6500000,
-      lastModificationDate: '2026-04-18',
-      trend: 'STABLE'
-    };
-  } else if (p.id === 'prop-3') {
-    p.legalDebtFree = p.legalDebtFree ?? false;
-    p.legalLienType = p.legalLienType || 'Infonavit';
-    p.legalLienObservations = p.legalLienObservations || 'Saldo de crédito Infonavit por liquidar de $340,000 MXN en la firma.';
-    p.legalPublicDeed = p.legalPublicDeed ?? true;
-    p.legalTaxCurrent = p.legalTaxCurrent ?? true;
-    p.legalServicesPaid = p.legalServicesPaid ?? true;
-    p.legalDocumentationComplete = p.legalDocumentationComplete ?? true;
-    p.legalRegime = p.legalRegime || 'Condominal';
-    p.legalLandUse = p.legalLandUse || 'Residencial';
-    p.legalRestrictions = p.legalRestrictions || 'Ninguna.';
-    p.appraisalAmount = p.appraisalAmount || 3800000;
-    p.appraisalDate = p.appraisalDate || '2026-05-30';
-    p.appraisalExpert = p.appraisalExpert || 'Lic. Jaime Soto';
-    p.appraisalValidity = p.appraisalValidity || '2026-11-30';
-    p.appreciationLevel = p.appreciationLevel || 'Alta';
-    p.commercialStatus = p.commercialStatus || 'Bajo Oferta';
-    p.priceHistory = p.priceHistory || {
-      initialPrice: 3600000,
-      currentPrice: 3800000,
-      lastModificationDate: '2026-05-30',
-      trend: 'UP'
-    };
-  } else if (p.id === 'prop-4' || p.id === 'user-prop-2') {
-    p.legalDebtFree = p.legalDebtFree ?? false;
-    p.legalLienType = p.legalLienType || 'Particular';
-    p.legalLienObservations = p.legalLienObservations || 'Hipoteca privada con acreedor particular activa por $150,000 USD.';
-    p.legalPublicDeed = p.legalPublicDeed ?? false;
-    p.legalTaxCurrent = p.legalTaxCurrent ?? false;
-    p.legalServicesPaid = p.legalServicesPaid ?? false;
-    p.legalDocumentationComplete = p.legalDocumentationComplete ?? false;
-    p.legalRegime = p.legalRegime || 'Ejidal';
-    p.legalLandUse = p.legalLandUse || 'Residencial';
-    p.legalRestrictions = p.legalRestrictions || 'Derechos ejidales sujetos a la asamblea ejidal de Ubud. Sin título de propiedad inscrito en registro público.';
-    p.appraisalAmount = p.appraisalAmount || 1800000;
-    p.appraisalDate = p.appraisalDate || '2026-01-10';
-    p.appraisalExpert = p.appraisalExpert || 'Ing. Made Sukra';
-    p.appraisalValidity = p.appraisalValidity || '2026-07-10';
-    p.appreciationLevel = p.appreciationLevel || 'En desarrollo';
-    p.commercialStatus = p.commercialStatus || 'Bajo Oferta';
-    p.priceHistory = p.priceHistory || {
-      initialPrice: 1950000,
-      currentPrice: 1800000,
-      lastModificationDate: '2026-06-01',
-      trend: 'DOWN'
-    };
-  } else {
-    p.legalDebtFree = p.legalDebtFree ?? true;
-    p.legalPublicDeed = p.legalPublicDeed ?? true;
-    p.legalTaxCurrent = p.legalTaxCurrent ?? true;
-    p.legalServicesPaid = p.legalServicesPaid ?? true;
-    p.legalDocumentationComplete = p.legalDocumentationComplete ?? true;
-    p.legalRegime = p.legalRegime || 'Propiedad Privada';
-    p.legalLandUse = p.legalLandUse || 'Residencial';
-    p.legalRestrictions = p.legalRestrictions || 'Ninguna.';
-    p.appraisalAmount = p.appraisalAmount || 4500000;
-    p.appraisalDate = p.appraisalDate || '2026-06-01';
-    p.appraisalExpert = p.appraisalExpert || 'Perito Valuador Autorizado';
-    p.appraisalValidity = p.appraisalValidity || '2026-12-01';
-    p.appreciationLevel = p.appreciationLevel || 'Media';
-    p.commercialStatus = p.commercialStatus || 'Disponible';
-  }
-
-  if (!p.brokerProfile) {
-    p.brokerProfile = {
-      photo: p.hostAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-      name: p.hostName || 'Agente Responsable',
-      company: 'AuraSwap Elite Estates',
-      position: p.id === 'prop-1' ? 'Directora Comercial Premium' : 'Asesor Inmobiliario Senior',
-      responseTime: 'Menos de 15 minutos',
-      phone: '+52 667 392 4829',
-      whatsapp: '526673924829',
-      email: 'contacto@auraswap.com'
-    };
-  }
-
-  return p;
+  return {
+    ...p,
+    legalDebtFree: p.legalDebtFree ?? null,
+    legalPublicDeed: p.legalPublicDeed ?? null,
+    legalTaxCurrent: p.legalTaxCurrent ?? null,
+    legalServicesPaid: p.legalServicesPaid ?? null,
+    legalDocumentationComplete: p.legalDocumentationComplete ?? null,
+    brokerProfile: p.brokerProfile,
+  };
 }
 
 export class InMemoryPropertyService implements IPropertyService {
-  private properties: Property[] = [...USER_PROPERTIES, ...MOCK_PROPERTIES].map(ensurePropertyOfferings).map(enrichMockPropertiesWithLegalInfo);
+  private properties: Property[] = [...USER_PROPERTIES, ...MOCK_PROPERTIES]
+    .map((property) => ({ ...property, isDemo: true }))
+    .map(ensurePropertyOfferings)
+    .map(enrichMockPropertiesWithLegalInfo);
 
   async getAll(): Promise<Property[]> {
     searchLogger.debug('[InMemoryPropertyService] getAll() called, returning', this.properties.length, 'properties');
@@ -169,39 +58,49 @@ export class InMemoryPropertyService implements IPropertyService {
   }
 
   async create(property: Partial<Property> & { title: string; hostId: string }): Promise<Property> {
+    property = {
+      ...property,
+      description: property.description?.trim()
+        || 'Información pendiente de revisión por Towers México.',
+      type: property.type || 'Apartment',
+      valueRating: property.valueRating || 'Premium',
+      country: property.country?.trim() || 'México',
+    };
+    const validation = PropertyValidator.validatePropertyBeforeInsert(property, 'REVIEW');
+    if (!validation.success) {
+      throw new Error(`[Property Validation Error] ${JSON.stringify(validation.errors)}`);
+    }
     const media = property.media || [];
     const imagesFromMedia = media
       .filter((m: any) => m.mediaType === 'IMAGE')
       .map((m: any) => m.url);
-    const finalImages = imagesFromMedia.length > 0 
-      ? imagesFromMedia 
-      : (property.images && property.images.length > 0 ? property.images : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80']);
+    const finalImages = imagesFromMedia.length > 0 ? imagesFromMedia : (property.images || []);
 
     const newProperty: Property = {
       ...property,
       id: `prop-${Date.now()}`,
       title: property.title,
       description: property.description || '',
-      type: property.type || 'Apartment',
+      type: property.type!,
       location: property.location || '',
       country: property.country || '',
       address: property.address || '',
-      valueRating: property.valueRating || 'Premium',
+      valueRating: property.valueRating!,
       media: media,
       images: finalImages,
       amenities: property.amenities || [],
-      auraScore: Math.floor(Math.random() * 10) + 90, // Random premium compatibility score (90-99%)
-      bedrooms: Number(property.bedrooms) || 1,
-      bathrooms: Number(property.bathrooms) || 1,
-      maxGuests: Number(property.maxGuests) || 2,
+      auraScore: property.auraScore ?? 0,
+      bedrooms: Number(property.bedrooms ?? 0),
+      bathrooms: Number(property.bathrooms ?? 0),
+      maxGuests: Number(property.maxGuests ?? 0),
       hostId: property.hostId,
-      hostName: property.hostName || 'Mateo Valenzuela',
-      hostAvatar: property.hostAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-      hostVerified: property.hostVerified ?? true,
-      hostRating: property.hostRating ?? 4.95,
-      hostReviewsCount: property.hostReviewsCount ?? 1,
-      availableStart: property.availableStart || '2026-06-01',
-      availableEnd: property.availableEnd || '2026-12-31',
+      hostName: property.hostName || '',
+      hostAvatar: property.hostAvatar || '',
+      hostVerified: property.hostVerified === true,
+      hostRating: property.hostRating ?? 0,
+      hostReviewsCount: property.hostReviewsCount ?? 0,
+      availableStart: property.availableStart || '',
+      availableEnd: property.availableEnd || '',
       latitude: property.latitude !== undefined && property.latitude !== null ? Number(property.latitude) : null,
       longitude: property.longitude !== undefined && property.longitude !== null ? Number(property.longitude) : null,
       placeId: property.placeId ?? null,
@@ -209,10 +108,11 @@ export class InMemoryPropertyService implements IPropertyService {
       city: property.city ?? null,
       state: property.state ?? null,
       geometrySource: property.geometrySource ?? null,
-      rules: property.rules || ['Be respectful of our domestic space.', 'Quiet hours after 10:00 PM.'],
+      rules: property.rules || [],
       reviews: [],
-      isPublished: property.isPublished ?? true,
-      offerings: property.offerings || []
+      isPublished: false,
+      folderStatus: 'UNDER_REVIEW',
+      offerings: (property.offerings || []).map((offering) => ({ ...offering, status: 'DRAFT' })),
     };
 
     const hydratedProperty = ensurePropertyOfferings(newProperty);
@@ -238,9 +138,23 @@ export class InMemoryPropertyService implements IPropertyService {
       ? imagesFromMedia
       : (propertyData.images !== undefined ? propertyData.images : this.properties[index].images);
 
+    const sensitiveFields: Array<keyof Property> = [
+      'title', 'description', 'type', 'location', 'country', 'address',
+      'latitude', 'longitude', 'bedrooms', 'bathrooms', 'parkingSpaces',
+      'surfaceTotal', 'surfaceBuilt', 'images', 'media', 'offerings',
+      'legalDebtFree', 'legalPublicDeed', 'legalTaxCurrent', 'legalServicesPaid',
+    ];
+    const sensitiveChange = sensitiveFields.some((key) => (
+      propertyData[key] !== undefined
+      && JSON.stringify(propertyData[key]) !== JSON.stringify(this.properties[index][key])
+    ));
+    const requiresReview = this.properties[index].isPublished === true && sensitiveChange;
+
     const updatedProperty: Property = ensurePropertyOfferings({
       ...this.properties[index],
       ...propertyData,
+      isPublished: requiresReview ? false : (propertyData.isPublished ?? this.properties[index].isPublished),
+      folderStatus: requiresReview ? 'UNDER_REVIEW' : (propertyData.folderStatus ?? this.properties[index].folderStatus),
       media,
       images: finalImages,
       offerings: syncedOfferings,
@@ -249,6 +163,18 @@ export class InMemoryPropertyService implements IPropertyService {
       bathrooms: propertyData.bathrooms !== undefined ? Number(propertyData.bathrooms) : this.properties[index].bathrooms,
       maxGuests: propertyData.maxGuests !== undefined ? Number(propertyData.maxGuests) : this.properties[index].maxGuests,
     });
+
+    const validation = PropertyValidator.validatePropertyBeforeInsert(
+      updatedProperty,
+      updatedProperty.isPublished
+        ? 'PUBLICATION'
+        : updatedProperty.folderStatus === 'DRAFT'
+          ? 'DRAFT'
+          : 'REVIEW',
+    );
+    if (!validation.success) {
+      throw new Error(`[Property Validation Error] ${JSON.stringify(validation.errors)}`);
+    }
 
     this.properties[index] = updatedProperty;
     searchCache.clear();
@@ -266,14 +192,22 @@ export class InMemoryPropertyService implements IPropertyService {
     const index = this.properties.findIndex(p => p.id === id);
     if (index === -1) throw new Error('Property not found');
 
-    const nextPublished = this.properties[index].isPublished === undefined ? false : !this.properties[index].isPublished;
-    this.properties[index] = ensurePropertyOfferings({
+    const nextPublished = this.properties[index].isPublished !== true;
+    const candidate = ensurePropertyOfferings({
       ...this.properties[index],
       isPublished: nextPublished,
+      folderStatus: nextPublished ? 'PUBLISHED' : 'PAUSED',
       offerings: (this.properties[index].offerings || []).map((offering) => (
-        offering.mode === 'SWAP' ? { ...offering, status: nextPublished ? 'ACTIVE' : 'PAUSED' } : offering
+        { ...offering, status: nextPublished ? 'ACTIVE' : 'PAUSED' }
       )),
     });
+    if (nextPublished) {
+      const validation = PropertyValidator.validateForPublication(candidate);
+      if (!validation.success) {
+        throw new Error(`[Property Publication Gate] ${JSON.stringify(validation.errors)}`);
+      }
+    }
+    this.properties[index] = candidate;
     searchCache.clear();
     return this.properties[index];
   }
@@ -554,13 +488,13 @@ export class InMemoryMessageService implements IMessageService {
     ]);
   }
 
-  async getAllForUser(userId: string): Promise<ChatMessage[]> {
+  async getAllForUser(_userId: string): Promise<ChatMessage[]> {
     return this.getMessages();
   }
 
   async send(swapRequestId: string, content: string, senderId: string): Promise<ChatMessage> {
     const list = this.getMessages();
-    let senderName = 'AuraSwap';
+    let senderName = 'Towers México';
     if (senderId === 'host-sofia') {
       senderName = 'Sofia Alvarez';
     } else if (senderId !== 'system') {
@@ -607,7 +541,7 @@ export class InMemoryLeadService implements ILeadService {
     return getStorageItem<Lead[]>(this.key, []);
   }
 
-  async getAllForUser(userId: string): Promise<Lead[]> {
+  async getAllForUser(_userId: string): Promise<Lead[]> {
     return this.getLeads();
   }
 
@@ -642,7 +576,7 @@ export class InMemoryNotificationService implements INotificationService {
       {
         id: 'noti-preload-2',
         userId,
-        title: 'Bienvenido a AuraSwap',
+        title: 'Bienvenido a Towers México',
         content: 'Explora espacios y propone swaps sin pagar renta.',
         isRead: false,
         createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()

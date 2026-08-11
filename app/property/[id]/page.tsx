@@ -1,53 +1,119 @@
-import { Metadata } from 'next';
-import { MOCK_PROPERTIES, USER_PROPERTIES } from '../../../lib/mockData';
-import PropertyDetailsClient from './PropertyDetailsClient';
+import type { Metadata } from 'next';
+import { getPublicAppOrigin } from '../../../lib/authUrls';
+import {
+  getCanonicalPropertyUrl,
+  getPublicPropertyForSeo,
+} from '../../../lib/seo/publicProperties';
+import PropertyDetailsClient from './_components/PropertyDetailsClient';
 
 interface PropertyDetailsPageProps {
   params: Promise<{ id: string }>;
 }
 
-// 1. Dynamic SEO Metadata Generation (Open Graph / Production Indexing Ready)
+const excerpt = (value: string, maxLength = 158): string => {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  return normalized.length > maxLength
+    ? `${normalized.slice(0, maxLength - 1).trimEnd()}…`
+    : normalized;
+};
+
 export async function generateMetadata({ params }: PropertyDetailsPageProps): Promise<Metadata> {
   const { id } = await params;
-  const property = [...USER_PROPERTIES, ...MOCK_PROPERTIES].find((p) => p.id === id);
+  const property = await getPublicPropertyForSeo(id);
 
-  if (!property) {
+  if (!property || property.isDemo) {
     return {
-      title: 'Propiedad en AuraSwap — detalles, costos y contacto',
-      description: 'Consulta la información, características, costos y opciones de contacto de esta propiedad en AuraSwap.',
+      title: 'Propiedad no disponible',
+      description: 'Esta propiedad no está disponible públicamente.',
+      robots: { index: false, follow: false },
     };
   }
 
-  const excerpt = property.description.length > 150 
-    ? `${property.description.slice(0, 150)}...` 
-    : property.description;
+  const canonical = getCanonicalPropertyUrl(property.id);
+  const title = property.metaTitle
+    ?.trim()
+    .replace(/\s*\|\s*(?:AuraSwap|Towers México)\s*$/i, '')
+    || `${property.title} en ${property.location || property.country || 'México'}`;
+  const brandedTitle = `${title} | Towers México`;
+  const description = excerpt(property.metaDescription?.trim() || property.description);
+  const images = property.images.slice(0, 4).map((url) => ({
+    url,
+    alt: property.title,
+  }));
 
   return {
-    title: `${property.title} — Home Swap in ${property.location} | AuraSwap`,
-    description: excerpt,
+    metadataBase: new URL(getPublicAppOrigin()),
+    title,
+    description,
+    keywords: property.metaKeywords.length > 0 ? property.metaKeywords : undefined,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
     openGraph: {
-      title: `${property.title} — Direct Swap Exchange`,
-      description: excerpt,
-      images: [
-        {
-          url: property.images[0],
-          width: 1200,
-          height: 630,
-          alt: property.title,
-        },
-      ],
       type: 'website',
+      locale: 'es_MX',
+      siteName: 'Towers México',
+      url: canonical,
+      title: brandedTitle,
+      description,
+      images,
     },
     twitter: {
-      card: 'summary_large_image',
-      title: `${property.title} — AuraSwap`,
-      description: excerpt,
-      images: [property.images[0]],
+      card: images.length > 0 ? 'summary_large_image' : 'summary',
+      title: brandedTitle,
+      description,
+      images: images.map((image) => image.url),
     },
   };
 }
 
 export default async function PropertyDetailsPage({ params }: PropertyDetailsPageProps) {
   const { id } = await params;
-  return <PropertyDetailsClient id={id} />;
+  const property = await getPublicPropertyForSeo(id);
+
+  const jsonLd = property && !property.isDemo
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'Residence',
+        name: property.title,
+        description: excerpt(property.description, 500),
+        url: getCanonicalPropertyUrl(property.id),
+        image: property.images,
+        address: {
+          '@type': 'PostalAddress',
+          addressLocality: property.location || undefined,
+          addressCountry: property.country || undefined,
+        },
+        ...(property.latitude !== null && property.longitude !== null
+          ? {
+              geo: {
+                '@type': 'GeoCoordinates',
+                latitude: property.latitude,
+                longitude: property.longitude,
+              },
+            }
+          : {}),
+        numberOfBedrooms: property.bedrooms || undefined,
+        numberOfBathroomsTotal: property.bathrooms || undefined,
+        occupancy: property.maxGuests
+          ? {
+              '@type': 'QuantitativeValue',
+              maxValue: property.maxGuests,
+            }
+          : undefined,
+      }
+    : null;
+
+  return (
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c'),
+          }}
+        />
+      )}
+      <PropertyDetailsClient id={id} />
+    </>
+  );
 }

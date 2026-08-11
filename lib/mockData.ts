@@ -1,4 +1,4 @@
-import { Property, User, PropertyReview } from './types';
+import { Property, User } from './types';
 
 export const MOCK_USERS: User[] = [
   {

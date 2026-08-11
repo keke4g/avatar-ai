@@ -1,4 +1,4 @@
-const DEFAULT_APP_ORIGIN = 'https://avatar-ai-4hcg.vercel.app';
+const DEFAULT_APP_ORIGIN = 'https://towersmexico.com';
 
 export const getPublicAppOrigin = (): string => {
   const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim();

@@ -17,11 +17,12 @@ export class LegalEngine {
   public static calculateStatus(property: Property): LegalEngineResult {
     const warnings: string[] = [];
 
-    // 🔴 RIESGO CRÍTICO: Si NO tiene escrituras o está embargado
+    // Explicit negative evidence is critical. Missing evidence is never
+    // converted into either a positive or a negative assertion.
     if (property.legalLienType === 'Embargo') {
       warnings.push('ATENCIÓN: Inmueble con proceso de embargo activo. La venta/renta está restringida jurídicamente hasta su resolución.');
     }
-    if (property.legalPublicDeed !== true) { // Se cambia === false por !== true para atrapar undefined/null
+    if (property.legalPublicDeed === false) {
       warnings.push('La propiedad no cuenta con Escrituras Públicas inscritas. No es elegible para ningún tipo de crédito hipotecario.');
     }
 
@@ -34,12 +35,14 @@ export class LegalEngine {
       };
     }
 
-    // 🟡 ADVERTENCIA: Requiere revisión (Predial o Gravamen menor)
-    if (property.legalDebtFree !== true) {
+    if (property.legalDebtFree === false) {
       warnings.push('La propiedad cuenta con un gravamen activo o hipoteca pendiente por liquidar.');
     }
-    if (property.legalTaxCurrent !== true) {
+    if (property.legalTaxCurrent === false) {
       warnings.push('Se detectó adeudo en el pago de Predial o requiere actualización de pagos.');
+    }
+    if (property.legalServicesPaid === false) {
+      warnings.push('Se reportan servicios pendientes de pago.');
     }
 
     if (warnings.length > 0) {
@@ -51,11 +54,27 @@ export class LegalEngine {
       };
     }
 
-    // 🟢 TODO CORRECTO: Expediente limpio
+    const unknownFacts = [
+      ['escritura pública', property.legalPublicDeed],
+      ['libertad de gravamen', property.legalDebtFree],
+      ['predial', property.legalTaxCurrent],
+      ['servicios', property.legalServicesPaid],
+      ['integridad documental', property.legalDocumentationComplete],
+    ].filter(([, value]) => value !== true);
+
+    if (unknownFacts.length > 0) {
+      return {
+        status: 'YELLOW',
+        label: 'Información no verificada',
+        explanation: 'El expediente aún no cuenta con evidencia suficiente para emitir una conclusión jurídica favorable.',
+        warnings: unknownFacts.map(([label]) => `Pendiente de verificar: ${label}.`),
+      };
+    }
+
     return {
       status: 'GREEN',
-      label: 'Expediente Completo',
-      explanation: 'La propiedad se encuentra libre de gravamen, al corriente en predial, debidamente escriturada y con expediente completo.',
+      label: 'Expediente verificado',
+      explanation: 'Los datos jurídicos requeridos fueron marcados como verificados. Consulta siempre la evidencia y su fecha de vigencia.',
       warnings: []
     };
   }
@@ -69,9 +88,10 @@ export class CreditEngine {
       noCompatibles: []
     };
 
-    const hasDeed = property.legalPublicDeed !== false;
+    const hasDeed = property.legalPublicDeed === true;
     const isEjidal = property.legalRegime === 'Ejidal';
     const isEmbargo = property.legalLienType === 'Embargo';
+    const lienVerified = property.legalDebtFree != null;
 
     // 1. Contado: Always compatible if not blocked by Embargo
     if (isEmbargo) {
@@ -79,8 +99,10 @@ export class CreditEngine {
         credit: 'Pago de Contado',
         reason: 'Restringido por proceso de embargo activo.'
       });
-    } else {
+    } else if (property.legalDebtFree === true) {
       result.compatibles.push('Contado');
+    } else {
+      result.evaluables.push('Pago de Contado');
     }
 
     // List of credits we evaluate
@@ -107,10 +129,14 @@ export class CreditEngine {
       }
 
       if (!hasDeed) {
-        result.noCompatibles.push({
-          credit: cred.name,
-          reason: 'Inmueble sin escrituras inscritas.'
-        });
+        if (property.legalPublicDeed === false) {
+          result.noCompatibles.push({
+            credit: cred.name,
+            reason: 'Inmueble sin escrituras inscritas.'
+          });
+        } else {
+          result.evaluables.push(cred.name);
+        }
         continue;
       }
 
@@ -123,6 +149,11 @@ export class CreditEngine {
       }
 
       // Gravamen-specific restrictions
+      if (!lienVerified) {
+        result.evaluables.push(cred.name);
+        continue;
+      }
+
       if (property.legalDebtFree === false) {
         // FOVISSSTE is highly restrictive about existing liens of any kind
         if (cred.type.includes('fovissste')) {
@@ -168,7 +199,7 @@ export class CreditEngine {
 
 export class CommercialEngine {
   public static getStatusDetails(property: Property): { label: string; color: string; description: string } {
-    const status = property.commercialStatus || 'Disponible';
+    const status = property.commercialStatus || 'Sin confirmar';
     const statusDetails: Record<string, { label: string; color: string; description: string }> = {
       'Disponible': { label: 'Disponible', color: 'bg-emerald-500 text-white', description: 'La propiedad está lista para comercialización.' },
       'Apartada': { label: 'Apartada', color: 'bg-amber-500 text-white', description: 'Se ha recibido un depósito de apartado para detener ventas.' },
@@ -180,20 +211,28 @@ export class CommercialEngine {
       'Bajo Oferta': { label: 'Bajo Oferta', color: 'bg-teal-500 text-white', description: 'Oferta comercial recibida y en evaluación por el propietario.' },
       'En negociación': { label: 'En negociación', color: 'bg-orange-500 text-white', description: 'Se están definiendo plazos o adecuaciones del contrato.' }
     };
-    return statusDetails[status] || statusDetails['Disponible'];
+    return statusDetails[status] || {
+      label: 'Disponibilidad sin confirmar',
+      color: 'bg-amber-100 text-amber-800',
+      description: 'La disponibilidad comercial debe ser confirmada por la persona responsable.',
+    };
   }
 }
 
 export class InvestmentEngine {
   public static getAppreciationLabel(property: Property): { label: string; color: string; rate: string } {
-    const level = property.appreciationLevel || 'Media';
+    const level = property.appreciationLevel || 'Sin análisis';
     const appreciationConfig: Record<string, { label: string; color: string; rate: string }> = {
       'Alta': { label: 'Plusvalía Alta (Premium)', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', rate: '8% - 12% anual' },
       'Media': { label: 'Plusvalía Media', color: 'text-sky-700 bg-sky-50 border-sky-200', rate: '5% - 8% anual' },
       'Baja': { label: 'Plusvalía Estable', color: 'text-brand-gray-500 bg-brand-gray-50 border-brand-gray-200', rate: '2% - 5% anual' },
       'En desarrollo': { label: 'Zona en Desarrollo', color: 'text-amber-700 bg-amber-50 border-amber-200', rate: 'Proyección acelerada' }
     };
-    return appreciationConfig[level] || appreciationConfig['Media'];
+    return appreciationConfig[level] || {
+      label: 'Plusvalía sin evaluar',
+      color: 'text-brand-gray-600 bg-brand-gray-50 border-brand-gray-200',
+      rate: 'No disponible',
+    };
   }
 }
 

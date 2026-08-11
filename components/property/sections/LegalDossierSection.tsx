@@ -1,18 +1,16 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
-import { 
-  FileText, 
-  CheckCircle2, 
-  Home, 
-  Map, 
-  UserCheck, 
-  Clock, 
-  AlertTriangle 
+import {
+  AlertTriangle,
+  CalendarClock,
+  CircleDashed,
+  FileCheck2,
+  FileText,
+  Landmark,
+  ShieldQuestion,
 } from 'lucide-react';
-import { Property } from '../../../lib/types';
-import { PropertyEligibilityEngine } from '../../../lib/services/PropertyEligibilityEngine';
+import type { Property, PropertyDocument } from '../../../lib/types';
 import { PropertySectionCard, PropertySubIcon } from '../PropertySectionCard';
 
 interface LegalDossierSectionProps {
@@ -20,176 +18,156 @@ interface LegalDossierSectionProps {
   language: 'es' | 'en';
 }
 
+const hasApprovedDocument = (
+  documents: PropertyDocument[] | undefined,
+  type: PropertyDocument['documentType'],
+) => documents?.some((document) => document.documentType === type && document.status === 'APPROVED') === true;
+
 export const LegalDossierSection: React.FC<LegalDossierSectionProps> = ({
   property,
-  language
+  language,
 }) => {
-  const legalStatus = PropertyEligibilityEngine.getLegalStatus(property);
+  const deedEvidence = hasApprovedDocument(property.documents, 'DEED');
+  const taxEvidence = hasApprovedDocument(property.documents, 'TAX_RECIPET');
+  const dossierReviewed = property.legalDocumentationComplete === true
+    && Boolean(property.legalLastUpdate)
+    && Boolean(property.legalJuridicalResponsible);
+  const hasAnyEvidence = deedEvidence || taxEvidence || dossierReviewed;
 
-  // Status configuration mapping
-  const statusConfig = {
-    GREEN: {
-      dotColor: 'bg-emerald-500 ring-emerald-100',
-      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      badgeText: language === 'es' ? 'Apto para escriturar' : 'Ready to deed'
-    },
-    YELLOW: {
-      dotColor: 'bg-amber-500 ring-amber-100',
-      badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
-      badgeText: language === 'es' ? 'Sujeto a evaluación' : 'Under evaluation'
-    },
-    RED: {
-      dotColor: 'bg-rose-500 ring-rose-100',
-      badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
-      badgeText: language === 'es' ? 'Restricción legal' : 'Legal restriction'
-    }
-  };
-
-  const config = statusConfig[legalStatus.status] || statusConfig.YELLOW;
-
-  // Grid cards structure
-  const dossierItems = [
+  const items = [
     {
-      id: 'deeds',
-      label: language === 'es' ? 'Escrituras' : 'Public Deeds',
-      value: property.legalPublicDeed 
-        ? (language === 'es' ? 'Inscritas' : 'Registered') 
-        : (language === 'es' ? 'Sin Escrituras' : 'Not Registered'),
-      status: property.legalPublicDeed ? 'valid' : 'critical',
-      icon: FileText
+      id: 'deed',
+      label: language === 'es' ? 'Escritura pública' : 'Public deed',
+      icon: FileText,
+      value: deedEvidence && property.legalPublicDeed === true
+        ? (language === 'es' ? 'Documento revisado' : 'Document reviewed')
+        : property.legalPublicDeed === true
+          ? (language === 'es' ? 'Escritura declarada' : 'Deed declared')
+          : (language === 'es' ? 'Información no proporcionada' : 'Information not provided'),
+      verified: deedEvidence && property.legalPublicDeed === true,
+      positive: property.legalPublicDeed === true,
     },
     {
-      id: 'taxes',
-      label: language === 'es' ? 'Predial' : 'Property Tax',
-      value: property.legalTaxCurrent 
-        ? (language === 'es' ? 'Al corriente' : 'Up to date') 
-        : (language === 'es' ? 'Con adeudo' : 'With debts'),
-      status: property.legalTaxCurrent ? 'valid' : 'critical',
-      icon: CheckCircle2
+      id: 'tax',
+      label: language === 'es' ? 'Predial' : 'Property tax',
+      icon: Landmark,
+      value: taxEvidence && property.legalTaxCurrent === true
+        ? (language === 'es' ? 'Comprobante revisado' : 'Receipt reviewed')
+        : property.legalTaxCurrent === true
+          ? (language === 'es' ? 'Declarado al corriente' : 'Declared up to date')
+          : (language === 'es' ? 'Información no proporcionada' : 'Information not provided'),
+      verified: taxEvidence && property.legalTaxCurrent === true,
+      positive: property.legalTaxCurrent === true,
     },
-    ...(property.legalRegime ? [{
-      id: 'regime',
-      label: language === 'es' ? 'Régimen' : 'Regime',
-      value: property.legalRegime,
-      status: 'valid',
-      icon: Home
-    }] : []),
-    ...(property.legalLandUse ? [{
-      id: 'landUse',
-      label: language === 'es' ? 'Uso de suelo' : 'Land Use',
-      value: property.legalLandUse,
-      status: 'valid',
-      icon: Map
-    }] : []),
-    ...(property.legalJuridicalResponsible ? [{
-      id: 'responsible',
-      label: language === 'es' ? 'Responsable Jurídico' : 'Juridical Responsible',
-      value: property.legalJuridicalResponsible,
-      status: 'valid',
-      icon: UserCheck
-    }] : []),
+    {
+      id: 'lien',
+      label: language === 'es' ? 'Gravamen' : 'Lien status',
+      icon: ShieldQuestion,
+      value: dossierReviewed && property.legalDebtFree === true
+        ? (language === 'es' ? 'Revisión registrada' : 'Review recorded')
+        : property.legalDebtFree === true
+          ? (language === 'es' ? 'Declarado libre' : 'Declared clear')
+          : (language === 'es' ? 'Información no proporcionada' : 'Information not provided'),
+      verified: dossierReviewed && property.legalDebtFree === true,
+      positive: property.legalDebtFree === true,
+    },
     ...(property.legalLastUpdate ? [{
-      id: 'lastUpdate',
-      label: language === 'es' ? 'Última actualización' : 'Last update',
+      id: 'updated',
+      label: language === 'es' ? 'Última revisión declarada' : 'Declared last review',
+      icon: CalendarClock,
       value: property.legalLastUpdate,
-      status: 'valid',
-      icon: Clock
-    }] : [])
+      verified: dossierReviewed,
+      positive: dossierReviewed,
+    }] : []),
   ];
-
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.08
-      }
-    }
-  };
-
-  const cardVariants = {
-    hidden: { opacity: 0, y: 15 },
-    show: { 
-      opacity: 1, 
-      y: 0,
-      transition: { type: 'spring' as const, stiffness: 100, damping: 15 }
-    }
-  };
 
   return (
     <PropertySectionCard
-      icon={FileText}
-      eyebrow={language === 'es' ? 'Verificación documental' : 'Document verification'}
-      title={language === 'es' ? 'Expediente jurídico' : 'Legal dossier'}
-      description={`${language === 'es' ? 'Estado legal:' : 'Legal status:'} ${legalStatus.label}`}
+      icon={FileCheck2}
+      eyebrow={language === 'es' ? 'Debida diligencia' : 'Due diligence'}
+      title={language === 'es' ? 'Situación documental' : 'Document status'}
+      description={hasAnyEvidence
+        ? (language === 'es'
+            ? 'Los documentos revisados se distinguen claramente de la información declarada.'
+            : 'Reviewed documents are clearly distinguished from declared information.')
+        : (language === 'es'
+            ? 'Consulta aquí la situación documental capturada para esta propiedad.'
+            : 'Review the document status reported for this property.')}
       action={(
-        <span className={`self-start sm:self-center px-3.5 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider ${config.badgeClass} shadow-xs`}>
-          {config.badgeText}
+        <span className={`inline-flex self-start items-center gap-1.5 rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.12em] ${
+          hasAnyEvidence
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+            : 'border-neutral-200 bg-neutral-50 text-neutral-600'
+        }`}>
+          {hasAnyEvidence ? <FileCheck2 className="h-3 w-3" /> : <CircleDashed className="h-3 w-3" />}
+          {hasAnyEvidence
+            ? (language === 'es' ? 'Evidencia parcial' : 'Partial evidence')
+            : (language === 'es' ? 'Expediente declarado' : 'Declared dossier')}
         </span>
       )}
     >
-      {/* Grid of Independent Cards with Staggered animations */}
-      <motion.div 
-        variants={containerVariants}
-        initial="hidden"
-        whileInView="show"
-        viewport={{ once: true, margin: '-50px' }}
-        className="grid grid-cols-2 gap-3 md:grid-cols-3"
-      >
-        {dossierItems.map((item) => {
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {items.map((item) => {
           const Icon = item.icon;
-
           return (
-            <motion.div
+            <article
               key={item.id}
-              variants={cardVariants}
-              whileHover={{ y: -4, scale: 1.01, boxShadow: '0 10px 20px -5px rgba(0, 0, 0, 0.03)' }}
-              className="relative flex min-h-32 flex-col overflow-hidden rounded-2xl border border-neutral-200/80 bg-white p-4 transition-shadow duration-300"
+              className="flex min-h-32 flex-col rounded-2xl border border-neutral-200/80 bg-white p-4"
             >
-              <PropertySubIcon icon={Icon} />
-              
+              <div className="flex items-start justify-between gap-3">
+                <PropertySubIcon
+                  icon={Icon}
+                  className={item.positive
+                    ? '!border-emerald-300 !bg-emerald-50/80 !text-emerald-700'
+                    : ''}
+                />
+                <span className={`rounded-full border px-2 py-1 text-[8px] font-black uppercase tracking-[0.11em] ${
+                  item.verified
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : item.positive
+                      ? 'border-emerald-100 bg-emerald-50/50 text-emerald-700'
+                      : 'border-neutral-200 bg-neutral-50 text-neutral-500'
+                }`}>
+                  {item.verified
+                    ? (language === 'es' ? 'Con evidencia' : 'Evidence-backed')
+                    : item.positive
+                      ? (language === 'es' ? 'Declarado' : 'Declared')
+                      : (language === 'es' ? 'Pendiente' : 'Pending')}
+                </span>
+              </div>
               <div className="mt-auto pt-4">
-                <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider block">
+                <span className="block text-[9px] font-bold uppercase tracking-[0.12em] text-neutral-400">
                   {item.label}
                 </span>
-                <span className="text-xs font-black text-neutral-900 mt-0.5 block truncate">
+                <span className="mt-1 block text-xs font-extrabold leading-snug text-neutral-900">
                   {item.value}
                 </span>
               </div>
-            </motion.div>
+            </article>
           );
         })}
-      </motion.div>
+      </div>
 
-      {/* Timeline Warning Card */}
-      {((legalStatus.warnings && legalStatus.warnings.length > 0) || property.legalRestrictions) && (
-        <div className="relative mt-4 flex gap-3.5 overflow-hidden rounded-2xl border border-amber-100/60 bg-amber-50/20 p-4 transition-all hover:bg-amber-50/30">
-          <div className="absolute top-0 bottom-0 left-0 w-1 bg-amber-400" />
-          
-          <div className="p-2 rounded-xl bg-amber-50 text-amber-600 shrink-0 h-fit">
-            <AlertTriangle className="w-4 h-4" />
-          </div>
-
-          <div className="flex flex-col gap-1.5 text-xs text-amber-900 font-medium">
-            <span className="font-extrabold uppercase tracking-wider text-[10px] text-amber-800">
-              {language === 'es' ? 'Observaciones de Expediente' : 'Dossier Observations'}
-            </span>
-            
-            {property.legalRestrictions && (
-              <p className="leading-relaxed font-semibold">{property.legalRestrictions}</p>
-            )}
-
-            {legalStatus.warnings && legalStatus.warnings.length > 0 && (
-              <ul className="list-disc list-inside flex flex-col gap-1 mt-1 font-bold text-amber-850">
-                {legalStatus.warnings.map((w, idx) => (
-                  <li key={idx} className="leading-snug">{w}</li>
-                ))}
-              </ul>
-            )}
+      {(property.legalRestrictions || property.legalLienType) && (
+        <div className="mt-1 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-amber-950">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-[0.12em] text-amber-800">
+              {language === 'es' ? 'Información declarada que requiere revisión' : 'Declared information requiring review'}
+            </p>
+            <p className="mt-1 text-xs font-semibold leading-relaxed">
+              {[property.legalLienType, property.legalRestrictions].filter(Boolean).join(' · ')}
+            </p>
           </div>
         </div>
       )}
+
+      <p className="flex items-start gap-2 border-t border-neutral-100 pt-4 text-[10px] font-semibold leading-relaxed text-neutral-500">
+        <ShieldQuestion className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        {language === 'es'
+          ? 'Esta ficha no sustituye la revisión de notaría, Registro Público ni de la institución financiera.'
+          : 'This listing does not replace review by a notary, public registry, or financial institution.'}
+      </p>
     </PropertySectionCard>
   );
 };

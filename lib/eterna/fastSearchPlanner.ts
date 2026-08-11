@@ -1,5 +1,6 @@
 import { parseBudgetRange } from '../search/SearchEngine';
 import type { ConversationMemory } from './ConversationEngine';
+import { isPropertyPublishingTrigger } from './IntentRouter';
 
 export interface CatalogLocationHint {
   city?: string | null;
@@ -34,7 +35,7 @@ function extractOperation(prompt: string): 'sale' | 'rent' | 'swap' | null {
   const clean = normalize(prompt);
   if (/\b(intercambio|intercambiar|swap|trueque|permuta)\b/.test(clean)) return 'swap';
   if (/\b(rentar|renta|alquilar|alquiler|arrendar|arriendo)\b/.test(clean)) return 'rent';
-  if (/\b(comprar|compra|adquirir|adquisicion|en venta)\b/.test(clean)) return 'sale';
+  if (/\b(comprar|compra|adquirir|adquisicion|venta|vender|en venta)\b/.test(clean)) return 'sale';
   return null;
 }
 
@@ -43,7 +44,9 @@ function extractPropertyType(prompt: string): 'departamento' | 'casa' | null {
   if (/\b(departamento|departamentos|depa|depas|depto|deptos|apartamento|condominio|condo)\b/.test(clean)) {
     return 'departamento';
   }
-  if (/\b(casa|casas|residencia|residencias|villa|vivienda|hogar)\b/.test(clean)) {
+  // Voice transcription can turn “casas” into “casos”; accept that common
+  // homophone when the rest of the utterance is clearly a property search.
+  if (/\b(casa|casas|casos|residencia|residencias|villa|vivienda|hogar)\b/.test(clean)) {
     return 'casa';
   }
   return null;
@@ -98,7 +101,7 @@ function hasOpenBudgetStatement(prompt: string): boolean {
 
 function hasBudgetValue(prompt: string): boolean {
   const clean = normalize(prompt);
-  const hasBudgetLanguage = /\b(presupuesto|hasta|maximo|maxima|menos de|entre|desde)\b/.test(clean)
+  const hasBudgetLanguage = /\b(presupuesto|hasta|maximo|maxima|menos de|debajo de|por debajo de|menor de|inferior a|menos que|entre|desde)\b/.test(clean)
     && /\d|\b(?:un|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|veinte|treinta|cincuenta|cien)\b/.test(clean);
   const hasMoneyExpression = /(?:\$\s*\d|\b\d[\d.,\s]*\s*(?:millones?|mil|mxn|pesos?|usd|dolares?|m)\b|\b(?:un|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|veinte|treinta|cincuenta|cien)\s+(?:millones?|mil)\b)/.test(clean);
   return hasBudgetLanguage || hasMoneyExpression;
@@ -123,11 +126,21 @@ export function planFastPropertySearch(params: {
 }): FastSearchPlan {
   const { prompt, currentMemory, catalogLocations } = params;
   const clean = normalize(prompt);
+  if (isPropertyPublishingTrigger(prompt)) {
+    return {
+      matched: false,
+      ready: false,
+      missing: null,
+      memory: { ...currentMemory },
+      reply: '',
+      suggestedReplies: [],
+    };
+  }
   const activeSearch = Boolean(
     currentMemory.operation || currentMemory.city || currentMemory.propertyType || currentMemory.budgetOpen,
   );
   const hasSearchVerb = /\b(busco|buscar|encuentra|encontrar|muestrame|mostrarme|quiero ver|necesito)\b/.test(clean);
-  const mentionsProperty = /\b(propiedad|inmueble|departamento|depa|casa|residencia|loft|terreno|local|oficina)\b/.test(clean);
+  const mentionsProperty = /\b(propiedad|inmueble|departamento|depa|casa|casas|casos|residencia|loft|terreno|local|oficina)\b/.test(clean);
   const isAccountOrPublishingCommand = /\b(mis propiedades|mi propiedad|publicar|subir|anunciar|editar|administrar|gestionar|panel|dashboard)\b/.test(clean);
   const operation = extractOperation(prompt);
   const detectedCity = extractCity(prompt, catalogLocations);
@@ -156,7 +169,11 @@ export function planFastPropertySearch(params: {
     const range = parseBudgetRange(prompt);
     const value = range.min && range.max
       ? `entre ${range.min} y ${range.max}`
-      : String(range.max || range.min || '');
+      : range.min
+      ? `desde ${range.min}`
+      : range.max
+      ? `hasta ${range.max}`
+      : '';
     if (value) {
       memory.budget = { value, confidence: 1 };
       memory.budgetOpen = { value: false, confidence: 1 };

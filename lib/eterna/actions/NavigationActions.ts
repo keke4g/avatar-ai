@@ -96,8 +96,8 @@ export function useNavigationActions({
           en: "To view your general control dashboard, you must sign in. Taking you to the login page."
         },
         post: {
-          es: "Hola, {name}. Bienvenido a tu panel de control general de AuraSwap.",
-          en: "Hello {name}. Welcome to your general AuraSwap control dashboard."
+          es: "Hola, {name}. Bienvenido a tu panel de control general de Towers México.",
+          en: "Hello {name}. Welcome to your general Towers México control dashboard."
         }
       }
     };

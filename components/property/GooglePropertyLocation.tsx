@@ -1,6 +1,4 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any -- Google Maps is loaded dynamically at runtime. */
-
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Clock3, Compass, ExternalLink, GraduationCap, Hospital, MapPin, ShoppingCart, Trees } from 'lucide-react';
 import type { Property } from '../../lib/types';
@@ -186,7 +184,7 @@ export default function GooglePropertyLocation({ property, places, loading, erro
               <Compass className="h-4 w-4" aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <p className="text-[9px] font-black uppercase tracking-[0.17em] text-neutral-400">{language === 'es' ? 'Entorno verificado' : 'Verified surroundings'}</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.17em] text-neutral-400">{language === 'es' ? 'Datos de entorno' : 'Surroundings data'}</p>
               <h4 className="mt-0.5 text-sm font-black tracking-tight text-neutral-950">{language === 'es' ? 'Lo que tienes cerca' : 'What is nearby'}</h4>
             </div>
           </div>

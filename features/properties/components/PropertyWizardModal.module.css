@@ -1,0 +1,68 @@
+.formSurface {
+  scrollbar-gutter: stable;
+}
+
+.formSurface input:not([type='checkbox']):not([type='radio']):not([type='file']),
+.formSurface select,
+.formSurface textarea {
+  min-height: 46px;
+  border: 1px solid #deddd8;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(23, 23, 23, 0.02);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.formSurface textarea {
+  min-height: 96px;
+}
+
+.formSurface input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
+.formSurface select:focus,
+.formSurface textarea:focus {
+  border-color: #171717;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.07);
+}
+
+.formSurface input::placeholder,
+.formSurface textarea::placeholder {
+  color: #a1a1aa;
+}
+
+.formSurface label {
+  color: #3f3f46;
+  letter-spacing: 0.01em;
+}
+
+.formSurface input[type='checkbox'],
+.formSurface input[type='radio'] {
+  accent-color: #171717;
+}
+
+@media (max-width: 639px) {
+  .formSurface {
+    scrollbar-gutter: auto;
+  }
+
+  .formSurface input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  .formSurface select,
+  .formSurface textarea {
+    font-size: 16px;
+  }
+
+  .formSurface [class~='grid-cols-2'],
+  .formSurface [class~='grid-cols-3'],
+  .formSurface [class~='grid-cols-4'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 860px) {
+  .previewPublisherRow {
+    display: none;
+  }
+}

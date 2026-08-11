@@ -1,10 +1,8 @@
 "use client";
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import { AvatarState } from "../../hooks/useAvatarState";
 import { useLiveContext } from "../../lib/context/LiveContext";
-import { Mic } from "lucide-react";
 import { DoubleBufferVideoPlayer } from "../DoubleBufferVideoPlayer";
-import { AvatarStateName } from "../../lib/eternaAssets";
 
 interface HeroVideoProps {
   avatarState: AvatarState;
@@ -30,9 +28,7 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
     console.log("[MOBILE TAP] HeroVideo mounted");
   }, [addDebugLog]);
 
-  const [isHydrated, setIsHydrated] = useState(false);
   useEffect(() => {
-    setIsHydrated(true);
     addDebugLog("HeroVideo hydrated");
     console.log("[MOBILE TAP] HeroVideo hydrated");
   }, [addDebugLog]);
@@ -201,22 +197,6 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
         />
       </div>
 
-      {/* Centered Glassmorphic Helper Tooltip */}
-      {avatarState === "WAITING" && (
-        <div className="absolute bottom-[35%] left-1/2 z-30 pointer-events-none select-none flex flex-col items-center animate-bounce-gentle w-full max-w-[90%]">
-          {/* Elegant moving rainbow border wrapper */}
-          <div className="p-[1.2px] rounded-full animate-rainbow-border shadow-floating">
-            <div className="bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3 py-1.5 md:px-4 md:py-2 rounded-full flex items-center gap-1.5 md:gap-2 transition-all duration-300">
-              <Mic className="w-3 h-3 md:w-3.5 md:h-3.5 text-blue-500 animate-pulse" />
-              <span className="text-[10px] md:text-[11px] font-bold tracking-wide text-zinc-800 dark:text-zinc-200 text-center whitespace-nowrap">
-                Haz clic para decirme qué necesitas
-              </span>
-            </div>
-          </div>
-          <div className="w-2 h-2 md:w-2.5 md:h-2.5 bg-white/95 dark:bg-zinc-950/95 border-r border-b border-zinc-200/50 dark:border-white/10 rotate-45 -mt-1 md:-mt-1.5 shadow-xs" />
-        </div>
-      )}
-
       {/* Styles for dynamic thinking/talking border animations */}
       <style jsx global>{`
         @keyframes border-glow-pulse {
@@ -237,48 +217,12 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
             transform: scale(1.006);
           }
         }
-        @keyframes bounce-gentle {
-          0%, 100% {
-            transform: translate(-50%, 0);
-          }
-          50% {
-            transform: translate(-50%, -6px);
-          }
-        }
-        @keyframes rainbow-border {
-          0% {
-            background-position: 0% 50%;
-          }
-          50% {
-            background-position: 100% 50%;
-          }
-          100% {
-            background-position: 0% 50%;
-          }
-        }
         .animate-border-glow-pulse {
           animation: border-glow-pulse 3s infinite ease-in-out;
         }
         .animate-border-glow-breath {
           animation: border-glow-breath 4s infinite ease-in-out;
           transition: transform 0.3s ease-in-out;
-        }
-        .animate-bounce-gentle {
-          animation: bounce-gentle 3s infinite ease-in-out;
-        }
-        .animate-rainbow-border {
-          background: linear-gradient(
-            270deg,
-            #ff5e62,
-            #ff9966,
-            #ffdb58,
-            #66ff99,
-            #33ccff,
-            #9966ff,
-            #ff5e62
-          );
-          background-size: 300% 300%;
-          animation: rainbow-border 6s ease-in-out infinite;
         }
       `}</style>
     </div>

@@ -1,4 +1,4 @@
-import { Property } from '../../types';
+import { Property, PropertyOfferingMode } from '../../types';
 import { formatCount, formatPropertyLocation } from '../../textHelpers';
 import { formatGooglePlaceName } from '../../maps/placeNames';
 import type { NearbyPlace, NearbyPlaceCategory } from '../../maps/types';
@@ -14,12 +14,219 @@ export interface EternaNearbyHighlight {
   drivingMinutes: number;
 }
 
+export interface EternaPropertyPresentation {
+  eyebrow: string;
+  headline: string;
+  speech: string;
+  highlights: string[];
+}
+
 const ETERNA_NEARBY_CATEGORY_ORDER: NearbyPlaceCategory[] = [
   'hospital',
   'park',
   'supermarket',
   'school',
 ];
+
+const hashString = (value: string): number => Array.from(value).reduce(
+  (hash, character) => ((hash << 5) - hash + character.charCodeAt(0)) | 0,
+  0,
+);
+
+const normalizePlacePart = (value?: string | null): string => value?.trim().replace(/\s+/g, ' ') || '';
+
+const getPublicLocationParts = (property: EternaProperty): { neighborhood: string; city: string; location: string } => {
+  const locationParts = (property.location || '')
+    .split(',')
+    .map(normalizePlacePart)
+    .filter(Boolean);
+  const neighborhood = normalizePlacePart(
+    property.neighborhood
+      || property.privateNeighborhood
+      || property.subdivisionName
+      || locationParts[0],
+  );
+  const city = normalizePlacePart(property.city || locationParts[1]);
+  const location = [neighborhood, city]
+    .filter((part, index, parts) => (
+      part && parts.findIndex((candidate) => candidate.toLocaleLowerCase() === part.toLocaleLowerCase()) === index
+    ))
+    .join(', ') || formatPropertyLocation(property.location, property.country);
+
+  return { neighborhood, city, location };
+};
+
+const getPropertyTypeLabel = (type: Property['type'], lang: 'es' | 'en'): string => {
+  const labels: Record<Property['type'], { es: string; en: string }> = {
+    Apartment: { es: 'departamento', en: 'apartment' },
+    'Beach House': { es: 'casa de playa', en: 'beach house' },
+    Cabin: { es: 'cabaña', en: 'cabin' },
+    Penthouse: { es: 'penthouse', en: 'penthouse' },
+    Villa: { es: 'villa', en: 'villa' },
+    Loft: { es: 'loft', en: 'loft' },
+  };
+
+  return labels[type]?.[lang] || (lang === 'es' ? 'propiedad' : 'property');
+};
+
+const formatSurface = (value: number, lang: 'es' | 'en'): string => (
+  lang === 'es'
+    ? `${new Intl.NumberFormat('es-MX').format(value)} metros cuadrados`
+    : `${new Intl.NumberFormat('en-US').format(value)} square meters`
+);
+
+const joinNaturally = (items: string[], conjunction: string): string => {
+  if (items.length <= 1) return items[0] || '';
+  return `${items.slice(0, -1).join(', ')} ${conjunction} ${items.at(-1)}`;
+};
+
+const getCommercialHighlight = (property: EternaProperty, lang: 'es' | 'en'): string | null => {
+  const activeOffering = property.offerings?.find((offering) => (
+    offering.status === 'ACTIVE' && offering.visibility === 'PUBLIC'
+  ));
+  if (!activeOffering) return null;
+
+  if (activeOffering.priceAmount && activeOffering.priceAmount > 0) {
+    const formattedPrice = new Intl.NumberFormat(lang === 'es' ? 'es-MX' : 'en-US', {
+      style: 'currency',
+      currency: activeOffering.currency || 'MXN',
+      maximumFractionDigits: 0,
+    }).format(activeOffering.priceAmount);
+    const priceLabels: Record<PropertyOfferingMode, { es: string; en: string }> = {
+      SALE: {
+        es: `un precio de venta de ${formattedPrice}`,
+        en: `a sale price of ${formattedPrice}`,
+      },
+      MONTHLY_RENT: {
+        es: `una renta mensual de ${formattedPrice}`,
+        en: `a monthly rent of ${formattedPrice}`,
+      },
+      SHORT_RENT: {
+        es: `una tarifa por noche de ${formattedPrice}`,
+        en: `a nightly rate of ${formattedPrice}`,
+      },
+      SWAP: {
+        es: `un valor de referencia de ${formattedPrice} para intercambio`,
+        en: `a reference value of ${formattedPrice} for exchange`,
+      },
+    };
+    return priceLabels[activeOffering.mode][lang];
+  }
+
+  const operationLabels: Record<PropertyOfferingMode, { es: string; en: string }> = {
+    SALE: { es: 'Disponible para compra', en: 'Available for sale' },
+    SHORT_RENT: { es: 'Disponible para estancias', en: 'Available for short stays' },
+    MONTHLY_RENT: { es: 'Disponible para renta mensual', en: 'Available for monthly rent' },
+    SWAP: { es: 'Disponible para intercambio', en: 'Available for exchange' },
+  };
+  return operationLabels[activeOffering.mode][lang];
+};
+
+/**
+ * Creates a short, factual listing introduction for Eterna. The variant is
+ * intentionally external so the UI can rotate the wording on each visit while
+ * keeping the function deterministic and testable.
+ */
+export const buildPropertyPresentation = (
+  property: EternaProperty,
+  lang: 'es' | 'en',
+  visitVariant = 0,
+): EternaPropertyPresentation => {
+  const title = property.title?.trim() || (lang === 'es' ? 'esta propiedad' : 'this property');
+  const { neighborhood, city, location } = getPublicLocationParts(property);
+  const propertyType = getPropertyTypeLabel(property.type, lang);
+  const isFemininePropertyType = ['casa de playa', 'cabaña', 'villa', 'propiedad'].includes(propertyType);
+  const propertyArticle = isFemininePropertyType ? 'una' : 'un';
+  const locatedAdjective = isFemininePropertyType ? 'ubicada' : 'ubicado';
+  const variantIndex = Math.abs(hashString(`${property.id}:${visitVariant}`)) % 4;
+  const roomDetails = [
+    property.bedrooms > 0
+      ? (lang === 'es'
+        ? formatCount(property.bedrooms, 'recámara', 'recámaras', 'feminine', true)
+        : `${property.bedrooms} ${property.bedrooms === 1 ? 'bedroom' : 'bedrooms'}`)
+      : null,
+    property.bathrooms > 0
+      ? (lang === 'es'
+        ? formatCount(property.bathrooms, 'baño completo', 'baños completos', 'masculine', true)
+        : `${property.bathrooms} ${property.bathrooms === 1 ? 'full bathroom' : 'full bathrooms'}`)
+      : null,
+    property.parkingSpaces !== undefined && property.parkingSpaces !== null && property.parkingSpaces > 0
+      ? (lang === 'es'
+        ? formatCount(property.parkingSpaces, 'lugar de estacionamiento', 'lugares de estacionamiento', 'masculine', true)
+        : `${property.parkingSpaces} ${property.parkingSpaces === 1 ? 'parking space' : 'parking spaces'}`)
+      : null,
+  ].filter((detail): detail is string => Boolean(detail));
+  const surfaceValue = property.surfaceBuilt || property.surfaceTotal;
+  const surfaceDetail = surfaceValue && surfaceValue > 0 ? formatSurface(surfaceValue, lang) : null;
+  const commercialHighlight = getCommercialHighlight(property, lang);
+
+  const highlights = [
+    roomDetails.slice(0, 2).join(' · '),
+    surfaceDetail,
+    commercialHighlight,
+  ].filter((detail): detail is string => Boolean(detail)).slice(0, 3);
+
+  if (lang === 'en') {
+    const openings = [
+      `Welcome. Let me introduce you to “${title}”, a ${propertyType} in ${location}.`,
+      `Picture your next chapter at “${title}”. This ${propertyType} is located in ${location}.`,
+      `We have arrived at “${title}”, a ${propertyType} in ${location} that deserves a closer look.`,
+      `Let me show you “${title}”, a ${propertyType} set in ${location}.`,
+    ];
+    const keyDetails = [
+      roomDetails.slice(0, 2).length ? joinNaturally(roomDetails.slice(0, 2), 'and') : null,
+      surfaceDetail,
+      commercialHighlight,
+    ].filter((detail): detail is string => Boolean(detail)).slice(0, 2);
+    const details = keyDetails.length
+      ? `The key details are ${joinNaturally(keyDetails, 'and')}.`
+      : '';
+    const close = [
+      'Would you like to review the location, price, or amenities first?',
+      'What would you like to explore first: the neighborhood, the terms, or the photos?',
+      'Would you prefer to start with the location or the commercial terms?',
+      'Which part would you like me to explain first?',
+    ][variantIndex];
+
+    return {
+      eyebrow: 'Eterna property tour',
+      headline: title,
+      highlights,
+      speech: [openings[variantIndex], details, close].filter(Boolean).join(' '),
+    };
+  }
+
+  const locationPhrase = neighborhood && city
+    ? `en ${neighborhood}, dentro de ${city}`
+    : `en ${location}`;
+  const openings = [
+    `Bienvenido. Quiero presentarte “${title}”, ${propertyArticle} ${propertyType} ${locatedAdjective} ${locationPhrase}.`,
+    `Imagina tu siguiente etapa en “${title}”. Se trata de ${propertyArticle} ${propertyType} ${locatedAdjective} ${locationPhrase}.`,
+    `Llegamos a “${title}”, ${propertyArticle} ${propertyType} ${locationPhrase} que vale la pena conocer con calma.`,
+    `Déjame mostrarte “${title}”, ${propertyArticle} ${propertyType} con ubicación ${locationPhrase}.`,
+  ];
+  const keyDetails = [
+    roomDetails.slice(0, 2).length ? joinNaturally(roomDetails.slice(0, 2), 'y') : null,
+    surfaceDetail,
+    commercialHighlight,
+  ].filter((detail): detail is string => Boolean(detail)).slice(0, 2);
+  const details = keyDetails.length
+    ? `Lo esencial: ${joinNaturally(keyDetails, 'y')}.`
+    : '';
+  const close = [
+    '¿Quieres revisar primero la ubicación, el precio o las amenidades?',
+    '¿Qué prefieres conocer primero: el entorno, las condiciones o las fotografías?',
+    '¿Comenzamos por la ubicación o por las condiciones comerciales?',
+    '¿Qué parte te gustaría que te explique primero?',
+  ][variantIndex];
+
+  return {
+    eyebrow: 'Recorrido con Eterna',
+    headline: title,
+    highlights,
+    speech: [openings[variantIndex], details, close].filter(Boolean).join(' '),
+  };
+};
 
 const getDrivingMinutes = (place: NearbyPlace): number => {
   if (place.durationSeconds && place.durationSeconds > 0) {
@@ -211,8 +418,8 @@ const getReasonWhy = (property: EternaProperty, lang: 'es' | 'en'): string => {
 
   if (property.auraScore > 90) {
     return lang === 'es' 
-      ? `Es una opción excepcional con un Aura Score de ${property.auraScore}%, lo cual garantiza un alto nivel de confort y excelente reputación.`
-      : `It is an exceptional choice with an Aura Score of ${property.auraScore}%, which guarantees high comfort and an excellent reputation.`;
+      ? `Es una opción excepcional con un Towers Score de ${property.auraScore}%, lo cual garantiza un alto nivel de confort y excelente reputación.`
+      : `It is an exceptional choice with an Towers Score of ${property.auraScore}%, which guarantees high comfort and an excellent reputation.`;
   }
 
   if (hasSeaView) {

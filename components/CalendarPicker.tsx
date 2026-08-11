@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import Image from 'next/image';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { useTranslation } from '../lib/context/LanguageContext';
 import { Property, SwapRequest } from '../lib/types';
@@ -215,7 +216,7 @@ export function CalendarPicker({
         isFallback: true,
       };
     }
-  }, [properties, swaps, searchQuery, tempRange?.start, tempRange?.end, guestsCount, activeCategory, selectedSwapType, sortBy]);
+  }, [properties, swaps, searchQuery, tempRange, guestsCount, activeCategory, selectedSwapType, sortBy]);
 
   // Keep picker within bounds of viewport on desktop
   const style: React.CSSProperties = isMobile
@@ -324,10 +325,14 @@ export function CalendarPicker({
             </div>
             <div className="flex shrink-0 items-center pl-2">
               {availabilityPreview.images.map((src, index) => (
-                <img
+                <Image
                   key={src}
                   src={src}
                   alt=""
+                  width={32}
+                  height={32}
+                  sizes="32px"
+                  unoptimized
                   className="h-8 w-8 rounded-xl border-2 border-white object-cover shadow-[0_8px_18px_rgba(60,68,98,0.16)] transition-transform duration-200 hover:-translate-y-0.5 hover:scale-105"
                   style={{ marginLeft: index === 0 ? 0 : -10, zIndex: availabilityPreview.images.length - index }}
                 />
@@ -380,57 +385,4 @@ export function CalendarPicker({
   return calendarCard;
 }
 
-export function formatHumanDate(dateStr: string, language: 'es' | 'en' = 'es'): string {
-  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-  
-  const [yearStr, monthStr, dayStr] = dateStr.split('-');
-  const year = parseInt(yearStr, 10);
-  const monthIdx = parseInt(monthStr, 10) - 1;
-  const day = parseInt(dayStr, 10);
-  
-  const monthNamesES = [
-    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
-  ];
-  
-  const monthNamesEN = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  
-  if (language === 'es') {
-    const monthName = monthNamesES[monthIdx] || '';
-    if (year === 2026) {
-      return `${day} de ${monthName}`;
-    } else {
-      return `${day} de ${monthName} de ${year}`;
-    }
-  } else {
-    const monthName = monthNamesEN[monthIdx] || '';
-    if (year === 2026) {
-      return `${monthName} ${day}`;
-    } else {
-      return `${monthName} ${day}, ${year}`;
-    }
-  }
-}
-
-export function formatElegantRange(start: string, end: string, lang: 'es' | 'en' = 'es'): string {
-  if (!start || !end) return '';
-  const monthsES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  const monthsEN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const months = lang === 'es' ? monthsES : monthsEN;
-
-  const startDate = new Date(start + 'T00:00:00');
-  const endDate = new Date(end + 'T00:00:00');
-
-  const startDay = startDate.getDate();
-  const startMonth = months[startDate.getMonth()];
-  const endDay = endDate.getDate();
-  const endMonth = months[endDate.getMonth()];
-
-  if (startMonth === endMonth) {
-    return `${startDay} - ${endDay} ${startMonth}`;
-  }
-  return `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
-}
+export { formatElegantRange, formatHumanDate } from '@/lib/shared/dateFormat';

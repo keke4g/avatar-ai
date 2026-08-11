@@ -12,12 +12,13 @@ output/
 scratch/
 
 # Runtime, modelos y archivos temporales del avatar local
-backend-local/models/
-backend-local/venv/
-backend-local/uploads/
-backend-local/**/__pycache__/
+backend-local/
 backend/**/__pycache__/
 *.pyc
+
+# Proyectos nativos que se construyen y distribuyen por separado
+android/
+mobile-shell/
 
 # Configuración y datos únicamente locales
 .env*

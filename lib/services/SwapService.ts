@@ -16,7 +16,7 @@ export const SwapService = {
   resolveDispute(swaps: SwapRequest[], swapId: string): SwapRequest[] {
     return swaps.map((s) => {
       if (s.id === swapId) {
-        const { isDisputed, disputeReason, ...rest } = s;
+        const { isDisputed: _isDisputed, disputeReason: _disputeReason, ...rest } = s;
         return rest as SwapRequest;
       }
       return s;

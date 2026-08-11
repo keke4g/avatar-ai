@@ -1,8 +1,7 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { Clock3, Gauge, TrendingUp } from 'lucide-react';
-import { Property } from '../../../lib/types';
+import { CalendarClock, LineChart, Scale, TrendingUp } from 'lucide-react';
+import type { Property } from '../../../lib/types';
 import { PropertySectionCard, PropertySubIcon } from '../PropertySectionCard';
 
 interface EternaMarketAnalysisProps {
@@ -10,85 +9,99 @@ interface EternaMarketAnalysisProps {
   language: 'es' | 'en';
 }
 
-export function EternaMarketAnalysis({
-  property,
-  language,
-}: EternaMarketAnalysisProps) {
-  const isProp1 = property.id === 'prop-1';
-  const speedLabel = isProp1
-    ? (language === 'es' ? 'Rápida' : 'Fast')
-    : (language === 'es' ? 'Media–alta' : 'Moderate–high');
-  const speedPercentage = isProp1 ? 88 : 72;
-  const estimatedTime = isProp1
-    ? (language === 'es' ? '45–60 días' : '45–60 days')
-    : (language === 'es' ? '60–90 días' : '60–90 days');
-  const estimatedDays = isProp1 ? 52 : 75;
-  const appreciationRate = isProp1 ? '8.5%' : '8.2%';
-  const appreciationValue = isProp1 ? 8.5 : 8.2;
+interface MarketEvidence {
+  source?: string;
+  measuredAt?: string;
+  appreciationRate?: number;
+  methodology?: string;
+}
 
-  const metrics = [
-    {
-      key: 'velocity',
-      Icon: Gauge,
-      label: language === 'es' ? 'Velocidad comercial' : 'Commercial velocity',
-      value: speedLabel,
-      detail: language === 'es' ? 'Ritmo estimado de colocación' : 'Estimated placement pace',
-    },
-    {
-      key: 'time',
-      Icon: Clock3,
-      label: language === 'es' ? 'Tiempo estimado' : 'Estimated time',
-      value: estimatedTime,
-      detail: language === 'es' ? 'Ventana comercial orientativa' : 'Indicative commercial window',
-    },
-    {
-      key: 'appreciation',
-      Icon: TrendingUp,
-      label: language === 'es' ? 'Plusvalía anual' : 'Annual appreciation',
-      value: appreciationRate,
-      detail: language === 'es' ? 'Proyección anual de la zona' : 'Annual area projection',
-    },
-  ];
+export function EternaMarketAnalysis({ property, language }: EternaMarketAnalysisProps) {
+  const evidence = property.metadata?.marketEvidence as MarketEvidence | undefined;
+  const hasAppraisal = Boolean(
+    property.appraisalAmount
+      && property.appraisalDate
+      && property.appraisalExpert,
+  );
+  const hasPriceHistory = Boolean(
+    property.priceHistory?.initialPrice
+      && property.priceHistory?.currentPrice
+      && property.priceHistory?.lastModificationDate,
+  );
+  const hasSourcedAppreciation = Boolean(
+    evidence?.source
+      && evidence?.measuredAt
+      && Number.isFinite(evidence?.appreciationRate),
+  );
+
+  if (!hasAppraisal && !hasPriceHistory && !hasSourcedAppreciation) {
+    return null;
+  }
 
   return (
     <PropertySectionCard
-      icon={TrendingUp}
-      eyebrow={language === 'es' ? 'Inteligencia inmobiliaria' : 'Real estate intelligence'}
-      title={language === 'es' ? 'Indicadores comerciales estimados' : 'Estimated commercial indicators'}
+      icon={LineChart}
+      eyebrow={language === 'es' ? 'Evidencia comercial' : 'Commercial evidence'}
+      title={language === 'es' ? 'Datos de mercado documentados' : 'Documented market data'}
       description={language === 'es'
-        ? 'Estimaciones orientativas de Eterna; confirma las condiciones actuales con el responsable.'
-        : 'Indicative Eterna estimates; confirm current conditions with the representative.'}
-      headingId="market-analysis-heading"
+        ? 'Se muestran únicamente cifras con fecha y procedencia disponibles en el expediente.'
+        : 'Only figures with a date and source available in the listing record are shown.'}
     >
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {metrics.map(({ key, Icon, label, value, detail }) => (
-          <article key={key} className="flex min-h-[150px] flex-col rounded-2xl border border-neutral-200/80 bg-white p-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {hasAppraisal && (
+          <article className="rounded-2xl border border-neutral-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
-              <PropertySubIcon icon={Icon} className="h-9 w-9 rounded-xl" iconClassName="h-4 w-4" />
-              <span className="text-right text-[9px] font-black uppercase tracking-[0.11em] text-brand-gray-500">
-                {label}
+              <PropertySubIcon icon={Scale} />
+              <span className="text-[8px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                {language === 'es' ? 'Con responsable y fecha' : 'Dated and attributed'}
               </span>
             </div>
-            <data
-              value={key === 'time' ? estimatedDays : key === 'appreciation' ? appreciationValue : speedPercentage}
-              className={`mt-5 block text-2xl font-black tracking-tight ${key === 'appreciation' ? 'text-emerald-600' : 'text-brand-black'}`}
-            >
-              {value}
-            </data>
-            <p className="mt-1 text-[10px] font-semibold text-brand-gray-500">{detail}</p>
-            {key === 'velocity' && (
-              <div className="mt-auto h-1.5 overflow-hidden rounded-full bg-brand-gray-200" aria-hidden="true">
-                <motion.div
-                  initial={{ width: 0 }}
-                  whileInView={{ width: `${speedPercentage}%` }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.8, ease: 'easeOut' }}
-                  className="h-full rounded-full bg-brand-black"
-                />
-              </div>
+            <p className="mt-5 text-xl font-black tracking-tight text-neutral-950">
+              MXN ${property.appraisalAmount!.toLocaleString()}
+            </p>
+            <p className="mt-1 text-[10px] font-semibold text-neutral-500">
+              {language === 'es' ? 'Avalúo declarado por' : 'Appraisal declared by'} {property.appraisalExpert}
+              {' · '}{property.appraisalDate}
+            </p>
+          </article>
+        )}
+
+        {hasPriceHistory && (
+          <article className="rounded-2xl border border-neutral-200 bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <PropertySubIcon icon={CalendarClock} />
+              <span className="text-[8px] font-black uppercase tracking-[0.12em] text-neutral-500">
+                {language === 'es' ? 'Historial del anuncio' : 'Listing history'}
+              </span>
+            </div>
+            <p className="mt-5 text-xl font-black tracking-tight text-neutral-950">
+              MXN ${property.priceHistory!.currentPrice.toLocaleString()}
+            </p>
+            <p className="mt-1 text-[10px] font-semibold text-neutral-500">
+              {language === 'es' ? 'Actualizado' : 'Updated'} {property.priceHistory!.lastModificationDate}
+            </p>
+          </article>
+        )}
+
+        {hasSourcedAppreciation && (
+          <article className="rounded-2xl border border-neutral-200 bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <PropertySubIcon icon={TrendingUp} />
+              <span className="text-[8px] font-black uppercase tracking-[0.12em] text-neutral-500">
+                {language === 'es' ? 'Dato de tercero' : 'Third-party data'}
+              </span>
+            </div>
+            <p className="mt-5 text-xl font-black tracking-tight text-neutral-950">
+              {evidence!.appreciationRate!.toLocaleString(undefined, { maximumFractionDigits: 2 })}%
+            </p>
+            <p className="mt-1 text-[10px] font-semibold text-neutral-500">
+              {evidence!.source} · {evidence!.measuredAt}
+            </p>
+            {evidence!.methodology && (
+              <p className="mt-2 text-[9px] leading-relaxed text-neutral-400">{evidence!.methodology}</p>
             )}
           </article>
-        ))}
+        )}
       </div>
     </PropertySectionCard>
   );

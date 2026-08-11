@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title description">
+  <title id="title">Propiedad sin fotografía</title>
+  <desc id="description">Marcador visual neutro de Towers México para una propiedad que aún no tiene fotografía.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4f1ec"/>
+      <stop offset="1" stop-color="#e5ddd2"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" fill="url(#background)"/>
+  <g fill="none" stroke="#876f59" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M410 485 600 330l190 155v205H410Z" stroke-width="18"/>
+    <path d="M545 690V545h110v145M465 440v-85h74v25" stroke-width="18"/>
+    <path d="M315 737h570" stroke-width="10" opacity=".45"/>
+  </g>
+  <text x="600" y="790" fill="#68584a" font-family="Arial, sans-serif" font-size="34" font-weight="700" text-anchor="middle">Fotografía pendiente</text>
+  <text x="600" y="834" fill="#887767" font-family="Arial, sans-serif" font-size="22" text-anchor="middle">Towers México</text>
+</svg>

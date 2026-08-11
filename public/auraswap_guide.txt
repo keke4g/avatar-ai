@@ -1,17 +1,17 @@
 ========================================================================
-AURASWAP — PREMIUM REAL ESTATE PLATFORM GUIDE & KNOWLEDGE DATABASE
+TOWERS MÉXICO — PREMIUM REAL ESTATE PLATFORM GUIDE & KNOWLEDGE DATABASE
 ========================================================================
 
-Este documento contiene la información oficial de AuraSwap, las reglas de la plataforma y el catálogo de propiedades exclusivas. Eterna, la Concierge Virtual Premium, utiliza esta base de datos para responder dudas de los usuarios y recomendar propiedades.
+Este documento contiene la información oficial de Towers México, las reglas de la plataforma y el catálogo de propiedades exclusivas. Eterna, la Concierge Virtual Premium, utiliza esta base de datos para responder dudas de los usuarios y recomendar propiedades.
 
 ------------------------------------------------------------------------
-1. FILOSOFÍA Y REGLAS GENERALES DE AURASWAP
+1. FILOSOFÍA Y REGLAS GENERALES DE TOWERS MÉXICO
 ------------------------------------------------------------------------
-* ¿Qué es AuraSwap?: AuraSwap es una red premium y exclusiva donde propietarios verificados compran, venden, rentan o intercambian sus propiedades e inmuebles residenciales o comerciales.
+* ¿Qué es Towers México?: Towers México es una red premium y exclusiva donde propietarios verificados compran, venden, rentan o intercambian sus propiedades e inmuebles residenciales o comerciales.
 * Costo de Alquiler: El costo de renta es de exactamente 0€ (CERO euros/dólares). Es un intercambio recíproco de confianza.
-* Tarifa de Servicio (Fee): AuraSwap cobra una tarifa de servicio única del 1% por cada intercambio (swap) completado con éxito, que cubre seguros premium de daños, verificación de identidad y soporte 24/7.
+* Tarifa de Servicio (Fee): Towers México cobra una tarifa de servicio única del 1% por cada intercambio (swap) completado con éxito, que cubre seguros premium de daños, verificación de identidad y soporte 24/7.
 * Seguridad y Confianza: El 100% de los propietarios y propiedades están verificados mediante inspección de propiedad y verificación de identidad digital.
-* Aura Match Score: Un puntaje inteligente de compatibilidad de intercambio (entre 90% y 99%) calculado en base a las fechas deseadas, el tipo de propiedad de cada usuario y sus necesidades inmobiliarias.
+* Towers Match Score: Un puntaje inteligente de compatibilidad de intercambio (entre 90% y 99%) calculado en base a las fechas deseadas, el tipo de propiedad de cada usuario y sus necesidades inmobiliarias.
 
 ------------------------------------------------------------------------
 2. PROCESO DE REGISTRO E INTERCAMBIO (ONBOARDING & SWAPS)
@@ -23,7 +23,7 @@ Este documento contiene la información oficial de AuraSwap, las reglas de la pl
 5. Aprobación y Confetti: Cuando el propietario receptor hace clic en "Accept Home Swap", el intercambio se confirma, se genera el contrato y se activa el seguro premium.
 
 ------------------------------------------------------------------------
-3. CATÁLOGO COMPLETO DE PROPIEDADES EN AURASWAP
+3. CATÁLOGO COMPLETO DE PROPIEDADES EN TOWERS MÉXICO
 ------------------------------------------------------------------------
 
 PROPIEDAD 1: Modernist Concrete Villa (Villa de Concreto Brutalista)
@@ -31,7 +31,7 @@ PROPIEDAD 1: Modernist Concrete Villa (Villa de Concreto Brutalista)
 - Categoría: Villa / Playa
 - Propietaria: Sofía Álvarez (Propietaria Verificada, Calificación 4.98, 42 reseñas)
 - Nivel de Valor: Luxury
-- Aura Score de Compatibilidad: 98%
+- Towers Score de Compatibilidad: 98%
 - Habitaciones: 4 dormitorios, 4.5 baños. Capacidad máxima: 8 personas.
 - Descripción: Estructura de concreto expuesto con líneas brutalistas y detalles tropicales. Paneles de vidrio deslizantes que conectan la sala con la piscina infinita y acceso directo a la playa privada.
 - Amenidades: Piscina infinita, playa privada, cocina de chef, cine en casa, vistas al océano, tablas de paddleboard, cargador Tesla.
@@ -42,7 +42,7 @@ PROPIEDAD 2: 17th-Century Marais Loft (Loft Histórico en París)
 - Categoría: Loft / Histórico
 - Propietaria: Chloé Laurent (Propietaria Verificada, Calificación 4.91, 56 reseñas)
 - Nivel de Valor: Exclusive
-- Aura Score de Compatibilidad: 96%
+- Towers Score de Compatibilidad: 96%
 - Habitaciones: 1 dormitorio, 1 baño. Capacidad máxima: 2 personas.
 - Descripción: Elegancia histórica en el vibrante distrito de Marais. Cuenta con vigas de roble originales del siglo XVII, paredes de piedra expuesta y una curaduría de muebles modernos de mediados de siglo. Hermosas ventanas que capturan la luz parisina y vistas a los techos clásicos.
 - Amenidades: Barra de espresso, reproductor de vinilos vintage, biblioteca personal, balcón francés, wifi de alta velocidad, secador Dyson Airwrap.
@@ -53,7 +53,7 @@ PROPIEDAD 3: Bauhaus Penthouse Roma Norte (Penthouse Bauhaus)
 - Categoría: Penthouse / Diseño
 - Anfitrión: Sofía Álvarez (Host Verificada, Calificación 4.98, 42 reseñas)
 - Nivel de Valor: Premium
-- Aura Score de Compatibilidad: 95%
+- Towers Score de Compatibilidad: 95%
 - Habitaciones: 2 dormitorios, 2 baños. Capacidad máxima: 4 personas.
 - Descripción: Un santuario de diseño en la arbolada Roma Norte. Inspirado en la escuela Bauhaus, con cancelería de acero negro, acabados de piedra natural y un espectacular jardín privado en la terraza con plantas endémicas.
 - Amenidades: Jardín en la azotea (rooftop), estación de trabajo dedicada, estufa de chef, cafetera espresso profesional, bicicletas de paseo, colección de arte contemporáneo.
@@ -64,7 +64,7 @@ PROPIEDAD 4: Tropical Ubud Sanctuary (Santuario Tropical en Bali)
 - Categoría: Villa / Exótico
 - Propietario: Yuki Sato (Propietario Verificado, Calificación 4.97, 19 reseñas)
 - Nivel de Valor: Luxury
-- Aura Score de Compatibilidad: 94%
+- Towers Score de Compatibilidad: 94%
 - Habitaciones: 3 dormitorios, 3.5 baños. Capacidad máxima: 6 personas.
 - Descripción: Sumérgete en la calma de la selva. Villa de arquitectura abierta que fluye directamente hacia la vegetación tropical y una piscina privada. Vistas espectaculares al amanecer sobre terrazas de arrozales.
 - Amenidades: Piscina infinita, ducha semi-exterior, scooters incluidos en la propiedad, deck de yoga privado, vistas a los arrozales, personal de servicio incluido.
@@ -75,7 +75,7 @@ PROPIEDAD 5: Contemporary Brooklyn Brownstone (Brownstone Contemporáneo)
 - Categoría: Apartment / Urbano
 - Anfitrión: Chloé Laurent (Host Verificada, Calificación 4.91, 56 reseñas)
 - Nivel de Valor: Curated
-- Aura Score de Compatibilidad: 93%
+- Towers Score de Compatibilidad: 93%
 - Habitaciones: 3 dormitorios, 2.5 baños. Capacidad máxima: 6 personas.
 - Descripción: Casa clásica de ladrillo restaurada con un diseño interior escandinavo minimalista. Combina chimeneas de época y molduras de yeso históricas con acabados de nogal y luminarias de diseño premium.
 - Amenidades: Cocina de nivel profesional, terraza en el patio trasero, sauna de infrarrojos privada, piano de cola, oficina de trabajo, sistema de sonido Sonos integrado.
@@ -103,17 +103,17 @@ PROPIEDAD DE INTERCAMBIO DEL USUARIO 2: Forest Retreat Cabin (Cabaña Refugio Fo
 4. PREGUNTAS FRECUENTES PARA LA CONCIERGE ETERNA
 ------------------------------------------------------------------------
 P: ¿Cómo funcionan las llaves y la entrada?
-R: Los propietarios y asesores de AuraSwap suelen usar cajas de seguridad con combinaciones digitales o cerraduras inteligentes para una entrada autónoma. Te enviarán una guía detallada en PDF con el código de acceso antes de tu entrada.
+R: Los propietarios y asesores de Towers México suelen usar cajas de seguridad con combinaciones digitales o cerraduras inteligentes para una entrada autónoma. Te enviarán una guía detallada en PDF con el código de acceso antes de tu entrada.
 
 P: ¿Se pueden llevar mascotas?
 R: Cada propiedad tiene sus propias reglas sobre mascotas en su ficha técnica. Si el propietario lo permite en el chat privado, puedes llevarlas, siempre cuidando de no dañar el mobiliario.
 
 P: ¿El wifi es confiable para trabajar de forma remota?
-R: Sí, la mayoría de los propietarios y asesores en AuraSwap son profesionales de la tecnología y el diseño, por lo que cuentan con conexiones de fibra óptica de alta velocidad (superior a 100 Mbps) o Starlink satelital en las cabañas.
+R: Sí, la mayoría de los propietarios y asesores en Towers México son profesionales de la tecnología y el diseño, por lo que cuentan con conexiones de fibra óptica de alta velocidad (superior a 100 Mbps) o Starlink satelital en las cabañas.
 
 P: ¿Qué pasa si hay daños?
 R: Cada intercambio incluye un seguro premium de cobertura amplia contra daños a la propiedad de hasta 1,000,000€. Cualquier percance menor se reporta a través de la plataforma.
 
 ========================================================================
-FIN DE LA BASE DE CONOCIMIENTOS DE AURASWAP
+FIN DE LA BASE DE CONOCIMIENTOS DE TOWERS MÉXICO
 ========================================================================

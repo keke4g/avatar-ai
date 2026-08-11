@@ -1,4 +1,4 @@
-import { Property, PropertyOffering, PropertyMedia } from '../types';
+import { Property, PropertyOffering } from '../types';
 import { PropertyMediaMapper } from './PropertyMediaMapper';
 import { PROPERTY_COLUMNS } from '../db/propertySchema';
 
@@ -31,6 +31,31 @@ export const isUuid = (val: any): boolean => {
   return uuidRegex.test(val);
 };
 
+const mapOfferingMetadata = (row: any): Record<string, unknown> => {
+  const metadata = row.metadata && typeof row.metadata === 'object'
+    ? { ...row.metadata }
+    : {};
+
+  // The public offerings view intentionally does not expose the complete
+  // metadata object. Rebuild only the rental fields that are safe and useful
+  // on the public property page.
+  if (row.rental_furnishing_status != null) {
+    metadata.rentalFurnishingStatus = row.rental_furnishing_status;
+  }
+  if (Array.isArray(row.included_rental_services)) {
+    metadata.includedRentalServices = row.included_rental_services;
+    metadata.includesServices = row.included_rental_services.length > 0;
+  }
+  if (row.accepts_pets != null) {
+    metadata.acceptsPets = row.accepts_pets === true;
+  }
+  if (row.includes_maintenance != null) {
+    metadata.includesMaintenance = row.includes_maintenance === true;
+  }
+
+  return metadata;
+};
+
 export const mapPostgresOffering = (row: any): PropertyOffering => ({
   id: row.id,
   propertyId: row.property_id,
@@ -41,9 +66,13 @@ export const mapPostgresOffering = (row: any): PropertyOffering => ({
   title: row.title,
   description: row.description,
   priceAmount: row.price_amount == null ? null : Number(row.price_amount),
-  currency: row.currency || 'USD',
+  currency: row.currency || '',
   billingPeriod: row.billing_period || 'NONE',
   depositAmount: row.deposit_amount == null ? null : Number(row.deposit_amount),
+  securityDepositAmount: row.security_deposit_amount == null ? null : Number(row.security_deposit_amount),
+  advanceMonths: row.advance_months == null ? undefined : Number(row.advance_months),
+  requiresGuarantor: row.requires_guarantor == null ? undefined : row.requires_guarantor === true,
+  requiresLegalPolicy: row.requires_legal_policy == null ? undefined : row.requires_legal_policy === true,
   cleaningFeeAmount: row.cleaning_fee_amount == null ? null : Number(row.cleaning_fee_amount),
   serviceFeePercent: row.service_fee_percent == null ? null : Number(row.service_fee_percent),
   commissionPercent: row.commission_percent == null ? null : Number(row.commission_percent),
@@ -76,7 +105,7 @@ export const mapPostgresOffering = (row: any): PropertyOffering => ({
   isFeatured: row.is_featured,
   featuredUntil: row.featured_until,
   featuredRank: row.featured_rank,
-  metadata: row.metadata || {},
+  metadata: mapOfferingMetadata(row),
   createdAt: row.created_at,
   availability: (row.property_offering_availability || []).map((avail: any) => ({
     id: avail.id,
@@ -139,7 +168,7 @@ export class PropertyMapper {
     const property: Record<string, any> = {};
 
     for (const [key, value] of Object.entries(row)) {
-      if (key === 'profiles' || key === 'property_images' || key === 'property_offerings' || key === 'property_media') {
+      if (key === 'profiles' || key === 'publisher_contact' || key === 'property_images' || key === 'property_offerings' || key === 'property_media') {
         continue;
       }
       const camelKey = toCamelCase(key);
@@ -159,18 +188,32 @@ export class PropertyMapper {
       .map((m: any) => m.url);
 
     const hostProfile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+    const publisherContact = Array.isArray(row.publisher_contact)
+      ? row.publisher_contact[0]
+      : row.publisher_contact;
 
     return {
       ...property,
       media,
-      images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80'],
-      hostName: hostProfile?.name || 'Verified Host',
-      hostAvatar: hostProfile?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-      hostVerified: hostProfile?.is_verified ?? true,
-      hostRating: row.host_rating ?? 4.95,
-      hostReviewsCount: row.host_reviews_count ?? 1,
-      availableStart: row.available_start || row.created_at?.split('T')[0] || '2026-06-01',
-      availableEnd: row.available_end || '2026-12-31',
+      images,
+      hostName: hostProfile?.name || '',
+      hostAvatar: hostProfile?.avatar_url || '',
+      hostVerified: hostProfile?.is_verified === true,
+      brokerProfile: publisherContact ? {
+        photo: hostProfile?.avatar_url || '',
+        name: publisherContact.full_name || hostProfile?.name || '',
+        company: publisherContact.organization_name || '',
+        position: '',
+        representativeType: publisherContact.representative_type,
+        responseTime: '',
+        phone: publisherContact.phone || '',
+        whatsapp: publisherContact.whatsapp || '',
+        email: publisherContact.contact_email || '',
+      } : undefined,
+      hostRating: row.host_rating == null ? 0 : Number(row.host_rating),
+      hostReviewsCount: row.host_reviews_count == null ? 0 : Number(row.host_reviews_count),
+      availableStart: row.available_start || '',
+      availableEnd: row.available_end || '',
       offerings: row.property_offerings ? row.property_offerings.map(mapPostgresOffering) : [],
     } as unknown as Property;
   }

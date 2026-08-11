@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, Search, Sparkles, Mic } from 'lucide-react';
-import { formatHumanDate } from '../CalendarPicker';
+import { formatHumanDate } from '@/lib/shared/dateFormat';
 import { 
   OperationMode, 
   SEARCH_CONFIG 
@@ -49,7 +49,7 @@ export function AuraSearchBar({
   className = '',
   onMicClick,
   
-  operation = 'SWAP',
+  operation = 'ALL',
   onOperationChange,
   budget = '',
   onBudgetChange,
@@ -88,6 +88,7 @@ export function AuraSearchBar({
       : `${guestsCount} huéspedes`;
 
   const operations: { id: OperationMode; label: string }[] = [
+    { id: 'ALL', label: language === 'es' ? 'Todo el mercado' : 'All listings' },
     { id: 'SALE', label: language === 'es' ? 'Venta' : 'Sale' },
     { id: 'RENT', label: language === 'es' ? 'Renta' : 'Rent' },
     { id: 'SWAP', label: language === 'es' ? 'Intercambio' : 'Swap' }
@@ -96,7 +97,7 @@ export function AuraSearchBar({
   return (
     <div ref={containerRef} className={`flex w-full flex-col ${className}`}>
       {/* 1. Operation Tabs Selector */}
-      <div className="flex items-center gap-2 mb-2 ml-1 self-start pointer-events-auto">
+      <div className="mb-3 grid w-full grid-cols-2 gap-2 rounded-2xl bg-slate-100/90 p-1.5 pointer-events-auto sm:flex sm:w-fit sm:items-center">
         {operations.map((op) => (
           <button
             key={op.id}
@@ -105,13 +106,16 @@ export function AuraSearchBar({
               onOperationChange(op.id);
               setActiveDropdown(null);
             }}
-            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+            className={`relative min-h-10 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-[0.08em] transition-all duration-200 cursor-pointer ${
               operation === op.id
-                ? 'bg-brand-black text-white shadow-sm scale-102'
-                : 'text-brand-gray-500 hover:text-brand-black hover:bg-brand-gray-100/50'
+                ? 'bg-brand-black text-white shadow-[0_8px_24px_rgba(15,23,42,0.2)] ring-2 ring-[#7169df]/25'
+                : 'bg-white/80 text-brand-gray-500 shadow-sm hover:bg-white hover:text-brand-black'
             }`}
           >
-            {op.label}
+            <span className="flex items-center justify-center gap-2">
+              {operation === op.id && <span className="h-1.5 w-1.5 rounded-full bg-[#8f88ff]" aria-hidden="true" />}
+              {op.label}
+            </span>
           </button>
         ))}
       </div>
@@ -144,7 +148,7 @@ export function AuraSearchBar({
 
           <div className="hero-search-divider" />
 
-          {operation === 'SWAP' ? (
+          {operation === 'ALL' ? null : operation === 'SWAP' ? (
             <>
               <button
                 ref={desktopDateButtonRef}
@@ -253,7 +257,7 @@ export function AuraSearchBar({
             )}
           </div>
 
-          {operation === 'SWAP' ? (
+          {operation === 'ALL' ? null : operation === 'SWAP' ? (
             <>
               <button
                 ref={mobileDateButtonRef}

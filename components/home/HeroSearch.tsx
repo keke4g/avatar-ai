@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { useLiveContext } from "../../lib/context/LiveContext";
-import { Mic, Send, MicOff } from "lucide-react";
+import { LoaderCircle, Mic, Send, MicOff, Square } from "lucide-react";
 
 interface HeroSearchProps {
   inputValue: string;
@@ -11,7 +11,16 @@ interface HeroSearchProps {
 
 export default function HeroSearch({ inputValue, setInputValue, isDark = false }: HeroSearchProps) {
   const { eternaChatState, sendPrompt, startVoice } = useLiveContext();
-  const { isListening } = eternaChatState;
+  const { isListening, voiceMode, isVoiceStarting, status } = eternaChatState;
+  const isEternaSpeaking = status === 'talking';
+  const isVoiceActive = voiceMode || isListening;
+  const voiceActionLabel = isEternaSpeaking
+    ? 'Interrumpir'
+    : isVoiceStarting
+      ? 'Activando…'
+      : isVoiceActive
+      ? 'Finalizar'
+      : 'Hablar';
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -59,20 +68,31 @@ export default function HeroSearch({ inputValue, setInputValue, isDark = false }
           <button
             type="button"
             onClick={startVoice}
-            className={`p-2 rounded-full cursor-pointer transition-all duration-200 ${
-              isListening
+            aria-label={isEternaSpeaking ? 'Interrumpir a Eterna' : isVoiceStarting ? 'Activando micrófono' : isVoiceActive ? 'Finalizar conversación por voz' : 'Hablar con Eterna'}
+            disabled={isVoiceStarting}
+            className={`flex h-9 items-center justify-center gap-1.5 rounded-full px-2.5 text-[10px] font-extrabold uppercase tracking-wider cursor-pointer transition-all duration-200 ${
+              isEternaSpeaking
+                ? "bg-rose-500 text-white hover:bg-rose-600"
+                : isVoiceStarting
+                ? "bg-sky-500/20 text-sky-500 cursor-wait"
+                : isVoiceActive
                 ? "bg-blue-500/20 text-blue-400 animate-pulse hover:bg-blue-500/30"
                 : isDark
                 ? "text-white/40 hover:text-white hover:bg-white/5"
                 : "text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
             }`}
-            title={isListening ? "Escuchando..." : "Hablar con Eterna"}
+            title={voiceActionLabel}
           >
-            {isListening ? (
+            {isEternaSpeaking ? (
+              <Square className="w-3 h-3 fill-current" />
+            ) : isVoiceStarting ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : isVoiceActive ? (
               <MicOff className="w-4 h-4" />
             ) : (
               <Mic className="w-4 h-4" />
             )}
+            <span className="hidden sm:inline">{voiceActionLabel}</span>
           </button>
 
           {/* Send Button */}

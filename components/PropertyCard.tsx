@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Property, PropertyOfferingMode } from '../lib/types';
 import { useSwap } from '../lib/context/SwapContext';
 import { Heart, ChevronLeft, ChevronRight, Star, ShieldCheck, CalendarDays } from 'lucide-react';
@@ -117,7 +118,9 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
     toggleFavorite(property.id);
   };
 
-  const fallbackUrl = 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80';
+  // A neutral local placeholder avoids presenting an unrelated stock home as
+  // if it belonged to a real listing.
+  const fallbackUrl = '/property-placeholder.svg';
 
   return (
     <Link 
@@ -131,30 +134,17 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
           
           {/* Image Slide */}
           <div className="w-full h-full relative">
-            {(() => {
-              const imageUrl = property.images[currentImageIndex] || fallbackUrl;
-              const getDisplayUrl = (url: string) => {
-                if (!url) return fallbackUrl;
-                if (property.metadata?.imagesMetadata?.[url]?.thumbnailUrl) {
-                  return property.metadata.imagesMetadata[url].thumbnailUrl;
-                }
-                if (url.includes('property-images/') && !url.includes('-thumb.webp') && url.endsWith('.webp')) {
-                  return url.replace(/\.webp$/, '-thumb.webp');
-                }
-                return url;
-              };
-
-              return (
-                <img
-                  src={imageError ? fallbackUrl : getDisplayUrl(imageUrl)}
-                  alt={property.title}
-                  onError={() => setImageError(true)}
-                  className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-                  loading="lazy"
-                  decoding="async"
-                />
-              );
-            })()}
+            <Image
+              src={imageError ? fallbackUrl : (property.images[currentImageIndex] || fallbackUrl)}
+              alt={property.title}
+              fill
+              sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 33vw"
+              unoptimized
+              onError={() => setImageError(true)}
+              className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+              loading="lazy"
+              decoding="async"
+            />
           </div>
 
           {/* Gradient Overlay for bottom text styling or UI elements */}
@@ -175,7 +165,7 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
             {property.hostVerified && (
               <div className="glass px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider text-brand-black flex items-center gap-1 shadow-sm bg-white/95 w-fit">
                 <ShieldCheck className="w-3.5 h-3.5 text-brand-accent fill-brand-accent/10" />
-                <span>{language === 'es' ? 'Anfitrión Verificado' : 'Verified Host'}</span>
+                <span>{language === 'es' ? 'Verificado' : 'Verified'}</span>
               </div>
             )}
           </div>
@@ -245,7 +235,7 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
 
           {/* Property Title / Micro Details */}
           <p className="text-sm text-brand-gray-500 truncate max-w-xs leading-normal">
-            {t(`properties.${property.id}.title`).startsWith('properties.') ? property.title : t(`properties.${property.id}.title`)}
+            {t(`properties.${property.id}.title`, undefined, property.title)}
           </p>
 
           {publicationLabel && (
@@ -264,8 +254,8 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
               <>
                 <span>•</span>
                 <span className="text-brand-accent font-bold">
-                  {language === 'es' 
-                    ? `Swap ${t(`valueRatings.${property.valueRating}`).startsWith('valueRatings.') ? property.valueRating : t(`valueRatings.${property.valueRating}`)}` 
+                  {language === 'es'
+                    ? `Swap ${t(`valueRatings.${property.valueRating}`, undefined, property.valueRating)}`
                     : `${property.valueRating} swap`}
                 </span>
               </>

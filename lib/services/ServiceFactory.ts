@@ -5,9 +5,22 @@ import { IStorageService, SupabaseStorageService, InMemoryStorageService } from 
 import { InMemoryReviewService, SupabaseReviewService } from './ReviewService';
 import { SupabasePropertyMediaService } from './SupabasePropertyMediaService';
 
-// Dynamically select backend persistence model
-export const useSupabase = process.env.NEXT_PUBLIC_PROPERTY_PROVIDER === 'supabase' || 
-  (process.env.NEXT_PUBLIC_PROPERTY_PROVIDER === undefined && process.env.NODE_ENV === 'production');
+export type PropertyProvider = 'supabase' | 'memory';
+
+const configuredProvider = process.env.NEXT_PUBLIC_PROPERTY_PROVIDER;
+if (configuredProvider && configuredProvider !== 'supabase' && configuredProvider !== 'memory') {
+  throw new Error('NEXT_PUBLIC_PROPERTY_PROVIDER must be either "supabase" or "memory".');
+}
+if (process.env.NODE_ENV === 'production' && configuredProvider === 'memory') {
+  throw new Error('The in-memory/demo property provider is disabled in production.');
+}
+
+// Production fails closed onto the real RLS-protected provider. Deployments
+// should nevertheless set the provider explicitly (see .env.example).
+export const propertyProvider: PropertyProvider = (configuredProvider as PropertyProvider | undefined)
+  || (process.env.NODE_ENV === 'production' ? 'supabase' : 'memory');
+export const propertyProviderIsExplicit = Boolean(configuredProvider);
+export const useSupabase = propertyProvider === 'supabase';
 
 export class ServiceFactory {
   private static _propertyService: IPropertyService;
@@ -27,6 +40,10 @@ export class ServiceFactory {
         : new InMemoryPropertyService();
     }
     return this._propertyService;
+  }
+
+  public static getPropertyProvider(): PropertyProvider {
+    return propertyProvider;
   }
 
   public static getUserService(): IUserService {

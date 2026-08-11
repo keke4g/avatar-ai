@@ -10,7 +10,7 @@ import InteractiveMap from '../../components/InteractiveMap';
 import { Map, List, RefreshCw, Compass, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { buildExploreSearchParams, filterAndSortProperties, findPropertyByReference, resolveSearchDestination, PROPERTY_TYPE_MAPPING, normalizeSearchText } from '../../lib/searchFilters';
+import { buildExploreSearchParams, filterAndSortProperties, findPropertyByReference, PROPERTY_TYPE_MAPPING, normalizeSearchText } from '../../lib/searchFilters';
 import { CalendarPicker } from '../../components/CalendarPicker';
 import { AuraSearchBar } from '../../components/search/AuraSearchBar';
 import { GuestPicker } from '../../components/search/GuestPicker';
@@ -41,14 +41,25 @@ function propertyMatchesOfferingTab(property: Property, tab: ExploreOfferingTab)
 }
 
 function ExploreContent() {
-  const { properties, swaps, activeSearch, setActiveSearch } = useSwap();
+  const { properties: allProperties, swaps, activeSearch, setActiveSearch, loading: propertiesLoading } = useSwap();
   const { t, language } = useTranslation();
   const router = useRouter();
   const { setExploreFilters } = useLiveContext();
+  const properties = useMemo(() => {
+    const allowDemo = process.env.NODE_ENV !== 'production'
+      && process.env.NEXT_PUBLIC_SHOW_DEMO_PROPERTIES !== 'false';
+    return allProperties.filter((property) => {
+      const isDemo = property.isDemo === true || property.is_demo === true;
+      return property.isPublished === true
+        && (!property.folderStatus || property.folderStatus === 'PUBLISHED')
+        && (allowDemo || !isDemo);
+    });
+  }, [allProperties]);
+  const catalogLoading = propertiesLoading && allProperties.length === 0;
   
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchBudget, setSearchBudget] = useState('');
-  const [activeOfferingTab, setActiveOfferingTab] = useState<ExploreOfferingTab>('SALE');
+  const [activeOfferingTab, setActiveOfferingTab] = useState<ExploreOfferingTab>('ALL');
   const [hoveredPropertyId, setHoveredPropertyId] = useState<string | null>(null);
   
   // View states: 'split' on desktop by default; can toggle between grid/map on mobile
@@ -56,6 +67,14 @@ function ExploreContent() {
   
   // Search and Filters
   const [searchQuery, setSearchQuery] = useState('');
+  // Keep the text being edited separate from the query that owns the current
+  // URL/session. While they differ, the draft must win visually so an Eterna
+  // result from Puebla cannot remain on screen after the user types Culiacan.
+  const [committedSearchQuery, setCommittedSearchQuery] = useState('');
+  const isSearchDraftDirty = useMemo(
+    () => normalizeSearchText(searchQuery) !== normalizeSearchText(committedSearchQuery),
+    [committedSearchQuery, searchQuery]
+  );
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [adults, setAdults] = useState(1);
@@ -100,6 +119,32 @@ function ExploreContent() {
 
   // Sync with URL query parameter (BUG #7 & availability/capacity integration)
   const searchParams = useSearchParams();
+  // The search session lives in a shared context so Eterna can hand results to
+  // the explorer.  It must not outlive the URL that created it: returning with
+  // the browser Back button and clearing the controls should immediately show
+  // the full catalogue instead of the previous one-result session.
+  const hasExplicitRouteFilters = useMemo(() => {
+    const hasValue = (key: string) => Boolean(searchParams.get(key)?.trim());
+    const offering = searchParams.get('offering')?.toUpperCase();
+    const category = searchParams.get('category')?.toLowerCase();
+
+    return Boolean(
+      hasValue('search')
+      || hasValue('start')
+      || hasValue('end')
+      || hasValue('guests')
+      || (offering && offering !== 'ALL')
+      || (category && category !== 'all')
+      || hasValue('tier')
+      || hasValue('budget')
+      || hasValue('minBudget')
+      || hasValue('rooms')
+      || hasValue('amenity')
+      || hasValue('view')
+      || hasValue('age')
+    );
+  }, [searchParams]);
+
   useEffect(() => {
     const q = searchParams.get('search');
     const startVal = searchParams.get('start');
@@ -109,9 +154,21 @@ function ExploreContent() {
     const offeringVal = searchParams.get('offering');
     const tierVal = searchParams.get('tier');
     const budgetVal = searchParams.get('budget');
-    const roomsVal = searchParams.get('rooms');
+    const hasExplicitFilters = hasExplicitRouteFilters;
+
+    if (!hasExplicitFilters) {
+      lastRequestIdRef.current += 1;
+      lastSearchedFiltersKeyRef.current = '';
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+      }
+      setActiveSearch(null);
+      setPageSize(4);
+    }
     
     setSearchQuery(q || '');
+    setCommittedSearchQuery(q || '');
     setSearchBudget(budgetVal || '');
     setStartDate(startVal || '');
     setEndDate(endVal || '');
@@ -134,17 +191,23 @@ function ExploreContent() {
 
     if (categoryVal) {
       const normalizedCategory = categoryVal.toLowerCase();
-      const matchedCategory = ['casas', 'departamentos', 'lofts', 'terrenos', 'locales', 'oficinas'].find(
+      const matchedCategory = ['casas', 'casa', 'departamentos', 'departamento', 'lofts', 'loft', 'terrenos', 'terreno', 'locales', 'local', 'oficinas', 'oficina'].find(
         c => c.toLowerCase() === normalizedCategory
       );
       if (matchedCategory) {
         const properCased: Record<string, string> = {
           'casas': 'Casas',
+          'casa': 'Casas',
           'departamentos': 'Departamentos',
+          'departamento': 'Departamentos',
           'lofts': 'Lofts',
+          'loft': 'Lofts',
           'terrenos': 'Terrenos',
+          'terreno': 'Terrenos',
           'locales': 'Locales',
-          'oficinas': 'Oficinas'
+          'local': 'Locales',
+          'oficinas': 'Oficinas',
+          'oficina': 'Oficinas',
         };
         setActiveCategory(properCased[matchedCategory] || 'All');
       } else {
@@ -162,11 +225,13 @@ function ExploreContent() {
         setActiveOfferingTab('RENT');
       } else if (normalizedOffering === 'SALE') {
         setActiveOfferingTab('SALE');
+      } else if (normalizedOffering === 'ALL') {
+        setActiveOfferingTab('ALL');
       } else {
-        setActiveOfferingTab('SALE');
+        setActiveOfferingTab('ALL');
       }
     } else {
-      setActiveOfferingTab('SALE');
+      setActiveOfferingTab('ALL');
     }
 
     if (tierVal) {
@@ -210,13 +275,15 @@ function ExploreContent() {
       setSelectedAgeRange('All');
     }
     
-    if (q || startVal || endVal || guestsVal || categoryVal || offeringVal || tierVal || budgetVal || roomsVal || amenityVal || viewVal || ageVal) {
+    if (hasExplicitFilters) {
       setPageSize(12); // Show more results if filtered
     }
-  }, [searchParams]);
+  }, [hasExplicitRouteFilters, searchParams, setActiveSearch]);
 
   // Load and synchronize activeSearch from URL query parameters (e.g. on direct navigation or refresh)
   useEffect(() => {
+    if (!hasExplicitRouteFilters) return;
+
     // If activeSearch is already set, let the central filter watcher (useEffect 2)
     // handle any updates to prevent competing search calls and infinite loops.
     if (activeSearch) return;
@@ -232,7 +299,12 @@ function ExploreContent() {
     const ageVal = searchParams.get('age');
 
     if (city || budgetVal || minBudgetVal || roomsVal || categoryVal || amenityVal || viewVal || ageVal) {
-      const operation: 'sale' | 'rent' = offeringVal.toUpperCase() === 'SALE' ? 'sale' : 'rent';
+      const normalizedOffering = offeringVal.toUpperCase();
+      const operation: 'sale' | 'rent' | undefined = normalizedOffering === 'SALE'
+        ? 'sale'
+        : ['RENT', 'MONTHLY_RENT', 'SHORT_RENT'].includes(normalizedOffering)
+          ? 'rent'
+          : undefined;
       const parsedBudget = budgetVal ? parseFloat(budgetVal) : undefined;
       const parsedMinBudget = minBudgetVal ? parseFloat(minBudgetVal) : undefined;
       const parsedRooms = roomsVal ? parseInt(roomsVal) : undefined;
@@ -241,11 +313,17 @@ function ExploreContent() {
       if (categoryVal) {
         const properCased = {
           'casas': 'Casas',
+          'casa': 'Casas',
           'departamentos': 'Departamentos',
+          'departamento': 'Departamentos',
           'lofts': 'Lofts',
+          'loft': 'Lofts',
           'terrenos': 'Terrenos',
+          'terreno': 'Terrenos',
           'locales': 'Locales',
-          'oficinas': 'Oficinas'
+          'local': 'Locales',
+          'oficinas': 'Oficinas',
+          'oficina': 'Oficinas',
         };
         matchedCategory = properCased[categoryVal.toLowerCase()];
       }
@@ -294,19 +372,81 @@ function ExploreContent() {
       // Clear the last searched filter key ref so useEffect 2 is guaranteed to perform the search
       lastSearchedFiltersKeyRef.current = '';
     }
-  }, [searchParams, activeSearch, setActiveSearch]);
+  }, [hasExplicitRouteFilters, searchParams, activeSearch, setActiveSearch]);
 
   // Central filter watcher when activeSearch is present
   useEffect(() => {
+    if (!hasExplicitRouteFilters) {
+      lastSearchedFiltersKeyRef.current = '';
+      return;
+    }
+
     if (!activeSearch) {
       lastSearchedFiltersKeyRef.current = '';
       return;
     }
 
-    const type = activeCategory !== 'All' ? activeCategory : undefined;
+    // Eterna updates the URL and the shared activeSearch in the same tick.
+    // During that transition the local controls still contain their initial
+    // values (“Todo el mercado”, no query, no budget). Prefer the URL and the
+    // active search session as fallbacks so the first search cannot be
+    // replaced by an unfiltered catalogue request.
+    const routeOffering = searchParams.get('offering')?.toUpperCase() || '';
+    const routeOfferingTab: ExploreOfferingTab | null = routeOffering === 'SALE'
+      ? 'SALE'
+      : ['RENT', 'MONTHLY_RENT', 'SHORT_RENT'].includes(routeOffering)
+        ? 'RENT'
+        : routeOffering === 'SWAP'
+          ? 'SWAP'
+          : routeOffering === 'ALL'
+            ? 'ALL'
+            : null;
+    const effectiveOfferingTab = activeOfferingTab !== 'ALL'
+      ? activeOfferingTab
+      : routeOfferingTab
+        ?? (activeSearch.filters.operation === 'sale'
+          ? 'SALE'
+          : activeSearch.filters.operation === 'rent'
+            ? 'RENT'
+            : 'ALL');
 
-    const operation = activeOfferingTab === 'SALE' ? 'sale' : activeOfferingTab === 'RENT' ? 'rent' : undefined;
-    const budget = (activeOfferingTab !== 'SWAP' && activeOfferingTab !== 'ALL' && searchBudget) ? parseFloat(searchBudget) : undefined;
+    const routeQuery = searchParams.get('search')?.trim() || '';
+    const effectiveSearchQuery = committedSearchQuery.trim()
+      || routeQuery
+      || activeSearch.filters.city?.trim()
+      || '';
+
+    const routeCategory = searchParams.get('category')?.toLowerCase() || '';
+    const routeCategoryLabel: Record<string, string> = {
+      casas: 'Casas',
+      casa: 'Casas',
+      departamentos: 'Departamentos',
+      departamento: 'Departamentos',
+      lofts: 'Lofts',
+      loft: 'Lofts',
+      terrenos: 'Terrenos',
+      terreno: 'Terrenos',
+      locales: 'Locales',
+      local: 'Locales',
+      oficinas: 'Oficinas',
+      oficina: 'Oficinas',
+    };
+    const effectiveCategory = activeCategory !== 'All'
+      ? activeCategory
+      : routeCategoryLabel[routeCategory]
+        || activeSearch.filters.type
+        || 'All';
+    const type = effectiveCategory !== 'All' ? effectiveCategory : undefined;
+
+    const operation = effectiveOfferingTab === 'SALE' ? 'sale' : effectiveOfferingTab === 'RENT' ? 'rent' : undefined;
+    const routeBudget = searchParams.get('budget')?.trim() || '';
+    const sessionBudget = activeSearch.filters.budget !== undefined
+      ? String(activeSearch.filters.budget)
+      : '';
+    const effectiveBudgetText = searchBudget || routeBudget || sessionBudget;
+    const budget = (effectiveOfferingTab !== 'SWAP' && effectiveOfferingTab !== 'ALL' && effectiveBudgetText)
+      ? parseFloat(effectiveBudgetText)
+      : undefined;
 
     let ageMin: number | undefined;
     let ageMax: number | undefined;
@@ -320,18 +460,36 @@ function ExploreContent() {
       ageMin = 10;
     }
 
-    const minBudget = activeSearch?.filters?.minBudget || (searchParams.get('minBudget') ? parseFloat(searchParams.get('minBudget')!) : undefined);
+    const routeMinBudget = searchParams.get('minBudget')
+      ? parseFloat(searchParams.get('minBudget')!)
+      : undefined;
+    const routeRooms = searchParams.get('rooms')
+      ? parseInt(searchParams.get('rooms')!)
+      : undefined;
+
+    // A manual submit creates a complete replacement session. During the
+    // short router transition, the URL can still contain Eterna-only filters
+    // (for example minBudget or rooms). Undefined values in the new manual
+    // session are intentional clears and must not fall back to that stale URL.
+    const minBudget = activeSearch.origin === 'manual'
+      ? activeSearch.filters.minBudget
+      : activeSearch.filters.minBudget ?? routeMinBudget;
+    const rooms = activeSearch.origin === 'manual'
+      ? activeSearch.filters.rooms
+      : routeRooms ?? activeSearch.filters.rooms;
 
     const currentFilters: PropertySearchFilters = {
-      city: searchQuery.trim() || undefined,
+      city: effectiveSearchQuery || undefined,
       operation,
       type,
       budget,
       minBudget,
-      rooms: searchParams.get('rooms') ? parseInt(searchParams.get('rooms')!) : undefined,
+      rooms,
       sort: (sortBy === 'capacity' ? 'featured' : sortBy === 'rating' ? 'featured' : 'best_match') as SearchSort,
-      amenityCategories: selectedAmenityCategory !== 'All' ? [selectedAmenityCategory] : undefined,
-      viewTypeId: selectedViewType !== 'All' ? selectedViewType : undefined,
+      amenityCategories: selectedAmenityCategory !== 'All'
+        ? [selectedAmenityCategory]
+        : activeSearch.filters.amenityCategories,
+      viewTypeId: selectedViewType !== 'All' ? selectedViewType : activeSearch.filters.viewTypeId,
       constructionAgeMin: ageMin,
       constructionAgeMax: ageMax,
     };
@@ -389,7 +547,15 @@ function ExploreContent() {
           setActiveSearch(prev => prev ? {
             ...prev,
             filters: searchResult.filters,
-            results: searchResult.results,
+            // The service already queries the public inventory. Do not apply
+            // the local catalog-ID intersection while that catalog is still
+            // hydrating: an empty initial array would erase every valid
+            // result and leave the search looking successful but empty.
+            results: properties.length === 0
+              ? searchResult.results
+              : searchResult.results.filter((property) => (
+                properties.some(({ id }) => id === property.id)
+              )),
             provider: searchResult.provider,
             loading: false,
             error: null
@@ -433,11 +599,13 @@ function ExploreContent() {
     selectedAgeRange,
     selectedAmenityCategory,
     searchBudget,
-    searchQuery,
+    committedSearchQuery,
     startDate,
     endDate,
     guestsCount,
+    properties,
     activeSearch,
+    hasExplicitRouteFilters,
     searchParams,
     setActiveSearch
   ]);
@@ -457,8 +625,9 @@ function ExploreContent() {
   // Clear all filters
   const handleClearFilters = () => {
     setActiveCategory('All');
-    setActiveOfferingTab('SALE');
+    setActiveOfferingTab('ALL');
     setSearchQuery('');
+    setCommittedSearchQuery('');
     setStartDate('');
     setEndDate('');
     setAdults(1);
@@ -474,26 +643,20 @@ function ExploreContent() {
     setSearchBudget('');
     setPageSize(4);
     
-    if (activeSearch) {
-      setActiveSearch(prev => prev ? {
-        ...prev,
-        filters: {},
-        results: properties,
-        loading: false,
-        error: null
-      } : null);
-    } else {
-      setActiveSearch(null);
+    lastRequestIdRef.current += 1;
+    lastSearchedFiltersKeyRef.current = '';
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
     }
-    router.push('/explore');
+    setActiveSearch(null);
+    router.replace('/explore');
   };
 
   const handleExploreSearch = () => {
-    const resolvedDestination = searchQuery.trim()
-      ? resolveSearchDestination(searchQuery.trim(), properties)
-      : '';
+    const destination = searchQuery.trim();
     const params = buildExploreSearchParams({
-      searchQuery: resolvedDestination,
+      searchQuery: destination,
       selectedDates,
       guestsCount,
     });
@@ -520,12 +683,23 @@ function ExploreContent() {
     const budget = (activeOfferingTab !== 'SWAP' && activeOfferingTab !== 'ALL' && searchBudget) ? parseFloat(searchBudget) : undefined;
 
     const filters: PropertySearchFilters = {
-      city: resolvedDestination || undefined,
+      city: destination || undefined,
       operation,
       type,
       budget,
       sort: (sortBy === 'capacity' ? 'featured' : sortBy === 'rating' ? 'featured' : 'best_match') as SearchSort,
     };
+
+    // Commit the draft and invalidate every pending request before creating the
+    // next session. This makes each button press a clean search, even while a
+    // previous request or debounce is still in flight.
+    setCommittedSearchQuery(destination);
+    lastRequestIdRef.current += 1;
+    lastSearchedFiltersKeyRef.current = '';
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
+    }
 
     setActiveSearch({
       id: sessionId,
@@ -644,6 +818,7 @@ function ExploreContent() {
       endDate,
       guestsCount,
       budget: searchBudget ? parseFloat(searchBudget) : undefined,
+      budgetOfferingMode: activeOfferingTab === 'SALE' ? 'SALE' : activeOfferingTab === 'RENT' ? 'RENT' : undefined,
       amenityCategories: selectedAmenityCategory !== 'All' ? [selectedAmenityCategory] : undefined,
       viewTypeId: selectedViewType !== 'All' ? selectedViewType : undefined,
       constructionAgeMin: ageLimits.ageMin,
@@ -671,9 +846,15 @@ function ExploreContent() {
 
   // Filter & Sort properties
   const allModeFilteredProperties = useMemo(() => {
-    if (activeSearch) {
-      if (activeSearch.loading) return [];
-      return activeSearch.results;
+    // Once the user edits the destination, stop rendering Eterna's committed
+    // session immediately. The local catalog provides an instant draft preview;
+    // pressing Search then commits the draft to the URL and server search.
+    const effectiveActiveSearch = hasExplicitRouteFilters && !isSearchDraftDirty
+      ? activeSearch
+      : null;
+    if (effectiveActiveSearch) {
+      if (effectiveActiveSearch.loading) return [];
+      return effectiveActiveSearch.results;
     }
     return filterAndSortProperties({
       properties,
@@ -687,22 +868,26 @@ function ExploreContent() {
       endDate,
       guestsCount,
       budget: searchBudget ? parseFloat(searchBudget) : undefined,
+      budgetOfferingMode: activeOfferingTab === 'SALE' ? 'SALE' : activeOfferingTab === 'RENT' ? 'RENT' : undefined,
       amenityCategories: selectedAmenityCategory !== 'All' ? [selectedAmenityCategory] : undefined,
       viewTypeId: selectedViewType !== 'All' ? selectedViewType : undefined,
       constructionAgeMin: ageLimits.ageMin,
       constructionAgeMax: ageLimits.ageMax,
     });
-  }, [properties, swaps, activeCategory, searchQuery, selectedSwapType, sortBy, startDate, endDate, guestsCount, searchBudget, selectedAmenityCategory, selectedViewType, ageLimits, activeSearch]);
+  }, [properties, swaps, activeCategory, searchQuery, selectedSwapType, sortBy, startDate, endDate, guestsCount, activeOfferingTab, searchBudget, selectedAmenityCategory, selectedViewType, ageLimits, activeSearch, hasExplicitRouteFilters, isSearchDraftDirty]);
 
   const filteredSortedProperties = useMemo(() => {
-    if (activeSearch && activeSearch.loading) {
+    const effectiveActiveSearch = hasExplicitRouteFilters && !isSearchDraftDirty
+      ? activeSearch
+      : null;
+    if (effectiveActiveSearch && effectiveActiveSearch.loading) {
       return [];
     }
     if (findPropertyByReference(allModeFilteredProperties, searchQuery)) {
       return allModeFilteredProperties;
     }
     return allModeFilteredProperties.filter((property) => propertyMatchesOfferingTab(property, activeOfferingTab));
-  }, [allModeFilteredProperties, activeOfferingTab, activeSearch, searchQuery]);
+  }, [allModeFilteredProperties, activeOfferingTab, activeSearch, hasExplicitRouteFilters, isSearchDraftDirty, searchQuery]);
 
   // Paginated properties for progressive load
   const paginatedProperties = useMemo(() => {
@@ -768,7 +953,9 @@ function ExploreContent() {
             <Sparkles className="w-5 h-5 text-brand-accent animate-pulse" />
           </h1>
           <p className="text-xs text-brand-gray-500 font-medium mt-1">
-            {t('explore.subtitle', { count: filteredSortedProperties.length })}
+            {catalogLoading
+              ? (language === 'es' ? 'Cargando propiedades verificadas…' : 'Loading verified properties…')
+              : t('explore.subtitle', { count: filteredSortedProperties.length })}
           </p>
         </div>
 
@@ -781,7 +968,6 @@ function ExploreContent() {
           onValueChange={(value) => {
             setSearchQuery(value);
             setPageSize(4);
-            if (activeSearch) setActiveSearch(null);
           }}
           selectedDates={selectedDates}
           hasFilteredGuests={hasFilteredGuests}
@@ -798,7 +984,7 @@ function ExploreContent() {
           mobileDateButtonRef={mobileDateButtonRef}
           desktopGuestButtonRef={desktopGuestButtonRef}
           mobileGuestButtonRef={mobileGuestButtonRef}
-          operation={activeOfferingTab === 'ALL' ? 'SALE' : activeOfferingTab}
+          operation={activeOfferingTab}
           onOperationChange={(op) => {
             setActiveOfferingTab(op);
             setPageSize(4);
@@ -807,10 +993,18 @@ function ExploreContent() {
             // Sync URL search params
             if (typeof window !== 'undefined') {
               const params = new URLSearchParams(window.location.search);
-              params.set('offering', op);
+              if (op === 'ALL') {
+                params.delete('offering');
+                params.delete('budget');
+                params.delete('start');
+                params.delete('end');
+                params.delete('guests');
+              } else {
+                params.set('offering', op);
+              }
               if (op === 'SWAP') {
                 params.delete('budget');
-              } else {
+              } else if (op !== 'ALL') {
                 params.delete('start');
                 params.delete('end');
                 params.delete('guests');
@@ -879,12 +1073,18 @@ function ExploreContent() {
         <div className={`flex-1 flex flex-col gap-8 w-full transition-all duration-300 ${
           mobileShowMap ? 'hidden lg:flex' : 'flex'
         }`}>
-          {activeSearch?.loading ? (
+          {catalogLoading || (hasExplicitRouteFilters && !isSearchDraftDirty && activeSearch?.loading) ? (
             <div className="py-20 text-center flex flex-col items-center justify-center bg-white border border-brand-gray-200/50 rounded-3xl shadow-sm">
               <RefreshCw className="w-10 h-10 text-brand-accent mb-3 animate-spin" />
-              <h3 className="text-base font-extrabold text-brand-black">{language === 'es' ? 'Buscando propiedades...' : 'Searching properties...'}</h3>
+              <h3 className="text-base font-extrabold text-brand-black">
+                {catalogLoading
+                  ? (language === 'es' ? 'Cargando el catálogo…' : 'Loading the catalog…')
+                  : (language === 'es' ? 'Buscando propiedades...' : 'Searching properties...')}
+              </h3>
               <p className="text-xs text-brand-gray-500 max-w-xs mt-1.5 leading-relaxed font-semibold">
-                {language === 'es' ? 'Eterna está analizando el catálogo de AuraSwap...' : 'Eterna is analyzing the AuraSwap catalog...'}
+                {catalogLoading
+                  ? (language === 'es' ? 'Estamos sincronizando las propiedades publicadas.' : 'We are syncing published properties.')
+                  : (language === 'es' ? 'Eterna está analizando el catálogo de Towers México...' : 'Eterna is analyzing the Towers México catalog...')}
               </p>
             </div>
           ) : filteredSortedProperties.length === 0 ? (
