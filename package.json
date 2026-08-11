@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "analyze:code": "node scripts/analyze-codebase.mjs",
     "quality": "npm run typecheck && npm run lint && npm test",
-    "test": "tsc -p tests/tsconfig.json && node --test output/property-integrity-tests/tests/unit/eterna/eterna-barge-in-detector.test.js output/property-integrity-tests/tests/unit/eterna/eterna-runtime-organization.test.js output/property-integrity-tests/tests/unit/eterna/eterna-speech-text.test.js output/property-integrity-tests/tests/unit/eterna/eterna-voice-config.test.js output/property-integrity-tests/tests/unit/profile/profile-settings.test.js output/property-integrity-tests/tests/unit/properties/property-wizard-utils.test.js output/property-integrity-tests/tests/integration/property/property-integrity.test.js",
+    "test": "tsc -p tests/tsconfig.json && node --test output/property-integrity-tests/tests/unit/eterna/eterna-barge-in-detector.test.js output/property-integrity-tests/tests/unit/eterna/eterna-catalog-price-actions.test.js output/property-integrity-tests/tests/unit/eterna/eterna-runtime-organization.test.js output/property-integrity-tests/tests/unit/eterna/eterna-speech-text.test.js output/property-integrity-tests/tests/unit/eterna/eterna-voice-config.test.js output/property-integrity-tests/tests/unit/profile/profile-settings.test.js output/property-integrity-tests/tests/unit/properties/property-wizard-utils.test.js output/property-integrity-tests/tests/integration/property/property-integrity.test.js",
     "release:check": "node scripts/check_release_readiness.js",
     "valuation:ingest": "npx --yes tsx scripts/valuation/ingest-official-sources.ts",
     "valuation:market:collect": "python -m scrapers.market.authorized_cli --provider easybroker",

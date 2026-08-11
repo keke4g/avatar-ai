@@ -1,5 +1,6 @@
 import { Property, PropertyOfferingMode, SwapRequest } from './types';
 import { ensurePropertyOfferings, getActiveOfferings, getOfferingsByMode } from './propertyOfferings';
+import { getPropertyPriceSnapshot, type PropertyPriceOperation } from './search/propertyPrice';
 
 export type PropertySortMode = 'match' | 'capacity' | 'rating' | string;
 export type PropertyOfferingSearchMode = PropertyOfferingMode | 'ALL';
@@ -446,6 +447,13 @@ export function filterAndSortProperties({
     return matchesCategory && matchesSearch && matchesSwapType;
   });
 
+  const priceMode = budgetOfferingMode || offeringMode;
+  const priceOperation: PropertyPriceOperation | undefined = priceMode === 'SALE'
+    ? 'sale'
+    : priceMode === 'RENT' || priceMode === 'MONTHLY_RENT' || priceMode === 'SHORT_RENT'
+      ? 'rent'
+      : undefined;
+
   return [...filtered].sort((a, b) => {
     if (sortBy === 'match') {
       return b.auraScore - a.auraScore;
@@ -455,6 +463,16 @@ export function filterAndSortProperties({
     }
     if (sortBy === 'rating') {
       return b.hostRating - a.hostRating;
+    }
+    if (sortBy === 'price_asc') {
+      const left = getPropertyPriceSnapshot(a, priceOperation)?.amount ?? Number.POSITIVE_INFINITY;
+      const right = getPropertyPriceSnapshot(b, priceOperation)?.amount ?? Number.POSITIVE_INFINITY;
+      return left - right;
+    }
+    if (sortBy === 'price_desc') {
+      const left = getPropertyPriceSnapshot(a, priceOperation)?.amount ?? Number.NEGATIVE_INFINITY;
+      const right = getPropertyPriceSnapshot(b, priceOperation)?.amount ?? Number.NEGATIVE_INFINITY;
+      return right - left;
     }
     return 0;
   });

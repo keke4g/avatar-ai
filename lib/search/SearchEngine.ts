@@ -1,6 +1,7 @@
 import { Property } from '../types';
 import { PropertySearchFilters, SearchSort } from './types';
 import { findPropertyByReference, PROPERTY_TYPE_MAPPING } from '../searchFilters';
+import { getPropertyPriceSnapshot } from './propertyPrice';
 
 export function normalizeSearchText(value: string): string {
   return value
@@ -172,14 +173,14 @@ export function searchProperties(properties: Property[], filters: PropertySearch
 
   if (sort === 'price_asc') {
     candidates.sort((a, b) => {
-      const priceA = (a.prop.offerings || []).find(o => o.status === 'ACTIVE')?.priceAmount ?? (a.prop as any).price ?? 0;
-      const priceB = (b.prop.offerings || []).find(o => o.status === 'ACTIVE')?.priceAmount ?? (b.prop as any).price ?? 0;
+      const priceA = getPropertyPriceSnapshot(a.prop, filters.operation)?.amount ?? Number.POSITIVE_INFINITY;
+      const priceB = getPropertyPriceSnapshot(b.prop, filters.operation)?.amount ?? Number.POSITIVE_INFINITY;
       return priceA - priceB;
     });
   } else if (sort === 'price_desc') {
     candidates.sort((a, b) => {
-      const priceA = (a.prop.offerings || []).find(o => o.status === 'ACTIVE')?.priceAmount ?? (a.prop as any).price ?? 0;
-      const priceB = (b.prop.offerings || []).find(o => o.status === 'ACTIVE')?.priceAmount ?? (b.prop as any).price ?? 0;
+      const priceA = getPropertyPriceSnapshot(a.prop, filters.operation)?.amount ?? Number.NEGATIVE_INFINITY;
+      const priceB = getPropertyPriceSnapshot(b.prop, filters.operation)?.amount ?? Number.NEGATIVE_INFINITY;
       return priceB - priceA;
     });
   } else if (sort === 'newest') {

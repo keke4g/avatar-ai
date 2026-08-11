@@ -55,6 +55,7 @@ import { findPropertyByNaturalReference, findPropertyByReference } from '@/lib/s
 import { ServiceFactory } from '@/lib/services/ServiceFactory';
 import { parseBudgetToNumber, parseBudgetRange } from '@/lib/search/SearchEngine';
 import { PropertySearchFilters } from '@/lib/search/types';
+import { getPropertyPriceSnapshot } from '@/lib/search/propertyPrice';
 import { searchLogger } from '@/lib/search/searchLogger';
 import MicrophonePermissionDialog from '@/features/eterna/components/MicrophonePermissionDialog';
 import { EternaDrawer } from '@/features/eterna/components/concierge/EternaDrawer';
@@ -70,6 +71,7 @@ import {
   determineOperation,
   determinePropertyType,
 } from '@/lib/eterna/searchIntentResolution';
+import { resolveCatalogPriceRequest } from '@/lib/eterna/actions/CatalogPriceActions';
 // ────────────────────────────────────────────────
 // MAIN COMPONENT
 // ────────────────────────────────────────────────
@@ -1175,7 +1177,7 @@ export default function EternaConcierge() {
       budget: budgetVal,
       minBudget: minBudgetVal,
       rooms: roomsVal,
-      sort: 'best_match',
+      sort: searchMemory.sort?.value || 'best_match',
       amenityCategories: amenityCategories.length > 0 ? amenityCategories : undefined,
       viewTypeId,
     };
@@ -1191,6 +1193,9 @@ export default function EternaConcierge() {
       if (type) url += `&category=${type.toLowerCase()}`;
       if (amenityCategories.length > 0) url += `&amenity=${encodeURIComponent(amenityCategories[0])}`;
       if (viewTypeId) url += `&view=${encodeURIComponent(viewTypeId)}`;
+      if (appliedFilters.sort === 'price_asc' || appliedFilters.sort === 'price_desc') {
+        url += `&sort=${appliedFilters.sort}`;
+      }
       return url;
     };
 
@@ -1201,7 +1206,9 @@ export default function EternaConcierge() {
         query: appliedFilters.city || city,
         guests: 0,
         swapType: 'All',
-        sortBy: 'match',
+        sortBy: appliedFilters.sort === 'price_asc' || appliedFilters.sort === 'price_desc'
+          ? appliedFilters.sort
+          : 'match',
       });
       router.push(buildExploreUrl(appliedFilters));
       if (window.innerWidth < 768) {
@@ -1789,9 +1796,94 @@ Explore actualizado: Redirecting to /explore`);
     // immediate, while Gemini remains responsible for nuanced conversation,
     // property advice and page actions.
     if (!activeProperty) {
+      // Price comparisons on the Explorer are resolved against the exact
+      // visible result set. This prevents the language model from claiming it
+      // cannot see prices that are already present in the catalog and keeps
+      // lowest/highest/range answers auditable.
+      if (isExplorePage && activeSearch?.results?.length) {
+        const catalogPriceAnswer = resolveCatalogPriceRequest({
+          prompt,
+          properties: activeSearch.results,
+          catalogProperties: properties,
+          operation: activeSearch.filters.operation,
+          language: language === 'es' ? 'es' : 'en',
+        });
+
+        if (catalogPriceAnswer) {
+          if (catalogPriceAnswer.orderedPropertyIds.length > 0) {
+            const order = new Map(
+              catalogPriceAnswer.orderedPropertyIds.map((propertyId, index) => [propertyId, index]),
+            );
+            setActiveSearch((previous) => previous ? {
+              ...previous,
+              filters: catalogPriceAnswer.sort
+                ? { ...previous.filters, sort: catalogPriceAnswer.sort }
+                : previous.filters,
+              results: [...previous.results].sort((left, right) => (
+                (order.get(left.id) ?? Number.MAX_SAFE_INTEGER)
+                - (order.get(right.id) ?? Number.MAX_SAFE_INTEGER)
+              )),
+            } : previous);
+          }
+          if (catalogPriceAnswer.sort) {
+            const params = new URLSearchParams(searchParams.toString());
+            params.set('sort', catalogPriceAnswer.sort);
+            router.replace(`/explore?${params.toString()}`);
+            if (liveContext.explore) {
+              setExploreFilters({
+                ...liveContext.explore,
+                sortBy: catalogPriceAnswer.sort,
+              });
+            }
+          }
+
+          setThinkingContext('property_search');
+          setChatHistory((previous) => [...previous, {
+            role: 'assistant',
+            content: catalogPriceAnswer.reply,
+            suggestedReplies: catalogPriceAnswer.suggestedReplies,
+          }]);
+          setSimulatedStatus('talking');
+          speak(catalogPriceAnswer.speech, () => setSimulatedStatus('idle'));
+          return;
+        }
+      }
+
+      const plannerMemory: ConversationMemory = { ...conversationalSession.memory };
+      if (isExplorePage && activeSearch) {
+        if (!plannerMemory.city && activeSearch.filters.city) {
+          plannerMemory.city = { value: activeSearch.filters.city, confidence: 1 };
+        }
+        if (!plannerMemory.operation && activeSearch.filters.operation) {
+          plannerMemory.operation = { value: activeSearch.filters.operation, confidence: 1 };
+        }
+        if (!plannerMemory.propertyType && activeSearch.filters.type) {
+          const normalizedType = activeSearch.filters.type.toLocaleLowerCase('es-MX');
+          if (normalizedType.includes('casa')) {
+            plannerMemory.propertyType = { value: 'casa', confidence: 1 };
+          } else if (normalizedType.includes('departamento')) {
+            plannerMemory.propertyType = { value: 'departamento', confidence: 1 };
+          }
+        }
+        if (!plannerMemory.budget) {
+          const minimum = activeSearch.filters.minBudget;
+          const maximum = activeSearch.filters.budget;
+          if (minimum && maximum) {
+            plannerMemory.budget = { value: `entre ${minimum} y ${maximum}`, confidence: 1 };
+          } else if (minimum) {
+            plannerMemory.budget = { value: `desde ${minimum}`, confidence: 1 };
+          } else if (maximum) {
+            plannerMemory.budget = { value: `hasta ${maximum}`, confidence: 1 };
+          }
+        }
+        if (!plannerMemory.rooms && activeSearch.filters.rooms) {
+          plannerMemory.rooms = { value: activeSearch.filters.rooms, confidence: 1 };
+        }
+      }
+
       const fastSearchPlan = planFastPropertySearch({
         prompt,
-        currentMemory: conversationalSession.memory,
+        currentMemory: plannerMemory,
         catalogLocations: properties,
       });
 
@@ -1967,14 +2059,21 @@ Explore actualizado: Redirecting to /explore`);
           exploreCatalog: activeSearch
             ? {
                 filters: activeSearch.filters,
-                results: activeSearch.results.slice(0, 12).map((property) => ({
-                  id: property.id,
-                  title: property.title,
-                  type: property.type,
-                  location: property.location,
-                  city: property.city,
-                  operation: property.primaryOperation,
-                })),
+                results: activeSearch.results.slice(0, 12).map((property) => {
+                  const price = getPropertyPriceSnapshot(property, activeSearch.filters.operation);
+                  return {
+                    id: property.id,
+                    title: property.title,
+                    type: property.type,
+                    location: property.location,
+                    city: property.city,
+                    operation: property.primaryOperation,
+                    priceAmount: price?.amount ?? null,
+                    currency: price?.currency ?? null,
+                    offeringMode: price?.mode ?? null,
+                    billingPeriod: price?.billingPeriod ?? null,
+                  };
+                }),
               }
             : null,
           propertyPage: liveContext.propertyPage,

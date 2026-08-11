@@ -24,6 +24,17 @@ import { searchLogger } from '../../lib/search/searchLogger';
 import { getCacheKey } from '../../lib/search/SearchCache';
 
 type ExploreOfferingTab = 'ALL' | 'SWAP' | 'RENT' | 'SALE';
+type ExploreSort = 'match' | 'capacity' | 'rating' | 'price_asc' | 'price_desc';
+
+function parseExploreSort(value: string | null): ExploreSort {
+  return value === 'price_asc' || value === 'price_desc' ? value : 'match';
+}
+
+function toSearchSort(value: ExploreSort): SearchSort {
+  if (value === 'price_asc' || value === 'price_desc') return value;
+  if (value === 'capacity' || value === 'rating') return 'featured';
+  return 'best_match';
+}
 
 function propertyMatchesOfferingTab(property: Property, tab: ExploreOfferingTab): boolean {
   if (tab === 'ALL') {
@@ -95,7 +106,7 @@ function ExploreContent() {
   const [selectedViewType, setSelectedViewType] = useState('All');
   const [selectedAgeRange, setSelectedAgeRange] = useState('All');
   const [selectedAmenityCategory, setSelectedAmenityCategory] = useState('All');
-  const [sortBy, setSortBy] = useState('match'); // 'match' | 'capacity' | 'rating'
+  const [sortBy, setSortBy] = useState<ExploreSort>('match');
   const selectedDates = startDate && endDate ? { start: startDate, end: endDate } : null;
   const guestsCount = hasFilteredGuests ? adults + children : 0;
   
@@ -142,6 +153,7 @@ function ExploreContent() {
       || hasValue('amenity')
       || hasValue('view')
       || hasValue('age')
+      || hasValue('sort')
     );
   }, [searchParams]);
 
@@ -154,6 +166,7 @@ function ExploreContent() {
     const offeringVal = searchParams.get('offering');
     const tierVal = searchParams.get('tier');
     const budgetVal = searchParams.get('budget');
+    const sortVal = searchParams.get('sort');
     const hasExplicitFilters = hasExplicitRouteFilters;
 
     if (!hasExplicitFilters) {
@@ -170,6 +183,7 @@ function ExploreContent() {
     setSearchQuery(q || '');
     setCommittedSearchQuery(q || '');
     setSearchBudget(budgetVal || '');
+    setSortBy(parseExploreSort(sortVal));
     setStartDate(startVal || '');
     setEndDate(endVal || '');
     if (guestsVal) {
@@ -297,8 +311,9 @@ function ExploreContent() {
     const amenityVal = searchParams.get('amenity');
     const viewVal = searchParams.get('view');
     const ageVal = searchParams.get('age');
+    const sortVal = searchParams.get('sort');
 
-    if (city || budgetVal || minBudgetVal || roomsVal || categoryVal || amenityVal || viewVal || ageVal) {
+    if (city || budgetVal || minBudgetVal || roomsVal || categoryVal || amenityVal || viewVal || ageVal || sortVal) {
       const normalizedOffering = offeringVal.toUpperCase();
       const operation: 'sale' | 'rent' | undefined = normalizedOffering === 'SALE'
         ? 'sale'
@@ -347,7 +362,7 @@ function ExploreContent() {
         budget: parsedBudget,
         minBudget: parsedMinBudget,
         rooms: parsedRooms,
-        sort: 'best_match',
+        sort: toSearchSort(parseExploreSort(sortVal)),
         amenityCategories: amenityVal ? [amenityVal] : undefined,
         viewTypeId: viewVal || undefined,
         constructionAgeMin: ageMin,
@@ -485,7 +500,7 @@ function ExploreContent() {
       budget,
       minBudget,
       rooms,
-      sort: (sortBy === 'capacity' ? 'featured' : sortBy === 'rating' ? 'featured' : 'best_match') as SearchSort,
+      sort: toSearchSort(sortBy),
       amenityCategories: selectedAmenityCategory !== 'All'
         ? [selectedAmenityCategory]
         : activeSearch.filters.amenityCategories,
@@ -672,6 +687,9 @@ function ExploreContent() {
     if (activeOfferingTab !== 'SWAP' && activeOfferingTab !== 'ALL' && searchBudget) {
       params.set('budget', searchBudget);
     }
+    if (sortBy === 'price_asc' || sortBy === 'price_desc') {
+      params.set('sort', sortBy);
+    }
     setPageSize(params.toString() ? 12 : 4);
     
     const sessionId = `ss-${Date.now()}`;
@@ -687,7 +705,7 @@ function ExploreContent() {
       operation,
       type,
       budget,
-      sort: (sortBy === 'capacity' ? 'featured' : sortBy === 'rating' ? 'featured' : 'best_match') as SearchSort,
+      sort: toSearchSort(sortBy),
     };
 
     // Commit the draft and invalidate every pending request before creating the

@@ -1,6 +1,7 @@
 import { parseBudgetRange } from '../search/SearchEngine';
 import type { ConversationMemory } from './ConversationEngine';
 import { isPropertyPublishingTrigger } from './IntentRouter';
+import { detectCatalogPriceRequest } from './actions/CatalogPriceActions';
 
 export interface CatalogLocationHint {
   city?: string | null;
@@ -101,7 +102,7 @@ function hasOpenBudgetStatement(prompt: string): boolean {
 
 function hasBudgetValue(prompt: string): boolean {
   const clean = normalize(prompt);
-  const hasBudgetLanguage = /\b(presupuesto|hasta|maximo|maxima|menos de|debajo de|por debajo de|menor de|inferior a|menos que|entre|desde)\b/.test(clean)
+  const hasBudgetLanguage = /\b(presupuesto|hasta|maximo|maxima|menos de|debajo de|por debajo de|menor de|inferior a|menos que|entre|desde|mas de|arriba de|por encima de|superior a|mayor de)\b/.test(clean)
     && /\d|\b(?:un|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|veinte|treinta|cincuenta|cien)\b/.test(clean);
   const hasMoneyExpression = /(?:\$\s*\d|\b\d[\d.,\s]*\s*(?:millones?|mil|mxn|pesos?|usd|dolares?|m)\b|\b(?:un|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|veinte|treinta|cincuenta|cien)\s+(?:millones?|mil)\b)/.test(clean);
   return hasBudgetLanguage || hasMoneyExpression;
@@ -144,11 +145,13 @@ export function planFastPropertySearch(params: {
   const isAccountOrPublishingCommand = /\b(mis propiedades|mi propiedad|publicar|subir|anunciar|editar|administrar|gestionar|panel|dashboard)\b/.test(clean);
   const operation = extractOperation(prompt);
   const detectedCity = extractCity(prompt, catalogLocations);
+  const priceRequest = detectCatalogPriceRequest(prompt);
   const matched = !isAccountOrPublishingCommand
     && (
       activeSearch
       || (hasSearchVerb && mentionsProperty)
       || Boolean(operation && (mentionsProperty || detectedCity))
+      || Boolean(priceRequest?.sort && (mentionsProperty || detectedCity || operation))
     );
   const memory: ConversationMemory = { ...currentMemory };
 
@@ -157,6 +160,7 @@ export function planFastPropertySearch(params: {
   }
 
   if (operation) memory.operation = { value: operation, confidence: 1 };
+  if (priceRequest?.sort) memory.sort = { value: priceRequest.sort, confidence: 1 };
   const propertyType = extractPropertyType(prompt);
   if (propertyType) memory.propertyType = { value: propertyType, confidence: 1 };
   const city = detectedCity;

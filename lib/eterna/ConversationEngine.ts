@@ -1,5 +1,6 @@
 import { extractEntities } from './IntentRouter';
 import { parseBudgetToNumber } from '../search/SearchEngine';
+import type { SearchSort } from '../search/types';
 
 export enum ConversationIntent {
   PROPERTY_SEARCH = "PROPERTY_SEARCH",
@@ -43,6 +44,7 @@ export interface ConversationMemory {
   propertyType?: MemoryField<string>;
   budget?: MemoryField<string>;
   budgetOpen?: MemoryField<boolean>;
+  sort?: MemoryField<SearchSort>;
   currency?: MemoryField<string>;
   rooms?: MemoryField<number>;
   bathrooms?: MemoryField<number>;
