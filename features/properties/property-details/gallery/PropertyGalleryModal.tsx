@@ -1,6 +1,7 @@
 import { memo } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Download, Maximize, Play, Share } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Maximize, Play, Share, X } from 'lucide-react';
 import Image from 'next/image';
 import type { LanguageType } from '@/lib/context/LanguageContext';
 import type { Property } from '@/lib/types';
@@ -29,8 +30,11 @@ export const PropertyGalleryModal = memo(function PropertyGalleryModal({
   property,
 }: PropertyGalleryModalProps) {
   const {
+    closeGallery,
     galleryIndex,
     handleDoubleClick,
+    handleGalleryTouchEnd,
+    handleGalleryTouchStart,
     handleNextImage,
     handlePrevImage,
     isGalleryOpen,
@@ -38,30 +42,34 @@ export const PropertyGalleryModal = memo(function PropertyGalleryModal({
     mediaItems,
     panOffset,
     selectGalleryItem,
-    setIsGalleryOpen,
     setPanOffset,
     zoomScale,
   } = controller;
   const currentItem = mediaItems[galleryIndex];
 
-  return (
+  const lightbox = (
     <AnimatePresence>
       {isGalleryOpen && mediaItems.length > 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-[#09090b]/98 backdrop-blur-xl flex flex-col justify-between"
+          role="dialog"
+          aria-modal="true"
+          aria-label={language === 'es' ? 'Galería ampliada de la propiedad' : 'Expanded property gallery'}
+          data-testid="property-gallery-lightbox"
+          className="fixed inset-0 z-[10000] flex flex-col justify-between bg-[#09090b]/98 backdrop-blur-xl"
         >
           <div className="flex items-center justify-between p-4 md:p-6 bg-gradient-to-b from-black/60 to-transparent z-10 text-white">
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setIsGalleryOpen(false)}
+                onClick={closeGallery}
+                aria-label={language === 'es' ? 'Cerrar galería' : 'Close gallery'}
                 className="p-2 hover:bg-white/10 rounded-full transition-colors cursor-pointer"
                 title={language === 'es' ? 'Cerrar' : 'Close'}
               >
-                <ChevronLeft className="w-6 h-6 rotate-180" />
+                <X className="w-6 h-6" />
               </button>
               <div className="flex flex-col">
                 <span className="text-[10px] font-black uppercase text-brand-accent tracking-widest">
@@ -112,7 +120,11 @@ export const PropertyGalleryModal = memo(function PropertyGalleryModal({
             </div>
           </div>
 
-          <div className="flex-1 w-full flex items-center justify-center relative overflow-hidden px-4 md:px-16">
+          <div
+            className="relative flex w-full flex-1 touch-pan-y items-center justify-center overflow-hidden px-4 md:px-16"
+            onTouchStart={handleGalleryTouchStart}
+            onTouchEnd={handleGalleryTouchEnd}
+          >
             <button
               type="button"
               onClick={handlePrevImage}
@@ -135,7 +147,7 @@ export const PropertyGalleryModal = memo(function PropertyGalleryModal({
                   onDoubleClick={handleDoubleClick}
                   className={`max-w-full max-h-[75vh] object-contain rounded-xl select-none shadow-2xl transition-shadow ${isZoomed ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
                 />
-              ) : (
+              ) : currentItem ? (
                 <div className="w-full max-w-4xl aspect-video rounded-xl overflow-hidden shadow-2xl bg-black flex items-center justify-center">
                   <PropertyMediaItem
                     item={currentItem}
@@ -143,7 +155,7 @@ export const PropertyGalleryModal = memo(function PropertyGalleryModal({
                     className="w-full h-full object-contain"
                   />
                 </div>
-              )}
+              ) : null}
             </div>
 
             <button
@@ -180,8 +192,11 @@ export const PropertyGalleryModal = memo(function PropertyGalleryModal({
                     </div>
                   ) : (
                     <div className="w-full h-full bg-brand-black flex items-center justify-center relative">
-                      <div className="absolute inset-0 bg-brand-accent/40" />
-                      <span className="absolute text-[8px] font-black text-white uppercase tracking-wider">3D</span>
+                      <div className="absolute inset-0 bg-brand-accent/25" />
+                      <Play className="absolute h-4 w-4 fill-white text-white" />
+                      <span className="absolute bottom-1 right-1 text-[7px] font-black uppercase tracking-wider text-white/80">
+                        {item.type}
+                      </span>
                     </div>
                   )}
                 </button>
@@ -192,4 +207,6 @@ export const PropertyGalleryModal = memo(function PropertyGalleryModal({
       )}
     </AnimatePresence>
   );
+
+  return typeof document === 'undefined' ? null : createPortal(lightbox, document.body);
 });

@@ -64,7 +64,10 @@ import {
   ensureConversationContinues,
   getConversationSuggestions,
 } from '@/lib/eterna/conversationContinuity';
-import { ETERNA_OPEN_PROPERTY_LOCATION_EVENT } from '@/lib/eterna/events';
+import {
+  ETERNA_OPEN_PROPERTY_LOCATION_EVENT,
+  ETERNA_OPEN_PROPERTY_VIDEO_EVENT,
+} from '@/lib/eterna/events';
 import { buildEternaSystemPrompt } from '@/lib/eterna/systemPrompt';
 import {
   determineOfferingMode,
@@ -270,6 +273,7 @@ export default function EternaConcierge() {
     voiceMode,
     voiceState,
     isListening,
+    isAvatarSpeaking,
     partialTranscript,
     speechRecognitionSupported,
     handleVoiceButtonClick,
@@ -1550,6 +1554,20 @@ Explore actualizado: Redirecting to /explore`);
       return { status: 'completed' as const, target: 'property location' };
     }
 
+    if (action.type === 'open_property_video') {
+      const property = liveContext.property;
+      const hasVideo = property?.media?.some((media) => (
+        ['VIDEO', 'YOUTUBE', 'VIMEO', 'DRONE'].includes(media.mediaType)
+      ));
+      if (!property || !hasVideo) return { status: 'not_found' as const, target: 'property video' };
+
+      window.dispatchEvent(new CustomEvent(ETERNA_OPEN_PROPERTY_VIDEO_EVENT, {
+        detail: { propertyId: property.id },
+      }));
+      setIsOpen(false);
+      return { status: 'completed' as const, target: 'property video' };
+    }
+
     if (action.type === 'open_property_wizard') {
       if (!currentUser || pathname !== '/dashboard' || searchParams.get('tab') !== 'properties') {
         navigateToRoute('/dashboard?tab=properties', originalPrompt, 'publish_property');
@@ -1687,6 +1705,9 @@ Explore actualizado: Redirecting to /explore`);
 
     // ── LOCAL PROPERTY QA ROUTER ──
     const activeProperty = liveContext.property;
+    const activePropertyVideos = activeProperty?.media?.filter((media) => (
+      ['VIDEO', 'YOUTUBE', 'VIMEO', 'DRONE'].includes(media.mediaType)
+    )) || [];
     const currentPropertyId = activeProperty?.id || liveContext.propertyPage?.propertyId || null;
 
     const activePropertyTitle = activeProperty
@@ -1774,6 +1795,10 @@ Explore actualizado: Redirecting to /explore`);
           estadoConservacion: activeProperty.conservationStateId || null,
         },
         amenidades: activeProperty.amenities || [],
+        multimedia: {
+          cantidadVideos: activePropertyVideos.length,
+          tiposVideo: activePropertyVideos.map((media) => media.mediaType),
+        },
         entornoGoogle: selectEternaNearbyHighlights(activeProperty.nearbyPlaces || []).map((place) => ({
           categoria: place.category,
           nombre: place.name,
@@ -1916,6 +1941,44 @@ Explore actualizado: Redirecting to /explore`);
     }
 
     const cleanPropertyPrompt = normalizedPrompt;
+    const requestsVideoExperience = Boolean(
+      activeProperty
+      && (
+        /\b(?:muestrame|ensename|quiero ver|abre|abrir|reproduce|reproducir|pon|ver)\b.*\b(?:video|videos|tour en video|recorrido en video)\b/.test(cleanPropertyPrompt)
+        || /\b(?:video|videos|tour en video|recorrido en video)\b.*\b(?:muestrame|ensename|abre|abrir|reproduce|reproducir|pon|ver)\b/.test(cleanPropertyPrompt)
+        || /\b(?:show|open|play|watch)\b.*\b(?:video|videos|video tour)\b/.test(cleanPropertyPrompt)
+      )
+    );
+
+    if (activeProperty && requestsVideoExperience) {
+      const hasVideo = activePropertyVideos.length > 0;
+      const videoReply = hasVideo
+        ? (language === 'es'
+            ? 'Abrí el video de la propiedad en pantalla completa. Puedes reproducirlo y cerrar el visor cuando quieras. ¿Quieres que después revisemos la ubicación?'
+            : 'I opened the property video in the full-screen viewer. You can play it and close the viewer whenever you want. Would you like to review the location afterward?')
+        : (language === 'es'
+            ? 'Esta propiedad no tiene videos publicados por ahora. Puedo mostrarte la galería de fotos o la ubicación. ¿Cuál prefieres?'
+            : 'This property does not have any published videos yet. I can show you the photo gallery or the location. Which would you prefer?');
+
+      setThinkingContext('property_detail');
+      setChatHistory((previous) => [...previous, {
+        role: 'assistant',
+        content: videoReply,
+        suggestedReplies: hasVideo
+          ? (language === 'es' ? ['Ver ubicación', 'Revisar amenidades'] : ['View location', 'Review amenities'])
+          : (language === 'es' ? ['Ver fotos', 'Ver ubicación'] : ['View photos', 'View location']),
+      }]);
+      setSimulatedStatus('talking');
+      if (hasVideo) {
+        window.dispatchEvent(new CustomEvent(ETERNA_OPEN_PROPERTY_VIDEO_EVENT, {
+          detail: { propertyId: activeProperty.id },
+        }));
+        setIsOpen(false);
+      }
+      speak(videoReply, () => setSimulatedStatus('idle'));
+      return;
+    }
+
     const requestsLocationExperience = Boolean(
       activeProperty
       && (
@@ -2899,10 +2962,11 @@ Explore actualizado: Redirecting to /explore`);
       isListening,
       voiceMode,
       isVoiceStarting: isCheckingMicPermission,
+      isAvatarSpeaking,
       status: activeStatus,
       chatHistory
     });
-  }, [isOpen, isListening, voiceMode, isCheckingMicPermission, activeStatus, chatHistory, setEternaChatState]);
+  }, [isOpen, isListening, voiceMode, isCheckingMicPermission, isAvatarSpeaking, activeStatus, chatHistory, setEternaChatState]);
 
   // Automatic welcome greeting presentation flow (Phase 6)
   useEffect(() => {
@@ -3165,6 +3229,7 @@ Explore actualizado: Redirecting to /explore`);
             activeStatus,
             hasActiveProperty: Boolean(activeProperty),
             isCompact,
+            isAvatarSpeaking,
             isListening,
             isMuted,
             isPresentingProperty: Boolean(propertyPresentation),

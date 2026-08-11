@@ -17,6 +17,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { LeadType, PropertyOffering, PropertyOfferingMode } from '@/lib/types';
 import { useLiveContext } from '@/lib/context/LiveContext';
+import {
+  ETERNA_OPEN_PROPERTY_VIDEO_EVENT,
+  type EternaOpenPropertyVideoDetail,
+} from '@/lib/eterna/events';
 import { LegalDossierSection } from '@/components/property/sections/LegalDossierSection';
 import { FinancingCompatibility } from '@/components/property/sections/FinancingCompatibility';
 import { EternaMarketAnalysis } from '@/components/property/sections/EternaMarketAnalysis';
@@ -90,7 +94,22 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   const hasResponsible = publicResponsible !== null;
 
   const gallery = usePropertyGallery(property);
+  const galleryMediaItems = gallery.mediaItems;
+  const openGallery = gallery.openGallery;
   const locationModal = usePropertyLocationModal(id);
+
+  useEffect(() => {
+    const handleOpenPropertyVideo = (event: Event) => {
+      const detail = (event as CustomEvent<EternaOpenPropertyVideoDetail>).detail;
+      if (detail?.propertyId !== id) return;
+
+      const firstVideoIndex = galleryMediaItems.findIndex((item) => item.type !== 'image');
+      if (firstVideoIndex >= 0) openGallery(firstVideoIndex);
+    };
+
+    window.addEventListener(ETERNA_OPEN_PROPERTY_VIDEO_EVENT, handleOpenPropertyVideo);
+    return () => window.removeEventListener(ETERNA_OPEN_PROPERTY_VIDEO_EVENT, handleOpenPropertyVideo);
+  }, [galleryMediaItems, id, openGallery]);
 
   // Financing Calculator States
   const [downPaymentPct, setDownPaymentPct] = useState<number>(DEFAULT_MORTGAGE_SCENARIO.downPaymentPercent);

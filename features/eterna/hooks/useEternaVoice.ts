@@ -21,6 +21,7 @@ import {
   playPcmStream,
   stopPcmSources,
 } from '@/features/eterna/audio/pcmStreamPlayer';
+import { ETERNA_AVATAR_AUDIO_LEAD_IN_MS } from '@/lib/eterna/voiceTiming';
 import {
   normalizeVoiceText,
   type SpeechRecognitionConstructor,
@@ -115,6 +116,7 @@ export function useEternaVoice({
     setVoiceMode(next);
   }, []);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isAvatarSpeaking, setIsAvatarSpeaking] = useState(false);
   const [partialTranscript, setPartialTranscript] = useState('');
 
   const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
@@ -138,6 +140,7 @@ export function useEternaVoice({
   const recognitionStartFailuresRef = useRef(0);
   const lastRecognitionErrorRef = useRef<string | null>(null);
   const speechGenerationRef = useRef(0);
+  const audibleStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFinalTranscriptRef = useRef<{ text: string; at: number }>({ text: '', at: 0 });
   const spokenTextHistoryRef = useRef<Array<{ text: string; at: number }>>([]);
 
@@ -175,6 +178,12 @@ export function useEternaVoice({
     setVoiceState(newState);
     voiceStateRef.current = newState;
     console.log(`[VOICE STATE] ${newState.toUpperCase()}`);
+  }, []);
+
+  const clearAudibleStartTimer = useCallback(() => {
+    if (!audibleStartTimerRef.current) return;
+    clearTimeout(audibleStartTimerRef.current);
+    audibleStartTimerRef.current = null;
   }, []);
 
   const clearRecognitionRestartTimer = useCallback(() => {
@@ -714,14 +723,15 @@ export function useEternaVoice({
     // playback waits for the next user gesture instead of silently replacing
     // the administrator's selected voice with SpeechSynthesis.
     const selectedEngine = voiceEngineRef.current;
+    clearAudibleStartTimer();
     setIsSpeaking(false);
+    setIsAvatarSpeaking(false);
     isSpeakingRef.current = false;
-    if (selectedEngine !== 'browser') {
-      // Durante la generación remota el avatar permanece procesando. El modo
-      // hablando se activa más abajo con la confirmación de audio audible.
-      transitionToState('PROCESSING');
-      setSimulatedStatusRef.current?.('thinking');
-    }
+    // The avatar stays in its processing state while either engine prepares
+    // speech. A separate visual pre-roll is enabled only when playback has a
+    // concrete start time, so animation and audible speech share one clock.
+    transitionToState('PROCESSING');
+    setSimulatedStatusRef.current?.('thinking');
 
     // La sesión empieza ahora para poder cancelarla durante la petición, pero
     // el avatar no entra en modo hablando hasta que el audio sea audible.
@@ -735,6 +745,7 @@ export function useEternaVoice({
 
       transitionToState('SPEAKING');
       setSimulatedStatusRef.current?.('talking');
+      setIsAvatarSpeaking(true);
       setIsSpeaking(true);
       isSpeakingRef.current = true;
       options.onStart?.();
@@ -761,6 +772,7 @@ export function useEternaVoice({
         return;
       }
       isFinished = true;
+      clearAudibleStartTimer();
       pendingAudioUnlockRef.current = null;
       stopBargeInMonitoring();
 
@@ -782,6 +794,7 @@ export function useEternaVoice({
       setSimulatedStatusRef.current?.('idle');
       setSimulatedTextRef.current?.('');
       setIsSpeaking(false);
+      setIsAvatarSpeaking(false);
       isSpeakingRef.current = false;
 
       // The microphone remains closed until the audio element, PCM sources, or
@@ -872,8 +885,15 @@ export function useEternaVoice({
         utterance.onstart = markAudibleSpeechStarted;
         utterance.onend = handleEnd;
         utterance.onerror = handleEnd;
-        console.log('[VOICE STATE] browser speech start');
-        window.speechSynthesis.speak(utterance);
+        console.log('[VOICE STATE] browser speech prepared');
+        setIsAvatarSpeaking(true);
+        clearAudibleStartTimer();
+        audibleStartTimerRef.current = setTimeout(() => {
+          audibleStartTimerRef.current = null;
+          if (!speechSessionActiveRef.current || speechGeneration !== speechGenerationRef.current) return;
+          console.log('[VOICE STATE] browser speech start');
+          window.speechSynthesis.speak(utterance);
+        }, ETERNA_AVATAR_AUDIO_LEAD_IN_MS);
       } catch (e) {
         console.warn('[Eterna Voice] browser speech failed:', e);
         handleEnd();
@@ -911,13 +931,20 @@ export function useEternaVoice({
             context,
             signal: controller.signal,
             sources: pcmSourcesRef.current,
-            onFirstAudioScheduled: (activeContext) => {
+            onFirstAudioScheduled: (activeContext, startAt) => {
               window.clearTimeout(firstAudioTimer);
               const markPcmPlaybackStarted = () => {
                 if (!speechSessionActiveRef.current) return;
                 pendingAudioUnlockRef.current = null;
-                markAudibleSpeechStarted();
-                console.log(`[VOICE STATE] ${engine} PCM playback start`);
+                setIsAvatarSpeaking(true);
+                clearAudibleStartTimer();
+                const delayMs = Math.max(0, Math.round((startAt - activeContext.currentTime) * 1_000));
+                audibleStartTimerRef.current = setTimeout(() => {
+                  audibleStartTimerRef.current = null;
+                  if (!speechSessionActiveRef.current || speechGeneration !== speechGenerationRef.current) return;
+                  markAudibleSpeechStarted();
+                  console.log(`[VOICE STATE] ${engine} PCM playback start`);
+                }, delayMs);
               };
 
               if (activeContext.state === 'running') {
@@ -976,9 +1003,10 @@ export function useEternaVoice({
     } else {
       startSelectedEngine();
     }
-  }, [clearRecognitionRestartTimer, enterListeningState, startBargeInMonitoring, stopBargeInMonitoring, transitionToState]);
+  }, [clearAudibleStartTimer, clearRecognitionRestartTimer, enterListeningState, startBargeInMonitoring, stopBargeInMonitoring, transitionToState]);
 
   const interruptEterna = useCallback(() => {
+    clearAudibleStartTimer();
     stopBargeInMonitoring();
     speechGenerationRef.current += 1;
     speechOutputGuardRef.current = false;
@@ -994,6 +1022,7 @@ export function useEternaVoice({
     }
 
     setIsSpeaking(false);
+    setIsAvatarSpeaking(false);
     isSpeakingRef.current = false; // Sync ref synchronously to prevent handleEnd from executing
     console.trace('[AUDIT] speechSessionActiveRef -> false (interruptEterna)');
     speechSessionActiveRef.current = false; // Clear session ref on interrupt
@@ -1017,9 +1046,10 @@ export function useEternaVoice({
         } catch {}
       }
     }
-  }, [clearRecognitionRestartTimer, enterListeningState, stopBargeInMonitoring]);
+  }, [clearAudibleStartTimer, clearRecognitionRestartTimer, enterListeningState, stopBargeInMonitoring]);
 
   const startConversationMode = useCallback((microphoneAlreadyAuthorized = false) => {
+    clearAudibleStartTimer();
     addVoiceDebugLog(`[CALL] startConversationMode`);
     addVoiceDebugLog(`startConversationMode called. voiceMode before: ${voiceModeRef.current}`);
     console.log("[MOBILE TAP] startConversationMode before: voiceMode =", voiceModeRef.current);
@@ -1048,6 +1078,7 @@ export function useEternaVoice({
     setSimulatedStatusRef.current?.('listening');
     setThinkingContextRef.current?.('general');
     setIsSpeaking(false);
+    setIsAvatarSpeaking(false);
     isSpeakingRef.current = false;
     console.trace('[AUDIT] speechSessionActiveRef -> false (startConversationMode)');
     speechSessionActiveRef.current = false; // Clear session ref
@@ -1079,9 +1110,10 @@ export function useEternaVoice({
     }
     addVoiceDebugLog(`startConversationMode completed. voiceMode after: ${voiceModeRef.current}`);
     console.log("[MOBILE TAP] startConversationMode after: voiceMode =", voiceModeRef.current);
-  }, [clearRecognitionRestartTimer, ensureMicrophoneCapture, language, loggedSetVoiceMode, primeBargeInAudioContext, releaseMicrophoneCapture, scheduleRecognitionRestart, setChatHistory, stopBargeInMonitoring]);
+  }, [clearAudibleStartTimer, clearRecognitionRestartTimer, ensureMicrophoneCapture, language, loggedSetVoiceMode, primeBargeInAudioContext, releaseMicrophoneCapture, scheduleRecognitionRestart, setChatHistory, stopBargeInMonitoring]);
 
   const stopConversationMode = useCallback(() => {
+    clearAudibleStartTimer();
     addVoiceDebugLog(`[CALL] stopConversationMode`);
     addVoiceDebugLog(`stopConversationMode called. voiceMode before: ${voiceModeRef.current}`);
     console.log("[MOBILE TAP] stopConversationMode before: voiceMode =", voiceModeRef.current);
@@ -1118,6 +1150,7 @@ export function useEternaVoice({
       window.speechSynthesis.cancel();
     }
     setIsSpeaking(false);
+    setIsAvatarSpeaking(false);
     isSpeakingRef.current = false;
     console.trace('[AUDIT] speechSessionActiveRef -> false (stopConversationMode)');
     speechSessionActiveRef.current = false; // Clear session ref
@@ -1127,7 +1160,7 @@ export function useEternaVoice({
     setThinkingContextRef.current?.('general');
     addVoiceDebugLog(`stopConversationMode completed. voiceMode after: ${voiceModeRef.current}`);
     console.log("[MOBILE TAP] stopConversationMode after: voiceMode =", voiceModeRef.current);
-  }, [clearRecognitionRestartTimer, loggedSetVoiceMode, releaseMicrophoneCapture, stopBargeInMonitoring, transitionToState]);
+  }, [clearAudibleStartTimer, clearRecognitionRestartTimer, loggedSetVoiceMode, releaseMicrophoneCapture, stopBargeInMonitoring, transitionToState]);
 
   const toggleVoiceMode = useCallback(() => {
     addVoiceDebugLog(`toggleVoiceMode called. supported: ${speechRecognitionSupportedRef.current}, active: ${voiceModeRef.current}`);
@@ -1222,11 +1255,14 @@ export function useEternaVoice({
     releaseMicrophoneCapture,
   });
 
+  useEffect(() => () => clearAudibleStartTimer(), [clearAudibleStartTimer]);
+
   return {
     voiceMode,
     voiceState,
     isListening,
     isSpeaking,
+    isAvatarSpeaking,
     partialTranscript,
     speechRecognitionSupported,
     startVoiceMode: startConversationMode,

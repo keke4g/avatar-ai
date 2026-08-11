@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Property, PropertyOfferingMode } from '../lib/types';
@@ -40,7 +40,11 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
   const { favorites, toggleFavorite, reviews } = useSwap();
   const { t, language } = useTranslation();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [previousImageIndex, setPreviousImageIndex] = useState<number | null>(null);
+  const [imageTransitionReady, setImageTransitionReady] = useState(true);
+  const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
   const [imageError, setImageError] = useState(false);
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isFavorited = favorites.includes(property.id);
 
@@ -98,18 +102,52 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
     language === 'es' ? 'es' : 'en',
   );
 
+  useEffect(() => {
+    if (property.images.length < 2 || typeof window === 'undefined') return;
+
+    const previous = property.images[(currentImageIndex - 1 + property.images.length) % property.images.length];
+    const next = property.images[(currentImageIndex + 1) % property.images.length];
+    [previous, next].filter(Boolean).forEach((url) => {
+      const image = new window.Image();
+      image.decoding = 'async';
+      image.src = url;
+    });
+  }, [currentImageIndex, property.images]);
+
+  useEffect(() => () => {
+    if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+  }, []);
+
+  const showImage = (index: number, direction: 1 | -1) => {
+    if (index === currentImageIndex || property.images.length === 0) return;
+    if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    setPreviousImageIndex(currentImageIndex);
+    setSlideDirection(direction);
+    setImageTransitionReady(false);
+    setImageError(false);
+    setCurrentImageIndex(index);
+  };
+
+  const handleCurrentImageReady = () => {
+    requestAnimationFrame(() => {
+      setImageTransitionReady(true);
+      transitionTimerRef.current = setTimeout(() => {
+        setPreviousImageIndex(null);
+        transitionTimerRef.current = null;
+      }, 460);
+    });
+  };
+
   const handleNextImage = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    setImageError(false);
-    setCurrentImageIndex((prev) => (prev + 1) % property.images.length);
+    showImage((currentImageIndex + 1) % property.images.length, 1);
   };
 
   const handlePrevImage = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    setImageError(false);
-    setCurrentImageIndex((prev) => (prev - 1 + property.images.length) % property.images.length);
+    showImage((currentImageIndex - 1 + property.images.length) % property.images.length, -1);
   };
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
@@ -133,15 +171,39 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
         <div className="relative aspect-[4/3] w-full rounded-2xl overflow-hidden bg-brand-gray-100 shadow-premium group-hover:shadow-floating transition-all duration-300">
           
           {/* Image Slide */}
-          <div className="w-full h-full relative">
+          <div className="w-full h-full relative isolate bg-brand-gray-100">
+            {previousImageIndex !== null && previousImageIndex !== currentImageIndex && (
+              <Image
+                src={property.images[previousImageIndex] || fallbackUrl}
+                alt=""
+                aria-hidden="true"
+                fill
+                sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 33vw"
+                unoptimized
+                className="z-0 h-full w-full scale-[1.01] object-cover"
+                loading="eager"
+                decoding="async"
+              />
+            )}
             <Image
+              key={`${currentImageIndex}-${imageError ? 'fallback' : 'image'}`}
               src={imageError ? fallbackUrl : (property.images[currentImageIndex] || fallbackUrl)}
               alt={property.title}
               fill
               sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 33vw"
               unoptimized
-              onError={() => setImageError(true)}
-              className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+              onLoad={handleCurrentImageReady}
+              onError={() => {
+                setImageError(true);
+                setImageTransitionReady(false);
+              }}
+              className={`z-10 h-full w-full object-cover transition-[opacity,transform] duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.035] ${
+                imageTransitionReady
+                  ? 'translate-x-0 opacity-100'
+                  : slideDirection === 1
+                    ? 'translate-x-[4%] opacity-0'
+                    : '-translate-x-[4%] opacity-0'
+              }`}
               loading="lazy"
               decoding="async"
             />

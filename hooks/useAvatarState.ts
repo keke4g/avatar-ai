@@ -5,9 +5,9 @@ export type AvatarState = "WAITING" | "LISTENING" | "THINKING" | "TALKING";
 
 export function useAvatarState(): AvatarState {
   const { eternaChatState } = useLiveContext();
-  const { isListening, voiceMode, status } = eternaChatState;
+  const { isAvatarSpeaking, isListening, voiceMode, status } = eternaChatState;
 
-  if (status === "talking") {
+  if (isAvatarSpeaking || status === "talking") {
     return "TALKING";
   }
 

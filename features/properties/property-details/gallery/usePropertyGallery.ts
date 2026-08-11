@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { MouseEvent, TouchEvent } from 'react';
 import type { Property } from '@/lib/types';
 import { getPropertyGalleryMedia } from '../propertyDetailsData';
 
@@ -11,6 +11,7 @@ export function usePropertyGallery(property?: Property) {
   const [isZoomed, setIsZoomed] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const resetZoom = useCallback(() => {
     setIsZoomed(false);
@@ -45,9 +46,16 @@ export function usePropertyGallery(property?: Property) {
   }, [mediaItems.length]);
 
   const openGallery = useCallback((index: number) => {
-    setGalleryIndex(index);
+    const safeIndex = Math.min(Math.max(index, 0), Math.max(mediaItems.length - 1, 0));
+    resetZoom();
+    setGalleryIndex(safeIndex);
     setIsGalleryOpen(true);
-  }, []);
+  }, [mediaItems.length, resetZoom]);
+
+  const closeGallery = useCallback(() => {
+    resetZoom();
+    setIsGalleryOpen(false);
+  }, [resetZoom]);
 
   const selectGalleryItem = useCallback((index: number) => {
     resetZoom();
@@ -63,12 +71,36 @@ export function usePropertyGallery(property?: Property) {
     }
   }, [isZoomed, resetZoom]);
 
+  const handleGalleryTouchStart = useCallback((event: TouchEvent<HTMLElement>) => {
+    if (isZoomed || event.touches.length !== 1) {
+      touchStartRef.current = null;
+      return;
+    }
+
+    const touch = event.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }, [isZoomed]);
+
+  const handleGalleryTouchEnd = useCallback((event: TouchEvent<HTMLElement>) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start || isZoomed || event.changedTouches.length !== 1) return;
+
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    if (Math.abs(deltaX) < 56 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.2) return;
+
+    if (deltaX < 0) handleNextImage();
+    else handlePrevImage();
+  }, [handleNextImage, handlePrevImage, isZoomed]);
+
   useEffect(() => {
     if (!isGalleryOpen || mediaItems.length === 0) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setIsGalleryOpen(false);
+        closeGallery();
       } else if (event.key === 'ArrowLeft') {
         handlePrevImage();
       } else if (event.key === 'ArrowRight') {
@@ -78,11 +110,28 @@ export function usePropertyGallery(property?: Property) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNextImage, handlePrevImage, isGalleryOpen, mediaItems.length]);
+  }, [closeGallery, handleNextImage, handlePrevImage, isGalleryOpen, mediaItems.length]);
+
+  useEffect(() => {
+    if (!isGalleryOpen || typeof document === 'undefined') return;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [isGalleryOpen]);
 
   return useMemo(() => ({
+    closeGallery,
     galleryIndex,
     handleDoubleClick,
+    handleGalleryTouchEnd,
+    handleGalleryTouchStart,
     handleNextHeroMedia,
     handleNextImage,
     handlePrevHeroMedia,
@@ -94,12 +143,14 @@ export function usePropertyGallery(property?: Property) {
     openGallery,
     panOffset,
     selectGalleryItem,
-    setIsGalleryOpen,
     setPanOffset,
     zoomScale,
   }), [
+    closeGallery,
     galleryIndex,
     handleDoubleClick,
+    handleGalleryTouchEnd,
+    handleGalleryTouchStart,
     handleNextHeroMedia,
     handleNextImage,
     handlePrevHeroMedia,

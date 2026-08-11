@@ -76,6 +76,7 @@ export interface EternaChatState {
   isListening: boolean;
   voiceMode: boolean;
   isVoiceStarting: boolean;
+  isAvatarSpeaking: boolean;
   status: string;
   chatHistory: ChatMessage[];
 }
@@ -138,6 +139,7 @@ export function LiveContextProvider({ children }: { children: React.ReactNode })
     isListening: false,
     voiceMode: false,
     isVoiceStarting: false,
+    isAvatarSpeaking: false,
     status: 'disconnected',
     chatHistory: []
   });

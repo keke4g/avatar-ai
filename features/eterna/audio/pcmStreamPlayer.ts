@@ -1,6 +1,7 @@
 import 'client-only';
 
 import { decodePcm16Le, parsePcm16LeSampleRate } from '@/lib/shared/pcm16';
+import { ETERNA_AVATAR_AUDIO_LEAD_IN_MS } from '@/lib/eterna/voiceTiming';
 
 export const ETERNA_FIRST_AUDIO_TIMEOUT_MS = 3_500;
 
@@ -13,7 +14,7 @@ export interface PcmStreamPlaybackOptions {
   context: AudioContext;
   signal: AbortSignal;
   sources: Set<AudioBufferSourceNode>;
-  onFirstAudioScheduled: (context: AudioContext) => void;
+  onFirstAudioScheduled: (context: AudioContext, startAt: number) => void;
   onPlaybackEnded: () => void;
 }
 
@@ -56,7 +57,7 @@ export async function playPcmStream({
 
   const reader = response.body.getReader();
   let pendingByte: number | null = null;
-  let nextStartTime = context.currentTime + 0.04;
+  let nextStartTime = context.currentTime + (ETERNA_AVATAR_AUDIO_LEAD_IN_MS / 1_000);
   let scheduledSources = 0;
   let streamEnded = false;
   let firstAudioScheduled = false;
@@ -105,7 +106,7 @@ export async function playPcmStream({
 
     if (!firstAudioScheduled) {
       firstAudioScheduled = true;
-      onFirstAudioScheduled(context);
+      onFirstAudioScheduled(context, startAt);
     }
   }
 

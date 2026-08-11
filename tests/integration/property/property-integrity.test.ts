@@ -29,6 +29,7 @@ import {
 } from '../../../lib/eterna/actions/ValuationActions';
 import { ensureConversationContinues } from '../../../lib/eterna/conversationContinuity';
 import { parsePageAgentResponse } from '../../../lib/eterna/pageAgent';
+import { getPropertyGalleryMedia } from '../../../lib/propertyMedia';
 import {
   getPropertyMicroMarketKey,
   hasValidMexicoCoordinates,
@@ -375,6 +376,60 @@ test('Eterna accepts the property location modal as a page action', () => {
   });
 
   assert.equal(parsed?.action.type, 'open_property_location');
+});
+
+test('Eterna accepts expanded property video as a page action', () => {
+  const parsed = parsePageAgentResponse({
+    reply: 'Abriré el video de la propiedad. ¿Quieres revisar después la ubicación?',
+    intent: 'interact',
+    action: {
+      type: 'open_property_video',
+      route: '',
+      target: 'Video de la propiedad',
+      channel: 'none',
+      requiresConfirmation: false,
+    },
+    search: {
+      intent: 'general',
+      operation: 'unknown',
+      purpose: 'unknown',
+      city: '',
+      zone: '',
+      propertyType: 'unknown',
+      budgetText: '',
+      budgetMin: 0,
+      budgetMax: 0,
+      rooms: 0,
+      features: [],
+      missingField: 'none',
+      readyToSearch: false,
+    },
+    propertyStage: 'discovery',
+    contactIntent: false,
+    preferredContact: 'none',
+    leadSummary: '',
+    suggestedReplies: ['Ver ubicación', 'Revisar amenidades'],
+    understoodGoal: 'Abrir el video de la propiedad',
+  });
+
+  assert.equal(parsed?.action.type, 'open_property_video');
+});
+
+test('property gallery includes direct, YouTube and Vimeo videos in display order', () => {
+  const property = {
+    ...validProperty(),
+    media: [
+      { mediaType: 'IMAGE', url: 'https://example.com/photo.webp' },
+      { mediaType: 'VIDEO', url: 'https://example.com/tour.mp4' },
+      { mediaType: 'YOUTUBE', url: 'https://youtu.be/dQw4w9WgXcQ' },
+      { mediaType: 'VIMEO', url: 'https://vimeo.com/123456' },
+    ],
+  } as Property;
+
+  assert.deepEqual(
+    getPropertyGalleryMedia(property).map((item) => item.type),
+    ['image', 'video', 'youtube', 'vimeo'],
+  );
 });
 
 const valuedProperty = () => ({

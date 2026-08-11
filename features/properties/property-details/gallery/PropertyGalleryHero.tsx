@@ -96,12 +96,12 @@ export const PropertyGalleryHero = memo(function PropertyGalleryHero({
           </div>
         )}
 
-        {mediaItems[heroMediaIndex]?.type === 'video' && (
+        {mediaItems[heroMediaIndex]?.type !== 'image' && (
           <div className="absolute right-4 top-4 z-10 flex items-center justify-center rounded-full bg-brand-black/60 p-2 text-white md:hidden">
             <Play className="w-4 h-4 fill-white text-white" />
           </div>
         )}
-        {mediaItems[0]?.type === 'video' && (
+        {mediaItems[0]?.type !== 'image' && (
           <div className="absolute right-4 top-4 z-10 hidden items-center justify-center rounded-full bg-brand-black/60 p-2 text-white md:flex">
             <Play className="w-4 h-4 fill-white text-white" />
           </div>
@@ -135,7 +135,7 @@ export const PropertyGalleryHero = memo(function PropertyGalleryHero({
                   {language === 'es' ? 'Ver más' : 'View more'}
                 </span>
               </div>
-              {item.type === 'video' && (
+              {item.type !== 'image' && (
                 <div className="absolute top-2 right-2 bg-brand-black/60 text-white p-1.5 rounded-full z-10 flex items-center justify-center">
                   <Play className="w-3.5 h-3.5 fill-white text-white" />
                 </div>

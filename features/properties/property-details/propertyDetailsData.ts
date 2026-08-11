@@ -1,10 +1,7 @@
 import { getActiveOfferings } from '@/lib/propertyOfferings';
 import type { Property, PropertyOffering, PropertyOfferingMode } from '@/lib/types';
-
-export interface PropertyGalleryMediaItem {
-  type: 'image' | 'video';
-  url: string;
-}
+export { getPropertyGalleryMedia } from '@/lib/propertyMedia';
+export type { PropertyGalleryMediaItem } from '@/lib/propertyMedia';
 
 export interface PublicResponsible {
   name: string;
@@ -17,7 +14,6 @@ export interface PublicResponsible {
   profileId: string;
   representativeType?: NonNullable<Property['brokerProfile']>['representativeType'];
 }
-
 export interface ActivePropertyOfferingSummary {
   activeOfferingModes: PropertyOfferingMode[];
   activeRentOffering: PropertyOffering | null;
@@ -106,7 +102,6 @@ export function getPublicResponsible(property: Property): PublicResponsible | nu
     representativeType: broker?.representativeType,
   };
 }
-
 export function getActivePropertyOfferingSummary(
   property?: Property,
 ): ActivePropertyOfferingSummary {
@@ -134,19 +129,4 @@ export function getActivePropertyOfferingSummary(
     activeSaleOffering: firstOfferingByMode.get('SALE') || null,
     activeSwapOffering: firstOfferingByMode.get('SWAP') || null,
   };
-}
-
-export function getPropertyGalleryMedia(property?: Property): PropertyGalleryMediaItem[] {
-  if (!property) return [];
-
-  if (property.media && property.media.length > 0) {
-    const mediaItems: PropertyGalleryMediaItem[] = [];
-    for (const media of property.media) {
-      if (media.mediaType === 'IMAGE') mediaItems.push({ type: 'image', url: media.url });
-      else if (media.mediaType === 'VIDEO') mediaItems.push({ type: 'video', url: media.url });
-    }
-    return mediaItems;
-  }
-
-  return (property.images || []).map((url) => ({ type: 'image', url }));
 }

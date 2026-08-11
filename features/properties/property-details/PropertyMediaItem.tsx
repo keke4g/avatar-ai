@@ -1,15 +1,10 @@
 import { memo } from 'react';
 import Image from 'next/image';
-import { getYouTubeEmbedUrl } from '@/lib/mediaEmbeds';
+import { getVimeoEmbedUrl, getYouTubeEmbedUrl } from '@/lib/mediaEmbeds';
 import type { PropertyGalleryMediaItem } from './propertyDetailsData';
 
-type RenderableMediaItem = PropertyGalleryMediaItem | {
-  type: 'youtube';
-  url: string;
-};
-
 interface PropertyMediaItemProps {
-  item: RenderableMediaItem;
+  item: PropertyGalleryMediaItem;
   title: string;
   className?: string;
 }
@@ -19,16 +14,20 @@ export const PropertyMediaItem = memo(function PropertyMediaItem({
   title,
   className,
 }: PropertyMediaItemProps) {
-  if (item.type === 'youtube') {
-    const embedUrl = getYouTubeEmbedUrl(item.url);
+  if (item.type === 'youtube' || item.type === 'vimeo') {
+    const embedUrl = item.type === 'youtube'
+      ? getYouTubeEmbedUrl(item.url)
+      : getVimeoEmbedUrl(item.url);
     if (!embedUrl) return null;
 
     return (
       <iframe
         src={embedUrl}
+        title={title}
         className={`${className} border-0`}
         allowFullScreen
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        loading="lazy"
       />
     );
   }

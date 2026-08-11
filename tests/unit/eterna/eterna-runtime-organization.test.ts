@@ -14,6 +14,7 @@ import {
   decodePcm16Le,
   parsePcm16LeSampleRate,
 } from '../../../lib/shared/pcm16';
+import { ETERNA_AVATAR_AUDIO_LEAD_IN_MS } from '../../../lib/eterna/voiceTiming';
 import { buildEternaSystemPrompt } from '../../../lib/eterna/systemPrompt';
 
 test('normaliza transcripciones y detecta ecos por tokens', () => {
@@ -23,6 +24,7 @@ test('normaliza transcripciones y detecta ecos por tokens', () => {
 });
 
 test('valida el formato PCM y decodifica muestras little-endian', () => {
+  assert.ok(ETERNA_AVATAR_AUDIO_LEAD_IN_MS >= 120 && ETERNA_AVATAR_AUDIO_LEAD_IN_MS <= 220);
   assert.equal(parsePcm16LeSampleRate('pcm_s16le_24000'), 24_000);
   assert.equal(parsePcm16LeSampleRate('PCM_S16LE_48000'), 48_000);
   assert.equal(parsePcm16LeSampleRate('mp3'), null);

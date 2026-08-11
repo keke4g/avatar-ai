@@ -47,6 +47,7 @@ export interface EternaAvatarViewModel {
   activeStatus: StreamStatus;
   hasActiveProperty: boolean;
   isCompact: boolean;
+  isAvatarSpeaking: boolean;
   isListening: boolean;
   isMuted: boolean;
   isPresentingProperty: boolean;

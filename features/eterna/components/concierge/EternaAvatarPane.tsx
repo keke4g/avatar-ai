@@ -33,6 +33,7 @@ export function EternaAvatarPane({ actions, model }: EternaAvatarPaneProps) {
     activeStatus,
     hasActiveProperty,
     isCompact,
+    isAvatarSpeaking,
     isListening,
     isMuted,
     isPresentingProperty,
@@ -55,7 +56,7 @@ export function EternaAvatarPane({ actions, model }: EternaAvatarPaneProps) {
             ? 'LISTENING'
             : activeStatus === 'thinking'
               ? 'THINKING'
-              : activeStatus === 'talking'
+              : isAvatarSpeaking || activeStatus === 'talking'
                 ? 'TALKING'
                 : 'IDLE'
         }

@@ -21,6 +21,7 @@ export type PageAgentActionType =
   | 'search_properties'
   | 'open_property_contact'
   | 'open_property_location'
+  | 'open_property_video'
   | 'open_property_wizard';
 
 export interface PageAgentAction {
@@ -65,6 +66,7 @@ const ACTIONS = new Set<PageAgentActionType>([
   'search_properties',
   'open_property_contact',
   'open_property_location',
+  'open_property_video',
   'open_property_wizard',
 ]);
 
@@ -196,7 +198,7 @@ export const PAGE_AGENT_RESPONSE_SCHEMA = {
       properties: {
         type: {
           type: 'string',
-          enum: ['none', 'navigate', 'go_back', 'scroll_to', 'click_element', 'search_properties', 'open_property_contact', 'open_property_location', 'open_property_wizard'],
+          enum: ['none', 'navigate', 'go_back', 'scroll_to', 'click_element', 'search_properties', 'open_property_contact', 'open_property_location', 'open_property_video', 'open_property_wizard'],
         },
         route: { type: 'string' },
         target: { type: 'string' },

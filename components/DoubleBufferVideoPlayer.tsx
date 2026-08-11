@@ -76,7 +76,9 @@ export function DoubleBufferVideoPlayer({
   const currentSrcRef = useRef<string>(srcA);
   const activeBufferRef = useRef<'A' | 'B'>('A');
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const switchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const transitionGenerationRef = useRef(0);
   
   useEffect(() => {
     preloadAllAvatarVideos();
@@ -103,8 +105,14 @@ export function DoubleBufferVideoPlayer({
 
   // Handle state change with queue, debounce and Transition Matrix
   useEffect(() => {
+    const generation = transitionGenerationRef.current + 1;
+    transitionGenerationRef.current = generation;
+
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
+    }
+    if (switchTimerRef.current) {
+      clearTimeout(switchTimerRef.current);
     }
 
     debounceTimerRef.current = setTimeout(() => {
@@ -141,8 +149,12 @@ export function DoubleBufferVideoPlayer({
         setSrcB(targetSrc);
       }
 
-      // We wait for the next render loop when the src is bound to the video element
-      setTimeout(() => {
+      // Wait one frame for React to bind the new source to the inactive
+      // buffer. The generation guard prevents a late media event from
+      // reviving an obsolete avatar state after speech has already ended.
+      switchTimerRef.current = setTimeout(() => {
+        switchTimerRef.current = null;
+        if (generation !== transitionGenerationRef.current) return;
         const nextVideo = nextBuffer === 'A' ? videoARef.current : videoBRef.current;
         const currentVideo = activeBufferRef.current === 'A' ? videoARef.current : videoBRef.current;
 
@@ -152,13 +164,17 @@ export function DoubleBufferVideoPlayer({
             nextVideo.load();
           }
 
+          let activated = false;
           const handleCanPlay = () => {
+            if (activated || generation !== transitionGenerationRef.current) return;
+            activated = true;
             // Rule 2: Keep synchronized time if they are same type of video
             if (currentVideo && nextVideo && fromState === 'TALKING' && toState === 'TALKING') {
               nextVideo.currentTime = currentVideo.currentTime;
             }
 
             safePlay(nextVideo).then(() => {
+              if (generation !== transitionGenerationRef.current) return;
               if (process.env.NODE_ENV !== 'production') {
                 console.log(`[ANIMATION] Crossfade start: ${activeBufferRef.current} -> ${nextBuffer}`);
               }
@@ -197,16 +213,27 @@ export function DoubleBufferVideoPlayer({
             nextVideo.removeEventListener('canplay', handleCanPlay);
           };
 
-          nextVideo.addEventListener('loadeddata', handleCanPlay);
-          nextVideo.addEventListener('canplay', handleCanPlay);
+          // Cached videos can already be ready before listeners are attached.
+          // Activate them immediately instead of waiting for an event that
+          // has already fired — the previous implementation occasionally
+          // left the avatar idle while audio was playing for this reason.
+          if (nextVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            handleCanPlay();
+          } else {
+            nextVideo.addEventListener('loadeddata', handleCanPlay);
+            nextVideo.addEventListener('canplay', handleCanPlay);
+          }
         }
-      }, 50);
+      }, 16);
 
-    }, 100); // 100ms Debounce to cancel rapid obsolete states
+    }, 24);
 
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
+      }
+      if (switchTimerRef.current) {
+        clearTimeout(switchTimerRef.current);
       }
     };
   }, [state, safePlay]);
@@ -215,6 +242,7 @@ export function DoubleBufferVideoPlayer({
   useEffect(() => {
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      if (switchTimerRef.current) clearTimeout(switchTimerRef.current);
       if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
     };
   }, []);
