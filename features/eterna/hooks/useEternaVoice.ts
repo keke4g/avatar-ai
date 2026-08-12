@@ -19,9 +19,13 @@ import {
   ETERNA_FIRST_AUDIO_TIMEOUT_MS,
   getPcmSampleRate,
   playPcmStream,
+  startSilentAudioOutputWarmup,
   stopPcmSources,
 } from '@/features/eterna/audio/pcmStreamPlayer';
-import { ETERNA_AVATAR_AUDIO_LEAD_IN_MS } from '@/lib/eterna/voiceTiming';
+import {
+  ETERNA_AVATAR_AUDIO_LEAD_IN_MS,
+  getEternaPlaybackLeadInMs,
+} from '@/lib/eterna/voiceTiming';
 import { isReusablePcmAudioContextState } from '@/lib/eterna/audioContextPolicy';
 import {
   normalizeVoiceText,
@@ -694,7 +698,12 @@ export function useEternaVoice({
     stopPcmSources(pcmSourcesRef.current);
 
     // Check if recognition is running
-    const wasRecognitionActive = recognitionRef.current && recognitionActiveRef.current;
+    const wasRecognitionActive = Boolean(recognitionRef.current && recognitionActiveRef.current);
+    const isMobileAudioHandoff = window.matchMedia('(max-width: 1023px), (pointer: coarse)').matches;
+    const playbackLeadInMs = getEternaPlaybackLeadInMs({
+      afterRecognition: wasRecognitionActive,
+      isMobile: isMobileAudioHandoff,
+    });
     // Register the playback continuation before aborting recognition. Mobile
     // browsers may dispatch `onend` synchronously; registering it afterwards
     // can leave the response stuck in the listening state with no audio.
@@ -914,14 +923,18 @@ export function useEternaVoice({
         utterance.onend = handleEnd;
         utterance.onerror = handleEnd;
         console.log('[VOICE STATE] browser speech prepared');
-        setIsAvatarSpeaking(true);
         clearAudibleStartTimer();
+        const routeHandoffMs = Math.max(0, playbackLeadInMs - ETERNA_AVATAR_AUDIO_LEAD_IN_MS);
         audibleStartTimerRef.current = setTimeout(() => {
-          audibleStartTimerRef.current = null;
           if (!speechSessionActiveRef.current || speechGeneration !== speechGenerationRef.current) return;
-          console.log('[VOICE STATE] browser speech start');
-          window.speechSynthesis.speak(utterance);
-        }, ETERNA_AVATAR_AUDIO_LEAD_IN_MS);
+          setIsAvatarSpeaking(true);
+          audibleStartTimerRef.current = setTimeout(() => {
+            audibleStartTimerRef.current = null;
+            if (!speechSessionActiveRef.current || speechGeneration !== speechGenerationRef.current) return;
+            console.log('[VOICE STATE] browser speech start');
+            window.speechSynthesis.speak(utterance);
+          }, ETERNA_AVATAR_AUDIO_LEAD_IN_MS);
+        }, routeHandoffMs);
       } catch (e) {
         console.warn('[Eterna Voice] browser speech failed:', e);
         handleEnd();
@@ -933,12 +946,33 @@ export function useEternaVoice({
       speechRequestRef.current = controller;
       let fallbackStarted = false;
       let firstAudioTimedOut = false;
+      let pcmAudioScheduled = false;
+      let stopOutputWarmup: (() => void) | null = null;
+      let outputWarmupStopTimer: ReturnType<typeof setTimeout> | null = null;
+      const stopWarmupNow = () => {
+        if (outputWarmupStopTimer) {
+          clearTimeout(outputWarmupStopTimer);
+          outputWarmupStopTimer = null;
+        }
+        stopOutputWarmup?.();
+        stopOutputWarmup = null;
+      };
+      const stopWarmupAtPlayback = (delayMs: number) => {
+        if (!stopOutputWarmup || outputWarmupStopTimer) return;
+        outputWarmupStopTimer = setTimeout(stopWarmupNow, Math.max(0, delayMs));
+      };
       const firstAudioTimer = window.setTimeout(() => {
         firstAudioTimedOut = true;
         controller.abort();
       }, ETERNA_FIRST_AUDIO_TIMEOUT_MS);
 
       try {
+        // Keep the mobile speaker route active while Fish Audio generates the
+        // first bytes. This prevents the OS from switching late and swallowing
+        // the first words after SpeechRecognition releases the microphone.
+        const context = ensurePcmAudioContext();
+        await context.resume().catch(() => {});
+        stopOutputWarmup = startSilentAudioOutputWarmup(context);
         const response = await fetch('/api/voz', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -954,27 +988,32 @@ export function useEternaVoice({
           // Installed mobile apps and WebViews can close a retained context
           // during client-side navigation. A closed instance cannot schedule
           // the next property's audio, so always replace it before playback.
-          const context = ensurePcmAudioContext();
-          await context.resume().catch(() => {});
           await playPcmStream({
             response,
             context,
             signal: controller.signal,
             sources: pcmSourcesRef.current,
+            leadInMs: playbackLeadInMs,
             onFirstAudioScheduled: (activeContext, startAt) => {
+              pcmAudioScheduled = true;
               window.clearTimeout(firstAudioTimer);
               const markPcmPlaybackStarted = () => {
                 if (!speechSessionActiveRef.current) return;
                 pendingAudioUnlockRef.current = null;
-                setIsAvatarSpeaking(true);
                 clearAudibleStartTimer();
                 const delayMs = Math.max(0, Math.round((startAt - activeContext.currentTime) * 1_000));
+                stopWarmupAtPlayback(delayMs);
+                const avatarPreRollDelayMs = Math.max(0, delayMs - ETERNA_AVATAR_AUDIO_LEAD_IN_MS);
                 audibleStartTimerRef.current = setTimeout(() => {
-                  audibleStartTimerRef.current = null;
                   if (!speechSessionActiveRef.current || speechGeneration !== speechGenerationRef.current) return;
-                  markAudibleSpeechStarted();
-                  console.log(`[VOICE STATE] ${engine} PCM playback start`);
-                }, delayMs);
+                  setIsAvatarSpeaking(true);
+                  audibleStartTimerRef.current = setTimeout(() => {
+                    audibleStartTimerRef.current = null;
+                    if (!speechSessionActiveRef.current || speechGeneration !== speechGenerationRef.current) return;
+                    markAudibleSpeechStarted();
+                    console.log(`[VOICE STATE] ${engine} PCM playback start`);
+                  }, Math.min(ETERNA_AVATAR_AUDIO_LEAD_IN_MS, delayMs));
+                }, avatarPreRollDelayMs);
               };
 
               if (activeContext.state === 'running') {
@@ -1009,11 +1048,14 @@ export function useEternaVoice({
         if (fallbackStarted) return;
         fallbackStarted = true;
         pendingAudioUnlockRef.current = null;
+        stopWarmupNow();
+        stopPcmSources(pcmSourcesRef.current);
         console.warn(`[Eterna Voice] ${engine} unavailable, using browser fallback:`, error);
         addVoiceDebugLog(`[VOICE FALLBACK] ${engine}${firstAudioTimedOut ? ' timeout' : ''} -> browser`);
         playWithBrowser();
       } finally {
         window.clearTimeout(firstAudioTimer);
+        if (!pcmAudioScheduled) stopWarmupNow();
       }
     };
 

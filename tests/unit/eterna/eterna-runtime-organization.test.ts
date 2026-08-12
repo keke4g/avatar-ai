@@ -14,7 +14,13 @@ import {
   decodePcm16Le,
   parsePcm16LeSampleRate,
 } from '../../../lib/shared/pcm16';
-import { ETERNA_AVATAR_AUDIO_LEAD_IN_MS } from '../../../lib/eterna/voiceTiming';
+import {
+  ETERNA_AVATAR_AUDIO_LEAD_IN_MS,
+  ETERNA_MOBILE_MIC_TO_SPEAKER_HANDOFF_MS,
+  ETERNA_PCM_START_BUFFER_MS,
+  getEternaPlaybackLeadInMs,
+  hasEnoughEternaPcmStartupAudio,
+} from '../../../lib/eterna/voiceTiming';
 import { buildEternaSystemPrompt } from '../../../lib/eterna/systemPrompt';
 import {
   isTemporaryPropertyVisualSection,
@@ -79,6 +85,17 @@ test('construye un prompt actual, localizado y limitado a rutas reales', () => {
   assert.doesNotMatch(prompt.content, /El Wizard consta de 6/);
   assert.match(prompt.content, /3 o 4 oraciones breves/);
   assert.match(prompt.content, /UNA pregunta breve/);
+});
+
+test('protege el inicio de voz al pasar del micrófono al altavoz móvil', () => {
+  assert.equal(getEternaPlaybackLeadInMs({ afterRecognition: false, isMobile: true }), ETERNA_AVATAR_AUDIO_LEAD_IN_MS);
+  assert.equal(getEternaPlaybackLeadInMs({ afterRecognition: true, isMobile: false }), ETERNA_AVATAR_AUDIO_LEAD_IN_MS);
+  assert.equal(
+    getEternaPlaybackLeadInMs({ afterRecognition: true, isMobile: true }),
+    ETERNA_AVATAR_AUDIO_LEAD_IN_MS + ETERNA_MOBILE_MIC_TO_SPEAKER_HANDOFF_MS,
+  );
+  assert.equal(hasEnoughEternaPcmStartupAudio((ETERNA_PCM_START_BUFFER_MS - 1) / 1_000), false);
+  assert.equal(hasEnoughEternaPcmStartupAudio(ETERNA_PCM_START_BUFFER_MS / 1_000), true);
 });
 
 test('reutiliza contextos de audio móviles suspendidos pero reemplaza los cerrados', () => {

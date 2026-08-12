@@ -1,9 +1,12 @@
 import 'client-only';
 
 import { decodePcm16Le, parsePcm16LeSampleRate } from '@/lib/shared/pcm16';
-import { ETERNA_AVATAR_AUDIO_LEAD_IN_MS } from '@/lib/eterna/voiceTiming';
+import {
+  ETERNA_AVATAR_AUDIO_LEAD_IN_MS,
+  hasEnoughEternaPcmStartupAudio,
+} from '@/lib/eterna/voiceTiming';
 
-export const ETERNA_FIRST_AUDIO_TIMEOUT_MS = 3_500;
+export const ETERNA_FIRST_AUDIO_TIMEOUT_MS = 5_500;
 
 type WebkitWindow = typeof window & {
   webkitAudioContext?: typeof AudioContext;
@@ -14,6 +17,7 @@ export interface PcmStreamPlaybackOptions {
   context: AudioContext;
   signal: AbortSignal;
   sources: Set<AudioBufferSourceNode>;
+  leadInMs?: number;
   onFirstAudioScheduled: (context: AudioContext, startAt: number) => void;
   onPlaybackEnded: () => void;
 }
@@ -28,6 +32,33 @@ export function createBrowserAudioContext(): AudioContext {
   const AudioContextClass = window.AudioContext || (window as WebkitWindow).webkitAudioContext;
   if (!AudioContextClass) throw new Error('Web Audio no está disponible');
   return new AudioContextClass();
+}
+
+/** Keeps the mobile speaker route awake while the first Fish Audio bytes arrive. */
+export function startSilentAudioOutputWarmup(context: AudioContext): () => void {
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  gain.gain.value = 0;
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+
+  let stopped = false;
+  oscillator.onended = () => {
+    oscillator.disconnect();
+    gain.disconnect();
+  };
+  oscillator.start();
+
+  return () => {
+    if (stopped) return;
+    stopped = true;
+    try {
+      oscillator.stop();
+    } catch {
+      oscillator.disconnect();
+      gain.disconnect();
+    }
+  };
 }
 
 export function stopPcmSources(sources: Set<AudioBufferSourceNode>): void {
@@ -47,6 +78,7 @@ export async function playPcmStream({
   context,
   signal,
   sources,
+  leadInMs = ETERNA_AVATAR_AUDIO_LEAD_IN_MS,
   onFirstAudioScheduled,
   onPlaybackEnded,
 }: PcmStreamPlaybackOptions): Promise<void> {
@@ -57,16 +89,48 @@ export async function playPcmStream({
 
   const reader = response.body.getReader();
   let pendingByte: number | null = null;
-  let nextStartTime = context.currentTime + (ETERNA_AVATAR_AUDIO_LEAD_IN_MS / 1_000);
+  let nextStartTime: number | null = null;
   let scheduledSources = 0;
   let streamEnded = false;
   let firstAudioScheduled = false;
   let playbackEnded = false;
+  let bufferedDuration = 0;
+  let startupBuffered = false;
+  const startupBuffers: AudioBuffer[] = [];
 
   const finishIfReady = () => {
     if (playbackEnded || signal.aborted || !streamEnded || scheduledSources > 0) return;
     playbackEnded = true;
     onPlaybackEnded();
+  };
+
+  const scheduleBuffer = (audioBuffer: AudioBuffer) => {
+    const source = context.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(context.destination);
+    scheduledSources += 1;
+    sources.add(source);
+    source.onended = () => {
+      scheduledSources = Math.max(0, scheduledSources - 1);
+      sources.delete(source);
+      finishIfReady();
+    };
+
+    const earliestStartTime = nextStartTime ?? (context.currentTime + (leadInMs / 1_000));
+    const startAt = Math.max(earliestStartTime, context.currentTime + 0.02);
+    source.start(startAt);
+    nextStartTime = startAt + audioBuffer.duration;
+
+    if (!firstAudioScheduled) {
+      firstAudioScheduled = true;
+      onFirstAudioScheduled(context, startAt);
+    }
+  };
+
+  const flushStartupBuffers = () => {
+    if (startupBuffered || startupBuffers.length === 0) return;
+    startupBuffered = true;
+    startupBuffers.splice(0).forEach(scheduleBuffer);
   };
 
   while (!signal.aborted) {
@@ -89,28 +153,19 @@ export async function playPcmStream({
     const audioBuffer = context.createBuffer(1, samples.length, sampleRate);
     audioBuffer.getChannelData(0).set(samples);
 
-    const source = context.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(context.destination);
-    scheduledSources += 1;
-    sources.add(source);
-    source.onended = () => {
-      scheduledSources = Math.max(0, scheduledSources - 1);
-      sources.delete(source);
-      finishIfReady();
-    };
-
-    const startAt = Math.max(nextStartTime, context.currentTime + 0.02);
-    source.start(startAt);
-    nextStartTime = startAt + audioBuffer.duration;
-
-    if (!firstAudioScheduled) {
-      firstAudioScheduled = true;
-      onFirstAudioScheduled(context, startAt);
+    if (!startupBuffered) {
+      startupBuffers.push(audioBuffer);
+      bufferedDuration += audioBuffer.duration;
+      if (hasEnoughEternaPcmStartupAudio(bufferedDuration)) {
+        flushStartupBuffers();
+      }
+    } else {
+      scheduleBuffer(audioBuffer);
     }
   }
 
   if (signal.aborted) return;
+  flushStartupBuffers();
   if (!firstAudioScheduled) throw new Error('El stream PCM terminó sin audio');
 
   streamEnded = true;
