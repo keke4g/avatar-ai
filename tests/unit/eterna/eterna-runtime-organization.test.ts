@@ -20,6 +20,11 @@ import {
   isTemporaryPropertyVisualSection,
   resolvePropertyVisualSection,
 } from '../../../lib/eterna/propertyVisuals';
+import { isReusablePcmAudioContextState } from '../../../lib/eterna/audioContextPolicy';
+import {
+  ETERNA_PROPERTY_PRESENTATION_SILENT_HOLD_MS,
+  getPropertyPresentationCloseDelay,
+} from '../../../lib/eterna/propertyPresentationTiming';
 
 test('normaliza transcripciones y detecta ecos por tokens', () => {
   assert.equal(normalizeVoiceText('¡Casa en MÉXICO, por favor!'), 'casa en mexico por favor');
@@ -72,6 +77,30 @@ test('construye un prompt actual, localizado y limitado a rutas reales', () => {
   assert.match(prompt.content, /\/dashboard\?tab=properties/);
   assert.match(prompt.content, /"propertiesCount":2/);
   assert.doesNotMatch(prompt.content, /El Wizard consta de 6/);
+  assert.match(prompt.content, /3 o 4 oraciones breves/);
+  assert.match(prompt.content, /UNA pregunta breve/);
+});
+
+test('reutiliza contextos de audio móviles suspendidos pero reemplaza los cerrados', () => {
+  assert.equal(isReusablePcmAudioContextState('running'), true);
+  assert.equal(isReusablePcmAudioContextState('suspended'), true);
+  assert.equal(isReusablePcmAudioContextState('closed'), false);
+  assert.equal(isReusablePcmAudioContextState(null), false);
+});
+
+test('mantiene visible el resumen si la narración no llegó a iniciar', () => {
+  assert.equal(getPropertyPresentationCloseDelay({
+    audibleSpeechStartedAt: null,
+    endedAt: 8_000,
+  }), ETERNA_PROPERTY_PRESENTATION_SILENT_HOLD_MS);
+  assert.equal(getPropertyPresentationCloseDelay({
+    audibleSpeechStartedAt: 1_000,
+    endedAt: 2_000,
+  }), 3_500);
+  assert.equal(getPropertyPresentationCloseDelay({
+    audibleSpeechStartedAt: 1_000,
+    endedAt: 8_000,
+  }), 0);
 });
 
 test('traduce preguntas de la ficha en secciones visuales deterministas', () => {

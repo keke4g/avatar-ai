@@ -74,6 +74,7 @@ import {
 } from '@/lib/eterna/events';
 import { resolvePropertyVisualSection } from '@/lib/eterna/propertyVisuals';
 import { buildEternaSystemPrompt } from '@/lib/eterna/systemPrompt';
+import { getPropertyPresentationCloseDelay } from '@/lib/eterna/propertyPresentationTiming';
 import {
   determineOfferingMode,
   determineOperation,
@@ -706,12 +707,29 @@ export default function EternaConcierge() {
         language === 'es' ? 'es' : 'en',
         visitVariant,
       );
+      let audibleSpeechStartedAt: number | null = null;
       const finishPresentation = () => {
         if (lastPropertySummaryRef.current !== presentationKey) return;
         clearPropertyPresentationTimers();
         closePropertyVisual(activeProperty.id, 'summary');
         setIsCompact(false);
         setPropertyPresentation(null);
+      };
+      const finishAfterSpeechAttempt = () => {
+        if (lastPropertySummaryRef.current !== presentationKey) return;
+
+        const delayMs = getPropertyPresentationCloseDelay({
+          audibleSpeechStartedAt,
+          endedAt: Date.now(),
+        });
+
+        // `speak` also ends when both audio engines are unavailable. In that
+        // case keep the visual summary readable instead of closing it as if a
+        // narration had completed successfully.
+        if (propertyPresentationSafetyTimerRef.current) {
+          clearTimeout(propertyPresentationSafetyTimerRef.current);
+        }
+        propertyPresentationSafetyTimerRef.current = setTimeout(finishPresentation, delayMs);
       };
 
       dispatchPropertyVisual(activeProperty.id, 'summary');
@@ -727,7 +745,11 @@ export default function EternaConcierge() {
       ));
 
       propertyPresentationStartTimerRef.current = setTimeout(() => {
-        speak(presentation.speech, finishPresentation);
+        speak(presentation.speech, finishAfterSpeechAttempt, {
+          onStart: () => {
+            audibleSpeechStartedAt = Date.now();
+          },
+        });
       }, 650);
 
       // Browser speech events are not perfectly reliable. Never leave the
@@ -2027,11 +2049,11 @@ Explore actualizado: Redirecting to /explore`);
       const hasVideo = activePropertyVideos.length > 0;
       const videoReply = hasVideo
         ? (language === 'es'
-            ? 'Abrí el video de la propiedad en pantalla completa. Puedes reproducirlo y cerrar el visor cuando quieras. ¿Quieres que después revisemos la ubicación?'
-            : 'I opened the property video in the full-screen viewer. You can play it and close the viewer whenever you want. Would you like to review the location afterward?')
+            ? `Abrí el video de la propiedad en pantalla completa. El expediente incluye ${activePropertyVideos.length === 1 ? 'un recorrido publicado' : `${activePropertyVideos.length} recorridos publicados`} para que observes mejor la distribución y los acabados. Puedes reproducirlo y cerrar el visor cuando quieras. ¿Quieres que después revisemos la ubicación o las amenidades?`
+            : `I opened the property video in the full-screen viewer. The listing includes ${activePropertyVideos.length === 1 ? 'one published tour' : `${activePropertyVideos.length} published tours`} so you can examine the layout and finishes more closely. You can play it and close the viewer whenever you want. Would you like to review the location or amenities afterward?`)
         : (language === 'es'
-            ? 'Esta propiedad no tiene videos publicados por ahora. Puedo mostrarte la galería de fotos o la ubicación. ¿Cuál prefieres?'
-            : 'This property does not have any published videos yet. I can show you the photo gallery or the location. Which would you prefer?');
+            ? 'Esta propiedad no tiene videos publicados por ahora. La galería de fotografías sí permite revisar sus espacios y acabados, y el mapa muestra el entorno disponible. Puedo abrir cualquiera de esas dos secciones sin perder esta conversación. ¿Prefieres ver las fotos o la ubicación?'
+            : 'This property does not have any published videos yet. Its photo gallery still lets you review the spaces and finishes, while the map shows the available neighborhood context. I can open either section without losing this conversation. Would you prefer the photos or the location?');
 
       setThinkingContext('property_detail');
       setChatHistory((previous) => [...previous, {
@@ -2061,9 +2083,17 @@ Explore actualizado: Redirecting to /explore`);
     );
 
     if (activeProperty && requestsLocationExperience) {
+      const nearbyHighlights = selectEternaNearbyHighlights(activeProperty.nearbyPlaces || []).slice(0, 2);
+      const nearbySentence = nearbyHighlights.length > 0
+        ? (language === 'es'
+            ? `Como referencias verificadas aparecen ${nearbyHighlights.map((place) => `${place.name}, a ${place.drivingMinutes} ${place.drivingMinutes === 1 ? 'minuto' : 'minutos'} en auto`).join(', y ')}.`
+            : `Verified nearby references include ${nearbyHighlights.map((place) => `${place.name}, ${place.drivingMinutes} ${place.drivingMinutes === 1 ? 'minute' : 'minutes'} by car`).join(', and ')}.`)
+        : (language === 'es'
+            ? 'El mapa conserva la ubicación publicada y permite explorar visualmente el entorno disponible.'
+            : 'The map preserves the published location and lets you explore the available neighborhood context visually.');
       const locationReply = language === 'es'
-        ? 'Abrí el mapa de la propiedad con los lugares cercanos y sus tiempos de traslado. ¿Quieres que revisemos algún punto del entorno en particular?'
-        : 'I opened the property map with nearby places and travel times. Would you like to review a specific place in the area?';
+        ? `Abrí el mapa de la propiedad con los lugares cercanos y sus tiempos de traslado. ${nearbySentence} Así puedes valorar la conectividad de la zona sin salir de la ficha. ¿Quieres que revisemos escuelas, servicios o algún punto del entorno en particular?`
+        : `I opened the property map with nearby places and travel times. ${nearbySentence} This lets you assess the area's connectivity without leaving the listing. Would you like to review schools, services, or a specific nearby place?`;
       setThinkingContext('property_detail');
       setChatHistory((previous) => [...previous, {
         role: 'assistant',
@@ -2187,38 +2217,41 @@ Explore actualizado: Redirecting to /explore`);
         setThinkingContext(activeProperty ? 'property_detail' : 'general');
         setSimulatedStatus('thinking');
 
-        const pageContext = captureEternaPageSnapshot({
-          route: liveContext.currentUrl,
-          dashboard: liveContext.dashboard,
-          wizard: liveContext.wizard,
-          explore: liveContext.explore,
-          exploreCatalog: activeSearch
-            ? {
-                filters: activeSearch.filters,
-                results: activeSearch.results.slice(0, 12).map((property) => {
-                  const price = getPropertyPriceSnapshot(property, activeSearch.filters.operation);
-                  return {
-                    id: property.id,
-                    title: property.title,
-                    type: property.type,
-                    location: property.location,
-                    city: property.city,
-                    operation: property.primaryOperation,
-                    priceAmount: price?.amount ?? null,
-                    currency: price?.currency ?? null,
-                    offeringMode: price?.mode ?? null,
-                    billingPeriod: price?.billingPeriod ?? null,
-                  };
-                }),
-              }
-            : null,
-          propertyPage: liveContext.propertyPage,
-          auth: liveContext.auth,
-          activeGuidedFlow: liveContext.eterna.activeGuidedFlow,
-          accountSummary: contextBridgeJSON,
-          currentPropertyDossier: activePropertyDossier,
-          currentSearchMemory: conversationalSession.memory,
-        });
+        const pageContext = {
+          ...captureEternaPageSnapshot({
+            route: liveContext.currentUrl,
+            dashboard: liveContext.dashboard,
+            wizard: liveContext.wizard,
+            explore: liveContext.explore,
+            exploreCatalog: activeSearch
+              ? {
+                  filters: activeSearch.filters,
+                  results: activeSearch.results.slice(0, 12).map((property) => {
+                    const price = getPropertyPriceSnapshot(property, activeSearch.filters.operation);
+                    return {
+                      id: property.id,
+                      title: property.title,
+                      type: property.type,
+                      location: property.location,
+                      city: property.city,
+                      operation: property.primaryOperation,
+                      priceAmount: price?.amount ?? null,
+                      currency: price?.currency ?? null,
+                      offeringMode: price?.mode ?? null,
+                      billingPeriod: price?.billingPeriod ?? null,
+                    };
+                  }),
+                }
+              : null,
+            propertyPage: liveContext.propertyPage,
+            auth: liveContext.auth,
+            activeGuidedFlow: liveContext.eterna.activeGuidedFlow,
+            accountSummary: contextBridgeJSON,
+            currentPropertyDossier: activePropertyDossier,
+            currentSearchMemory: conversationalSession.memory,
+          }),
+          requestedPropertyVisualSection: requestedVisualSection,
+        };
         const rawPageDecision = await requestPageAgentResponse(prompt, pageContext);
         const continuationContext = activeProperty
           ? 'property'

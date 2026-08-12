@@ -8,6 +8,7 @@ type RefCell<T> = { current: T };
 
 interface UseVoiceSessionLifecycleOptions {
   pendingAudioUnlockRef: RefCell<(() => void) | null>;
+  prepareAudioPlayback: () => void;
   speechGenerationRef: RefCell<number>;
   speechOutputGuardRef: RefCell<boolean>;
   speechCooldownUntilRef: RefCell<number>;
@@ -35,6 +36,7 @@ function abortSpeechRequest(speechRequestRef: RefCell<AbortController | null>): 
 
 export function useVoiceSessionLifecycle({
   pendingAudioUnlockRef,
+  prepareAudioPlayback,
   speechGenerationRef,
   speechOutputGuardRef,
   speechCooldownUntilRef,
@@ -50,6 +52,11 @@ export function useVoiceSessionLifecycle({
     if (typeof document === 'undefined') return;
 
     const unlockPendingAudio = () => {
+      // Mobile browsers grant Web Audio playback from a user gesture. Prime
+      // the retained context on every real interaction so a property summary
+      // requested after client-side navigation can still start once Fish
+      // Audio begins streaming.
+      prepareAudioPlayback();
       const pendingPlayback = pendingAudioUnlockRef.current;
       if (!pendingPlayback) return;
 
@@ -66,7 +73,7 @@ export function useVoiceSessionLifecycle({
       document.removeEventListener('touchstart', unlockPendingAudio, true);
       document.removeEventListener('keydown', unlockPendingAudio, true);
     };
-  }, [pendingAudioUnlockRef]);
+  }, [pendingAudioUnlockRef, prepareAudioPlayback]);
 
   useEffect(() => {
     const pcmSources = pcmSourcesRef.current;

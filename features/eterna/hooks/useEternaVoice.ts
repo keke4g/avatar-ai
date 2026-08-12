@@ -22,6 +22,7 @@ import {
   stopPcmSources,
 } from '@/features/eterna/audio/pcmStreamPlayer';
 import { ETERNA_AVATAR_AUDIO_LEAD_IN_MS } from '@/lib/eterna/voiceTiming';
+import { isReusablePcmAudioContextState } from '@/lib/eterna/audioContextPolicy';
 import {
   normalizeVoiceText,
   type SpeechRecognitionConstructor,
@@ -179,6 +180,33 @@ export function useEternaVoice({
     voiceStateRef.current = newState;
     console.log(`[VOICE STATE] ${newState.toUpperCase()}`);
   }, []);
+
+  const ensurePcmAudioContext = useCallback((): AudioContext => {
+    const currentContext = pcmAudioContextRef.current;
+    if (currentContext && isReusablePcmAudioContextState(currentContext.state)) return currentContext;
+
+    const replacementContext = createBrowserAudioContext();
+    pcmAudioContextRef.current = replacementContext;
+    addVoiceDebugLog(`[AUDIO CONTEXT] created in ${replacementContext.state} state`);
+    return replacementContext;
+  }, []);
+
+  const preparePcmAudioPlayback = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const context = ensurePcmAudioContext();
+      if (context.state === 'running') return;
+
+      void context.resume()
+        .then(() => addVoiceDebugLog(`[AUDIO CONTEXT] gesture resume -> ${context.state}`))
+        .catch((error) => {
+          addVoiceDebugLog(`[AUDIO CONTEXT] gesture resume failed: ${error instanceof Error ? error.message : String(error)}`);
+        });
+    } catch (error) {
+      addVoiceDebugLog(`[AUDIO CONTEXT] gesture preparation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [ensurePcmAudioContext]);
 
   const clearAudibleStartTimer = useCallback(() => {
     if (!audibleStartTimerRef.current) return;
@@ -923,8 +951,10 @@ export function useEternaVoice({
         if (!response.ok) throw new Error(`Voice engine ${engine} returned ${response.status}`);
 
         if (getPcmSampleRate(response)) {
-          const context = pcmAudioContextRef.current || createBrowserAudioContext();
-          pcmAudioContextRef.current = context;
+          // Installed mobile apps and WebViews can close a retained context
+          // during client-side navigation. A closed instance cannot schedule
+          // the next property's audio, so always replace it before playback.
+          const context = ensurePcmAudioContext();
           await context.resume().catch(() => {});
           await playPcmStream({
             response,
@@ -1003,7 +1033,7 @@ export function useEternaVoice({
     } else {
       startSelectedEngine();
     }
-  }, [clearAudibleStartTimer, clearRecognitionRestartTimer, enterListeningState, startBargeInMonitoring, stopBargeInMonitoring, transitionToState]);
+  }, [clearAudibleStartTimer, clearRecognitionRestartTimer, ensurePcmAudioContext, enterListeningState, startBargeInMonitoring, stopBargeInMonitoring, transitionToState]);
 
   const interruptEterna = useCallback(() => {
     clearAudibleStartTimer();
@@ -1066,6 +1096,7 @@ export function useEternaVoice({
     voiceModeRef.current = true; // Synchronously update ref to avoid React state batching delays
     stopBargeInMonitoring(true);
     primeBargeInAudioContext();
+    preparePcmAudioPlayback();
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
@@ -1110,7 +1141,7 @@ export function useEternaVoice({
     }
     addVoiceDebugLog(`startConversationMode completed. voiceMode after: ${voiceModeRef.current}`);
     console.log("[MOBILE TAP] startConversationMode after: voiceMode =", voiceModeRef.current);
-  }, [clearAudibleStartTimer, clearRecognitionRestartTimer, ensureMicrophoneCapture, language, loggedSetVoiceMode, primeBargeInAudioContext, releaseMicrophoneCapture, scheduleRecognitionRestart, setChatHistory, stopBargeInMonitoring]);
+  }, [clearAudibleStartTimer, clearRecognitionRestartTimer, ensureMicrophoneCapture, language, loggedSetVoiceMode, preparePcmAudioPlayback, primeBargeInAudioContext, releaseMicrophoneCapture, scheduleRecognitionRestart, setChatHistory, stopBargeInMonitoring]);
 
   const stopConversationMode = useCallback(() => {
     clearAudibleStartTimer();
@@ -1243,6 +1274,7 @@ export function useEternaVoice({
 
   useVoiceSessionLifecycle({
     pendingAudioUnlockRef,
+    prepareAudioPlayback: preparePcmAudioPlayback,
     speechGenerationRef,
     speechOutputGuardRef,
     speechCooldownUntilRef,
