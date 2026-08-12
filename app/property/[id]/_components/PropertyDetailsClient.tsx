@@ -53,9 +53,9 @@ import {
 import { PropertyGalleryHero } from '@/features/properties/property-details/gallery/PropertyGalleryHero';
 import { PropertyGalleryModal } from '@/features/properties/property-details/gallery/PropertyGalleryModal';
 import { usePropertyGallery } from '@/features/properties/property-details/gallery/usePropertyGallery';
-import { PropertyLocationModal } from '@/features/properties/property-details/location/PropertyLocationModal';
 import { PropertyLocationSection } from '@/features/properties/property-details/location/PropertyLocationSection';
-import { usePropertyLocationModal } from '@/features/properties/property-details/location/usePropertyLocationModal';
+import { PropertyEternaVisualPanel } from '@/features/properties/property-details/eterna/PropertyEternaVisualPanel';
+import { usePropertyEternaVisual } from '@/features/properties/property-details/eterna/usePropertyEternaVisual';
 import { buildPresentationValuation } from '@/features/properties/property-details/propertyValuation';
 import {
   RentalTermCardGrid,
@@ -96,7 +96,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
   const gallery = usePropertyGallery(property);
   const galleryMediaItems = gallery.mediaItems;
   const openGallery = gallery.openGallery;
-  const locationModal = usePropertyLocationModal(id);
+  const eternaVisual = usePropertyEternaVisual(id);
 
   useEffect(() => {
     const handleOpenPropertyVideo = (event: Event) => {
@@ -1924,14 +1924,17 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
         )}
       </AnimatePresence>
 
-      {/* Eterna location experience: map and nearby places without losing page context. */}
-      <PropertyLocationModal
-        controller={locationModal}
+      {/* One visual canvas for every property question Eterna can answer. */}
+      <PropertyEternaVisualPanel
+        activeSection={eternaVisual.activeSection}
         property={property}
+        valuation={presentationValuation}
         places={nearby.data?.places}
         loading={nearby.loading}
         error={nearby.error}
         language={language}
+        onClose={eternaVisual.close}
+        onOpenGallery={openGallery}
       />
       {/* Premium Lightbox Gallery Modal */}
       <PropertyGalleryModal controller={gallery} language={language} property={property} />

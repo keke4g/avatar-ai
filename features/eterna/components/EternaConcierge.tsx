@@ -65,9 +65,12 @@ import {
   getConversationSuggestions,
 } from '@/lib/eterna/conversationContinuity';
 import {
-  ETERNA_OPEN_PROPERTY_LOCATION_EVENT,
+  ETERNA_CLOSE_PROPERTY_VISUAL_EVENT,
   ETERNA_OPEN_PROPERTY_VIDEO_EVENT,
+  ETERNA_SHOW_PROPERTY_VISUAL_EVENT,
+  type EternaPropertyVisualSection,
 } from '@/lib/eterna/events';
+import { resolvePropertyVisualSection } from '@/lib/eterna/propertyVisuals';
 import { buildEternaSystemPrompt } from '@/lib/eterna/systemPrompt';
 import {
   determineOfferingMode,
@@ -92,6 +95,24 @@ type ThinkingContext = 'property_search' | 'property_detail' | 'publish_property
 const ETERNA_CONVERSATION_SESSION_KEY = 'eterna_conversation_session_v2';
 const ETERNA_HOME_INTRO_SESSION_KEY = 'eterna_home_intro_v4';
 const ETERNA_PROPERTY_VISIT_PREFIX = 'eterna_property_visit_v1';
+
+const dispatchPropertyVisual = (
+  propertyId: string,
+  section: EternaPropertyVisualSection,
+) => {
+  window.dispatchEvent(new CustomEvent(ETERNA_SHOW_PROPERTY_VISUAL_EVENT, {
+    detail: { propertyId, section },
+  }));
+};
+
+const closePropertyVisual = (
+  propertyId: string,
+  section?: EternaPropertyVisualSection,
+) => {
+  window.dispatchEvent(new CustomEvent(ETERNA_CLOSE_PROPERTY_VISUAL_EVENT, {
+    detail: { propertyId, section },
+  }));
+};
 
 export default function EternaConcierge() {
   const pathname = usePathname();
@@ -656,15 +677,17 @@ export default function EternaConcierge() {
       const finishPresentation = () => {
         if (lastPropertySummaryRef.current !== presentationKey) return;
         clearPropertyPresentationTimers();
+        closePropertyVisual(activeProperty.id, 'summary');
         setIsCompact(false);
         setPropertyPresentation(null);
       };
 
+      dispatchPropertyVisual(activeProperty.id, 'summary');
       setPropertyPresentation(presentation);
       setConciergeMode('avatar');
       setShowTooltip(false);
       setIsCompact(false);
-      setIsOpen(true);
+      setIsOpen(window.matchMedia('(min-width: 768px)').matches);
       setChatHistory((previous) => (
         previous.some((message) => message.role === 'assistant' && message.content === presentation.speech)
           ? previous
@@ -1547,10 +1570,10 @@ Explore actualizado: Redirecting to /explore`);
 
     if (action.type === 'open_property_location') {
       if (!liveContext.property) return { status: 'not_found' as const, target: 'property location' };
-      window.dispatchEvent(new CustomEvent(ETERNA_OPEN_PROPERTY_LOCATION_EVENT, {
-        detail: { propertyId: liveContext.property.id },
-      }));
-      setIsOpen(false);
+      dispatchPropertyVisual(liveContext.property.id, 'location');
+      setConciergeMode('avatar');
+      setIsCompact(false);
+      setIsOpen(window.matchMedia('(min-width: 768px)').matches);
       return { status: 'completed' as const, target: 'property location' };
     }
 
@@ -1594,6 +1617,8 @@ Explore actualizado: Redirecting to /explore`);
     router,
     searchParams,
     setActiveGuidedFlow,
+    setConciergeMode,
+    setIsCompact,
     setIsOpen,
   ]);
 
@@ -1709,6 +1734,22 @@ Explore actualizado: Redirecting to /explore`);
       ['VIDEO', 'YOUTUBE', 'VIMEO', 'DRONE'].includes(media.mediaType)
     )) || [];
     const currentPropertyId = activeProperty?.id || liveContext.propertyPage?.propertyId || null;
+
+    // Property answers should be visible as well as spoken. This local router
+    // opens the matching evidence panel immediately, before any network/model
+    // response completes. Only the summary is dismissed when speech ends.
+    const requestedVisualSection = activeProperty
+      ? resolvePropertyVisualSection(prompt, [
+          ...(activeProperty.amenities || []),
+          ...((activeProperty.metadata?.customAmenities as string[] | undefined) || []),
+        ])
+      : null;
+    if (activeProperty && requestedVisualSection) {
+      dispatchPropertyVisual(activeProperty.id, requestedVisualSection);
+      setConciergeMode('avatar');
+      setIsCompact(false);
+      setIsOpen(window.matchMedia('(min-width: 768px)').matches);
+    }
 
     const activePropertyTitle = activeProperty
       ? t(`properties.${activeProperty.id}.title`, undefined, activeProperty.title)
@@ -2000,10 +2041,10 @@ Explore actualizado: Redirecting to /explore`);
           : ['Nearby hospitals', 'Nearby schools', 'Nearby supermarkets'],
       }]);
       setSimulatedStatus('talking');
-      window.dispatchEvent(new CustomEvent(ETERNA_OPEN_PROPERTY_LOCATION_EVENT, {
-        detail: { propertyId: activeProperty.id },
-      }));
-      setIsOpen(false);
+      dispatchPropertyVisual(activeProperty.id, 'location');
+      setConciergeMode('avatar');
+      setIsCompact(false);
+      setIsOpen(window.matchMedia('(min-width: 768px)').matches);
       speak(locationReply, () => setSimulatedStatus('idle'));
       return;
     }

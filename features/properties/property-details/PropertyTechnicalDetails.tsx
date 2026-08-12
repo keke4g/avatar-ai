@@ -13,6 +13,7 @@ interface SpecFieldConfig {
 interface PropertyTechnicalDetailsProps {
   property: Property;
   language: LanguageType;
+  expanded?: boolean;
 }
 
 const SPEC_FIELDS: SpecFieldConfig[] = [
@@ -89,6 +90,7 @@ function buildRows(property: Property, fields: SpecFieldConfig[], language: Lang
 export const PropertyTechnicalDetails = memo(function PropertyTechnicalDetails({
   property,
   language,
+  expanded = false,
 }: PropertyTechnicalDetailsProps) {
   const groups = [
     {
@@ -116,7 +118,7 @@ export const PropertyTechnicalDetails = memo(function PropertyTechnicalDetails({
   const detailCount = groups.reduce((total, group) => total + group.rows.length, 0);
 
   return (
-    <details className="group overflow-hidden rounded-[28px] border border-neutral-200/80 bg-white shadow-[0_22px_55px_-42px_rgba(15,23,42,0.55)]">
+    <details open={expanded || undefined} className="group overflow-hidden rounded-[28px] border border-neutral-200/80 bg-white shadow-[0_22px_55px_-42px_rgba(15,23,42,0.55)]">
       <summary className="flex min-h-[88px] cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:content-none sm:px-6 [&::-webkit-details-marker]:hidden">
         <span className="flex min-w-0 items-center gap-3.5">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-neutral-950 text-white shadow-[0_12px_24px_-16px_rgba(0,0,0,0.95)]">

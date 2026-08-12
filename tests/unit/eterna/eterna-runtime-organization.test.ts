@@ -16,6 +16,10 @@ import {
 } from '../../../lib/shared/pcm16';
 import { ETERNA_AVATAR_AUDIO_LEAD_IN_MS } from '../../../lib/eterna/voiceTiming';
 import { buildEternaSystemPrompt } from '../../../lib/eterna/systemPrompt';
+import {
+  isTemporaryPropertyVisualSection,
+  resolvePropertyVisualSection,
+} from '../../../lib/eterna/propertyVisuals';
 
 test('normaliza transcripciones y detecta ecos por tokens', () => {
   assert.equal(normalizeVoiceText('¡Casa en MÉXICO, por favor!'), 'casa en mexico por favor');
@@ -68,4 +72,22 @@ test('construye un prompt actual, localizado y limitado a rutas reales', () => {
   assert.match(prompt.content, /\/dashboard\?tab=properties/);
   assert.match(prompt.content, /"propertiesCount":2/);
   assert.doesNotMatch(prompt.content, /El Wizard consta de 6/);
+});
+
+test('traduce preguntas de la ficha en secciones visuales deterministas', () => {
+  assert.equal(resolvePropertyVisualSection('Dime las amenidades y si tiene alberca'), 'amenities');
+  assert.equal(resolvePropertyVisualSection('Muéstrame el mapa y qué hay cerca'), 'location');
+  assert.equal(resolvePropertyVisualSection('Explícame la estimación y sus comparables'), 'valuation');
+  assert.equal(resolvePropertyVisualSection('¿Cuánto cuesta y es negociable?'), 'commercial');
+  assert.equal(resolvePropertyVisualSection('¿Cuántos metros cuadrados tiene?'), 'technical');
+  assert.equal(resolvePropertyVisualSection('¿Tiene cuarto de servicio?', ['Cuarto de servicio']), 'amenities');
+  assert.equal(resolvePropertyVisualSection('Hazme un resumen en pocas palabras'), 'summary');
+  assert.equal(resolvePropertyVisualSection('Buenos días'), null);
+});
+
+test('el resumen es la única experiencia visual temporal', () => {
+  assert.equal(isTemporaryPropertyVisualSection('summary'), true);
+  assert.equal(isTemporaryPropertyVisualSection('amenities'), false);
+  assert.equal(isTemporaryPropertyVisualSection('location'), false);
+  assert.equal(isTemporaryPropertyVisualSection('commercial'), false);
 });
