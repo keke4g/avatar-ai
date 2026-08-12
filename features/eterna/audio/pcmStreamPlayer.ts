@@ -34,33 +34,6 @@ export function createBrowserAudioContext(): AudioContext {
   return new AudioContextClass();
 }
 
-/** Keeps the mobile speaker route awake while the first Fish Audio bytes arrive. */
-export function startSilentAudioOutputWarmup(context: AudioContext): () => void {
-  const oscillator = context.createOscillator();
-  const gain = context.createGain();
-  gain.gain.value = 0;
-  oscillator.connect(gain);
-  gain.connect(context.destination);
-
-  let stopped = false;
-  oscillator.onended = () => {
-    oscillator.disconnect();
-    gain.disconnect();
-  };
-  oscillator.start();
-
-  return () => {
-    if (stopped) return;
-    stopped = true;
-    try {
-      oscillator.stop();
-    } catch {
-      oscillator.disconnect();
-      gain.disconnect();
-    }
-  };
-}
-
 export function stopPcmSources(sources: Set<AudioBufferSourceNode>): void {
   sources.forEach((source) => {
     source.onended = null;

@@ -19,12 +19,12 @@ import {
   ETERNA_FIRST_AUDIO_TIMEOUT_MS,
   getPcmSampleRate,
   playPcmStream,
-  startSilentAudioOutputWarmup,
   stopPcmSources,
 } from '@/features/eterna/audio/pcmStreamPlayer';
 import {
   ETERNA_AVATAR_AUDIO_LEAD_IN_MS,
   getEternaPlaybackLeadInMs,
+  shouldUseAutomaticBargeIn,
 } from '@/lib/eterna/voiceTiming';
 import { isReusablePcmAudioContextState } from '@/lib/eterna/audioContextPolicy';
 import {
@@ -67,6 +67,31 @@ export interface ChatMessage {
 }
 
 const POST_SPEECH_MIC_COOLDOWN_MS = 850;
+
+type NavigatorWithAudioSession = Navigator & {
+  audioSession?: {
+    type: 'auto' | 'playback' | 'play-and-record';
+  };
+};
+
+const isMobileVoiceRuntime = (): boolean => (
+  typeof window !== 'undefined'
+  && window.matchMedia('(max-width: 1023px), (pointer: coarse)').matches
+);
+
+const setMobileAudioSession = (type: 'playback' | 'play-and-record'): void => {
+  if (typeof navigator === 'undefined') return;
+  const audioSession = (navigator as NavigatorWithAudioSession).audioSession;
+  if (!audioSession) return;
+
+  try {
+    audioSession.type = type;
+    addVoiceDebugLog(`[AUDIO SESSION] ${type}`);
+  } catch {
+    // Audio Session is still experimental. The Web Audio path remains valid
+    // when a browser exposes a partial or read-only implementation.
+  }
+};
 
 interface UseEternaVoiceProps {
   language: 'es' | 'en';
@@ -422,6 +447,16 @@ export function useEternaVoice({
       return;
     }
 
+    // Opening a second microphone capture while PCM is playing makes Android
+    // move Bluetooth headsets into the call profile. On affected devices the
+    // first words come from the phone and the rest jump to the headset. Mobile
+    // keeps the explicit Interrumpir button; automatic voice barge-in remains
+    // available on desktop where the output route is stable.
+    if (!shouldUseAutomaticBargeIn(isMobileVoiceRuntime())) {
+      addVoiceDebugLog('[BARGE-IN] automático omitido en móvil para conservar la salida Bluetooth');
+      return;
+    }
+
     const context = primeBargeInAudioContext();
     if (!context) {
       addVoiceDebugLog('[BARGE-IN] Web Audio no disponible; se conserva el botón Interrumpir');
@@ -582,6 +617,7 @@ export function useEternaVoice({
     if (!recognitionActiveRef.current && !recognitionStartPendingRef.current) {
       recognitionStartPendingRef.current = true;
       try {
+        setMobileAudioSession('play-and-record');
         // Web Speech does not consume microphoneStreamRef. Keeping that
         // independent MediaStream alive competes with Android's recognition
         // service for the same input on physical devices.
@@ -699,7 +735,7 @@ export function useEternaVoice({
 
     // Check if recognition is running
     const wasRecognitionActive = Boolean(recognitionRef.current && recognitionActiveRef.current);
-    const isMobileAudioHandoff = window.matchMedia('(max-width: 1023px), (pointer: coarse)').matches;
+    const isMobileAudioHandoff = isMobileVoiceRuntime();
     const playbackLeadInMs = getEternaPlaybackLeadInMs({
       afterRecognition: wasRecognitionActive,
       isMobile: isMobileAudioHandoff,
@@ -909,6 +945,7 @@ export function useEternaVoice({
       }
 
       try {
+        setMobileAudioSession('playback');
         const utterance = new SpeechSynthesisUtterance(speechText);
         if (selectedVoiceRef.current) {
           utterance.voice = selectedVoiceRef.current;
@@ -946,33 +983,18 @@ export function useEternaVoice({
       speechRequestRef.current = controller;
       let fallbackStarted = false;
       let firstAudioTimedOut = false;
-      let pcmAudioScheduled = false;
-      let stopOutputWarmup: (() => void) | null = null;
-      let outputWarmupStopTimer: ReturnType<typeof setTimeout> | null = null;
-      const stopWarmupNow = () => {
-        if (outputWarmupStopTimer) {
-          clearTimeout(outputWarmupStopTimer);
-          outputWarmupStopTimer = null;
-        }
-        stopOutputWarmup?.();
-        stopOutputWarmup = null;
-      };
-      const stopWarmupAtPlayback = (delayMs: number) => {
-        if (!stopOutputWarmup || outputWarmupStopTimer) return;
-        outputWarmupStopTimer = setTimeout(stopWarmupNow, Math.max(0, delayMs));
-      };
       const firstAudioTimer = window.setTimeout(() => {
         firstAudioTimedOut = true;
         controller.abort();
       }, ETERNA_FIRST_AUDIO_TIMEOUT_MS);
 
       try {
-        // Keep the mobile speaker route active while Fish Audio generates the
-        // first bytes. This prevents the OS from switching late and swallowing
-        // the first words after SpeechRecognition releases the microphone.
+        // Select a media-playback session without generating a silent signal.
+        // A zero-gain oscillator still opens a physical Android output route
+        // and was responsible for the phone-speaker -> Bluetooth transition.
+        setMobileAudioSession('playback');
         const context = ensurePcmAudioContext();
         await context.resume().catch(() => {});
-        stopOutputWarmup = startSilentAudioOutputWarmup(context);
         const response = await fetch('/api/voz', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -995,14 +1017,12 @@ export function useEternaVoice({
             sources: pcmSourcesRef.current,
             leadInMs: playbackLeadInMs,
             onFirstAudioScheduled: (activeContext, startAt) => {
-              pcmAudioScheduled = true;
               window.clearTimeout(firstAudioTimer);
               const markPcmPlaybackStarted = () => {
                 if (!speechSessionActiveRef.current) return;
                 pendingAudioUnlockRef.current = null;
                 clearAudibleStartTimer();
                 const delayMs = Math.max(0, Math.round((startAt - activeContext.currentTime) * 1_000));
-                stopWarmupAtPlayback(delayMs);
                 const avatarPreRollDelayMs = Math.max(0, delayMs - ETERNA_AVATAR_AUDIO_LEAD_IN_MS);
                 audibleStartTimerRef.current = setTimeout(() => {
                   if (!speechSessionActiveRef.current || speechGeneration !== speechGenerationRef.current) return;
@@ -1048,14 +1068,12 @@ export function useEternaVoice({
         if (fallbackStarted) return;
         fallbackStarted = true;
         pendingAudioUnlockRef.current = null;
-        stopWarmupNow();
         stopPcmSources(pcmSourcesRef.current);
         console.warn(`[Eterna Voice] ${engine} unavailable, using browser fallback:`, error);
         addVoiceDebugLog(`[VOICE FALLBACK] ${engine}${firstAudioTimedOut ? ' timeout' : ''} -> browser`);
         playWithBrowser();
       } finally {
         window.clearTimeout(firstAudioTimer);
-        if (!pcmAudioScheduled) stopWarmupNow();
       }
     };
 

@@ -81,6 +81,7 @@ import {
   determinePropertyType,
 } from '@/lib/eterna/searchIntentResolution';
 import { resolveCatalogPriceRequest } from '@/lib/eterna/actions/CatalogPriceActions';
+import { resolvePropertyVisualAnswer } from '@/lib/eterna/actions/PropertyVisualActions';
 // ────────────────────────────────────────────────
 // MAIN COMPONENT
 // ────────────────────────────────────────────────
@@ -2205,6 +2206,32 @@ Explore actualizado: Redirecting to /explore`);
         }]);
         setSimulatedStatus('talking');
         speak(mortgageReply, () => setSimulatedStatus('idle'));
+        return;
+      }
+    }
+
+    // Visual property sections are backed by structured listing data. Resolve
+    // their overview locally so the panel and Fish Audio can start together,
+    // instead of waiting for a second AI round trip before narration begins.
+    // Specialized video, location, valuation, and mortgage flows above still
+    // take precedence whenever their richer deterministic action applies.
+    if (activeProperty && requestedVisualSection) {
+      const visualAnswer = resolvePropertyVisualAnswer({
+        language: language === 'es' ? 'es' : 'en',
+        prompt,
+        property: activeProperty,
+        section: requestedVisualSection,
+      });
+
+      if (visualAnswer) {
+        setThinkingContext('property_detail');
+        setChatHistory((previous) => [...previous, {
+          role: 'assistant',
+          content: visualAnswer.reply,
+          suggestedReplies: visualAnswer.suggestedReplies,
+        }]);
+        setSimulatedStatus('talking');
+        speak(visualAnswer.speech, () => setSimulatedStatus('idle'));
         return;
       }
     }

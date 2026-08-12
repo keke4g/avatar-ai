@@ -2,10 +2,10 @@
 // perceived beat as Fish Audio without delaying text generation or streaming.
 export const ETERNA_AVATAR_AUDIO_LEAD_IN_MS = 160;
 
-// Mobile WebViews need a little more time to switch the hardware audio route
-// from SpeechRecognition input back to speaker output. Without this handoff,
-// the operating system can swallow the beginning of the next response.
-export const ETERNA_MOBILE_MIC_TO_SPEAKER_HANDOFF_MS = 650;
+// The PCM startup buffer already gives mobile devices time to leave the input
+// route. Adding another fixed delay made every voice turn slower and could
+// activate the phone speaker before Bluetooth became the selected media route.
+export const ETERNA_MOBILE_MIC_TO_SPEAKER_HANDOFF_MS = 0;
 export const ETERNA_PCM_START_BUFFER_MS = 500;
 
 interface EternaPlaybackLeadInOptions {
@@ -23,4 +23,8 @@ export function getEternaPlaybackLeadInMs({
 
 export function hasEnoughEternaPcmStartupAudio(bufferedDurationSeconds: number): boolean {
   return bufferedDurationSeconds * 1_000 >= ETERNA_PCM_START_BUFFER_MS;
+}
+
+export function shouldUseAutomaticBargeIn(isMobile: boolean): boolean {
+  return !isMobile;
 }

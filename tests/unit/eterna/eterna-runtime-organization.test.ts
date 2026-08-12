@@ -20,6 +20,7 @@ import {
   ETERNA_PCM_START_BUFFER_MS,
   getEternaPlaybackLeadInMs,
   hasEnoughEternaPcmStartupAudio,
+  shouldUseAutomaticBargeIn,
 } from '../../../lib/eterna/voiceTiming';
 import { buildEternaSystemPrompt } from '../../../lib/eterna/systemPrompt';
 import {
@@ -31,6 +32,8 @@ import {
   ETERNA_PROPERTY_PRESENTATION_SILENT_HOLD_MS,
   getPropertyPresentationCloseDelay,
 } from '../../../lib/eterna/propertyPresentationTiming';
+import { resolvePropertyVisualAnswer } from '../../../lib/eterna/actions/PropertyVisualActions';
+import type { Property } from '../../../lib/types';
 
 test('normaliza transcripciones y detecta ecos por tokens', () => {
   assert.equal(normalizeVoiceText('¡Casa en MÉXICO, por favor!'), 'casa en mexico por favor');
@@ -87,7 +90,8 @@ test('construye un prompt actual, localizado y limitado a rutas reales', () => {
   assert.match(prompt.content, /UNA pregunta breve/);
 });
 
-test('protege el inicio de voz al pasar del micrófono al altavoz móvil', () => {
+test('protege el inicio PCM sin agregar una espera fija al salir del micrófono móvil', () => {
+  assert.equal(ETERNA_MOBILE_MIC_TO_SPEAKER_HANDOFF_MS, 0);
   assert.equal(getEternaPlaybackLeadInMs({ afterRecognition: false, isMobile: true }), ETERNA_AVATAR_AUDIO_LEAD_IN_MS);
   assert.equal(getEternaPlaybackLeadInMs({ afterRecognition: true, isMobile: false }), ETERNA_AVATAR_AUDIO_LEAD_IN_MS);
   assert.equal(
@@ -96,6 +100,8 @@ test('protege el inicio de voz al pasar del micrófono al altavoz móvil', () =>
   );
   assert.equal(hasEnoughEternaPcmStartupAudio((ETERNA_PCM_START_BUFFER_MS - 1) / 1_000), false);
   assert.equal(hasEnoughEternaPcmStartupAudio(ETERNA_PCM_START_BUFFER_MS / 1_000), true);
+  assert.equal(shouldUseAutomaticBargeIn(true), false);
+  assert.equal(shouldUseAutomaticBargeIn(false), true);
 });
 
 test('reutiliza contextos de audio móviles suspendidos pero reemplaza los cerrados', () => {
@@ -140,4 +146,80 @@ test('el resumen es la única experiencia visual temporal', () => {
   assert.equal(isTemporaryPropertyVisualSection('amenities'), false);
   assert.equal(isTemporaryPropertyVisualSection('location'), false);
   assert.equal(isTemporaryPropertyVisualSection('commercial'), false);
+});
+
+test('responde secciones visuales desde los datos de la propiedad sin esperar al agente remoto', () => {
+  const property = {
+    id: 'property-fast-voice',
+    title: 'Casa de prueba',
+    description: 'Casa familiar con distribución funcional.',
+    type: 'Villa',
+    location: 'Montebello, Culiacán Rosales',
+    country: 'México',
+    valueRating: 'Premium',
+    images: ['https://example.com/cover.jpg', 'https://example.com/kitchen.jpg'],
+    amenities: ['Alberca', 'Gimnasio', 'Balcón'],
+    auraScore: 90,
+    bedrooms: 3,
+    bathrooms: 2,
+    maxGuests: 6,
+    hostId: 'host-1',
+    hostName: 'Asesor Towers',
+    hostAvatar: '',
+    hostVerified: true,
+    hostRating: 5,
+    hostReviewsCount: 1,
+    availableStart: '',
+    availableEnd: '',
+    latitude: 24.8,
+    longitude: -107.4,
+    surfaceBuilt: 154.85,
+    offerings: [{
+      id: 'offering-1',
+      propertyId: 'property-fast-voice',
+      mode: 'SALE',
+      status: 'ACTIVE',
+      visibility: 'PUBLIC',
+      priceAmount: 2_900_000,
+      currency: 'MXN',
+      billingPeriod: 'TOTAL',
+      acceptsBankCredit: true,
+      acceptsCash: true,
+      isPriceNegotiable: false,
+      acceptsOffers: false,
+      requiresApproval: false,
+      allowInstantRequest: false,
+      swapPreferences: {},
+      isFeatured: false,
+      featuredRank: 0,
+      metadata: {},
+    }],
+  } as Property;
+
+  const amenities = resolvePropertyVisualAnswer({
+    language: 'es',
+    prompt: 'Dime las amenidades',
+    property,
+    section: 'amenities',
+  });
+  assert.match(amenities?.speech || '', /Alberca/);
+  assert.match(amenities?.speech || '', /Gimnasio/);
+  assert.match(amenities?.speech || '', /\?$/);
+
+  const financing = resolvePropertyVisualAnswer({
+    language: 'es',
+    prompt: 'Muéstrame las opciones de pago',
+    property,
+    section: 'financing',
+  });
+  assert.match(financing?.speech || '', /crédito bancario/);
+  assert.match(financing?.speech || '', /recursos propios/);
+
+  const technical = resolvePropertyVisualAnswer({
+    language: 'es',
+    prompt: 'Dime cuántos metros tiene',
+    property,
+    section: 'technical',
+  });
+  assert.match(technical?.speech || '', /154\.85 metros cuadrados/);
 });
