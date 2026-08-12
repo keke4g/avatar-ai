@@ -1,4 +1,5 @@
 import { Sparkles, User, Volume2, VolumeX, X } from 'lucide-react';
+import Image from 'next/image';
 
 import { VideoAvatar } from '@/components/VideoAvatar';
 
@@ -27,13 +28,25 @@ export function EternaChatHeader({ actions, model }: EternaChatHeaderProps) {
       <div className="flex min-w-0 items-center gap-3">
         {!isHome && (
           <div className="w-11 h-11 shrink-0 rounded-full overflow-hidden border border-brand-gray-200 bg-slate-950 flex items-center justify-center shadow-sm">
-            <VideoAvatar
-              status={activeStatus}
-              size={40}
-              hidePill={true}
-              hideGlow={true}
-              isListening={isListening}
-            />
+            {isListening || activeStatus === 'thinking' || activeStatus === 'talking' ? (
+              <VideoAvatar
+                status={activeStatus}
+                size={40}
+                hidePill={true}
+                hideGlow={true}
+                isListening={isListening}
+              />
+            ) : (
+              <span className="relative block h-10 w-10 overflow-hidden rounded-full">
+                <Image
+                  src="/avatar.png"
+                  alt="Eterna Concierge"
+                  fill
+                  sizes="40px"
+                  className="object-cover object-[center_15%]"
+                />
+              </span>
+            )}
           </div>
         )}
         <div className="min-w-0">

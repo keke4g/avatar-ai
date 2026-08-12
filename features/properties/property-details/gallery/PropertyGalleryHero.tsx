@@ -1,14 +1,48 @@
 import { memo } from 'react';
 import { ChevronLeft, ChevronRight, Compass, Play, ZoomIn } from 'lucide-react';
+import Image from 'next/image';
 import type { LanguageType } from '@/lib/context/LanguageContext';
 import type { Property } from '@/lib/types';
 import { PropertyMediaItem } from '../PropertyMediaItem';
 import type { PropertyGalleryController } from './usePropertyGallery';
+import type { PropertyGalleryMediaItem } from '../propertyDetailsData';
 
 interface PropertyGalleryHeroProps {
   controller: PropertyGalleryController;
   language: LanguageType;
   property: Property;
+}
+
+function PropertyHeroMedia({
+  item,
+  title,
+  className,
+}: {
+  item: PropertyGalleryMediaItem;
+  title: string;
+  className: string;
+}) {
+  if (item.type === 'image') {
+    return <PropertyMediaItem item={item} title={title} className={className} />;
+  }
+
+  return (
+    <div className={`relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-neutral-800 to-black ${className}`}>
+      {item.thumbnailUrl && (
+        <Image
+          src={item.thumbnailUrl}
+          alt=""
+          fill
+          sizes="(max-width: 767px) 100vw, 25vw"
+          unoptimized
+          className="object-cover opacity-70"
+        />
+      )}
+      <span className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-neutral-950 shadow-lg">
+        <Play className="h-5 w-5 fill-current" aria-hidden="true" />
+      </span>
+    </div>
+  );
 }
 
 export const PropertyGalleryHero = memo(function PropertyGalleryHero({
@@ -32,7 +66,7 @@ export const PropertyGalleryHero = memo(function PropertyGalleryHero({
       >
         <div className="h-full w-full md:hidden">
           {mediaItems[heroMediaIndex] ? (
-            <PropertyMediaItem
+            <PropertyHeroMedia
               item={mediaItems[heroMediaIndex]}
               title={property.title}
               className="h-full w-full object-cover"
@@ -45,7 +79,7 @@ export const PropertyGalleryHero = memo(function PropertyGalleryHero({
         </div>
         <div className="hidden h-full w-full md:block">
           {mediaItems[0] ? (
-            <PropertyMediaItem
+            <PropertyHeroMedia
               item={mediaItems[0]}
               title={property.title}
               className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]"
@@ -125,7 +159,7 @@ export const PropertyGalleryHero = memo(function PropertyGalleryHero({
               onClick={() => openGallery(index)}
               className="aspect-square relative overflow-hidden bg-brand-gray-100 group"
             >
-              <PropertyMediaItem
+              <PropertyHeroMedia
                 item={item}
                 title={property.title}
                 className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"

@@ -46,6 +46,7 @@ export default function GooglePropertyLocation({ property, places, loading, erro
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const [mapsApi, setMapsApi] = useState<any>(null);
+  const [shouldLoadMap, setShouldLoadMap] = useState(false);
   const [mapError, setMapError] = useState('');
   const latitude = Number(property.latitude);
   const longitude = Number(property.longitude);
@@ -59,16 +60,36 @@ export default function GooglePropertyLocation({ property, places, loading, erro
   }, [places]);
 
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setShouldLoadMap(true);
+        observer.disconnect();
+      }
+    }, { rootMargin: '320px' });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!shouldLoadMap) return;
+    let cancelled = false;
     loadGoogleMaps()
       .then(async (namespace) => {
         const maps = await namespace.maps.importLibrary('maps');
-        setMapsApi({ namespace, maps });
+        if (!cancelled) setMapsApi({ namespace, maps });
       })
       .catch((loadError) => {
+        if (cancelled) return;
         console.error('[Property Google Map]', loadError);
         setMapError(loadError instanceof Error ? loadError.message : 'No se pudo cargar el mapa.');
       });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldLoadMap]);
 
   useEffect(() => {
     if (!mapsApi || !containerRef.current || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return;

@@ -3,46 +3,30 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { AvatarStateName, AvatarAnimations, getTransitionDuration, getAvatarVideoUrl } from '../lib/eternaAssets';
 
-// Global cache for preloaded HTMLVideoElements
-const preloadedVideosCache: Record<string, HTMLVideoElement> = {};
-let isPreloadingStarted = false;
+// The old warmup downloaded every walking variant on page load (roughly
+// 87 MB). Public avatar states only need IDLE and TALKING; any other clip is
+// loaded by the inactive buffer when that state is actually requested.
+const warmingAvatarVideos = new Map<string, HTMLVideoElement>();
 
-export function preloadAllAvatarVideos() {
-  if (typeof window === 'undefined' || isPreloadingStarted) return;
-  isPreloadingStarted = true;
+function shouldWarmAvatarVideo() {
+  if (typeof window === 'undefined' || document.visibilityState === 'hidden') return false;
+  const connection = (navigator as Navigator & {
+    connection?: { saveData?: boolean; effectiveType?: string };
+  }).connection;
+  return !connection?.saveData && connection?.effectiveType !== 'slow-2g' && connection?.effectiveType !== '2g';
+}
 
-  const allVideoUrls = [
-    AvatarAnimations.IDLE,
-    AvatarAnimations.TALKING,
-    ...AvatarAnimations.WALKING
-  ];
-  
-  const uniqueUrls = Array.from(new Set(allVideoUrls));
+export function warmTalkingAvatarVideo() {
+  const url = AvatarAnimations.TALKING;
+  if (!shouldWarmAvatarVideo() || warmingAvatarVideos.has(url)) return;
 
-  uniqueUrls.forEach(url => {
-    if (preloadedVideosCache[url]) return;
-
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[ANIMATION] Smart Preload Start: ${url}`);
-    }
-
-    const video = document.createElement('video');
-    video.src = url;
-    video.preload = 'auto';
-    video.muted = true;
-    video.playsInline = true;
-    video.loop = true;
-
-    // Load and cache
-    video.load();
-    preloadedVideosCache[url] = video;
-
-    video.addEventListener('canplaythrough', () => {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`[ANIMATION] Smart Preload Ready: ${url} (readyState: ${video.readyState})`);
-      }
-    }, { once: true });
-  });
+  const video = document.createElement('video');
+  video.preload = 'metadata';
+  video.muted = true;
+  video.playsInline = true;
+  video.src = url;
+  warmingAvatarVideos.set(url, video);
+  video.load();
 }
 
 interface DoubleBufferVideoPlayerProps {
@@ -81,7 +65,17 @@ export function DoubleBufferVideoPlayer({
   const transitionGenerationRef = useRef(0);
   
   useEffect(() => {
-    preloadAllAvatarVideos();
+    const warm = () => warmTalkingAvatarVideo();
+    const idleWindow = window as unknown as {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    if (idleWindow.requestIdleCallback) {
+      const idleId = idleWindow.requestIdleCallback(warm, { timeout: 2_000 });
+      return () => idleWindow.cancelIdleCallback?.(idleId);
+    }
+    const timer = window.setTimeout(warm, 1_000);
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Safe play helper to avoid double plays and handle errors
@@ -247,6 +241,24 @@ export function DoubleBufferVideoPlayer({
     };
   }, []);
 
+  // Media decoding is one of the most expensive pieces of persistent work on
+  // the site. Pause both buffers while the tab is hidden and resume only the
+  // active one when it becomes visible again.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        videoARef.current?.pause();
+        videoBRef.current?.pause();
+        return;
+      }
+      const activeVideo = activeBufferRef.current === 'A' ? videoARef.current : videoBRef.current;
+      void safePlay(activeVideo);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [safePlay]);
+
   return (
     <div className={`relative w-full h-full ${className}`} style={{ ...style, overflow: 'hidden' }}>
       {/* Buffer A */}
@@ -256,6 +268,7 @@ export function DoubleBufferVideoPlayer({
         muted
         playsInline
         autoPlay
+        preload="auto"
         loop={loop}
         onEnded={activeBuffer === 'A' ? onEnded : undefined}
         className="absolute inset-0 w-full h-full object-cover"
@@ -274,6 +287,7 @@ export function DoubleBufferVideoPlayer({
         muted
         playsInline
         autoPlay
+        preload={srcB ? 'metadata' : 'none'}
         loop={loop}
         onEnded={activeBuffer === 'B' ? onEnded : undefined}
         className="absolute inset-0 w-full h-full object-cover"

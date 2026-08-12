@@ -14,7 +14,7 @@ import {
   Eye, EyeOff, MapPin, Copy, Wifi, Key, Clock, Phone, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import confetti from 'canvas-confetti';
+import { launchConfetti } from '@/components/runtime/launchConfetti';
 
 import AuthGuard from '@/components/AuthGuard';
 import PublisherOnboardingModal from '@/components/PublisherOnboardingModal';
@@ -154,7 +154,7 @@ function DashboardPageContent() {
         hostNotes
       });
       setHostDrawerOpen(false);
-      confetti({
+      launchConfetti({
         particleCount: 50,
         spread: 40,
         origin: { y: 0.8 }
@@ -182,7 +182,7 @@ function DashboardPageContent() {
         comment: reviewComment.trim()
       });
 
-      confetti({
+      launchConfetti({
         particleCount: 150,
         spread: 70,
         origin: { y: 0.6 }
@@ -323,7 +323,7 @@ function DashboardPageContent() {
 
   const handleAcceptSwap = (swapId: string) => {
     updateSwapStatus(swapId, 'APPROVED');
-    confetti({
+    launchConfetti({
       particleCount: 150,
       spread: 90,
       origin: { y: 0.5 }
@@ -606,7 +606,7 @@ function DashboardPageContent() {
                               onClick={async () => {
                                 try {
                                   await confirmSwapCompletion(trip.id);
-                                  confetti({
+                                  launchConfetti({
                                     particleCount: 80,
                                     spread: 50,
                                     origin: { y: 0.8 }
@@ -1247,7 +1247,7 @@ function DashboardPageContent() {
               try {
                 await deleteProperty(id);
                 setEditingProperty(null);
-                confetti({
+                launchConfetti({
                   particleCount: 70,
                   spread: 50,
                   colors: ['#ff4d4d', '#ff9999']

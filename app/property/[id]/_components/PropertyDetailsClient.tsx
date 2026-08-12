@@ -14,7 +14,7 @@ import {
   Car, Building, Home, PhoneCall, Mail, UserRound, MessageCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import confetti from 'canvas-confetti';
+import { launchConfetti } from '@/components/runtime/launchConfetti';
 import { LeadType, PropertyOffering, PropertyOfferingMode } from '@/lib/types';
 import { useLiveContext } from '@/lib/context/LiveContext';
 import {
@@ -325,7 +325,7 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
       setSuccessOpen(true);
 
       // Fire a premium startup confetti show
-      confetti({
+      launchConfetti({
         particleCount: 140,
         spread: 80,
         origin: { y: 0.6 }

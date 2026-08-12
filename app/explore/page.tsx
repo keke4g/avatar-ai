@@ -2,11 +2,11 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import React, { useState, useMemo, useEffect, useRef, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { useSwap } from '../../lib/context/SwapContext';
 import { useTranslation } from '../../lib/context/LanguageContext';
 import CategorySlider from '../../components/CategorySlider';
 import PropertyCard from '../../components/PropertyCard';
-import InteractiveMap from '../../components/InteractiveMap';
 import { Map, List, RefreshCw, Compass, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -22,6 +22,15 @@ import { ServiceFactory } from '../../lib/services/ServiceFactory';
 import { PropertySearchFilters, SearchSort } from '../../lib/search/types';
 import { searchLogger } from '../../lib/search/searchLogger';
 import { getCacheKey } from '../../lib/search/SearchCache';
+
+const InteractiveMap = dynamic(() => import('../../components/InteractiveMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full min-h-[400px] w-full items-center justify-center bg-brand-gray-50 lg:min-h-0">
+      <RefreshCw className="h-7 w-7 animate-spin text-brand-accent" aria-label="Cargando mapa" />
+    </div>
+  ),
+});
 
 type ExploreOfferingTab = 'ALL' | 'SWAP' | 'RENT' | 'SALE';
 type ExploreSort = 'match' | 'capacity' | 'rating' | 'price_asc' | 'price_desc';
@@ -75,6 +84,15 @@ function ExploreContent() {
   
   // View states: 'split' on desktop by default; can toggle between grid/map on mobile
   const [mobileShowMap, setMobileShowMap] = useState(false);
+  const [desktopMapEnabled, setDesktopMapEnabled] = useState(false);
+
+  useEffect(() => {
+    const desktopMedia = window.matchMedia('(min-width: 1024px)');
+    const syncDesktopMap = () => setDesktopMapEnabled(desktopMedia.matches);
+    syncDesktopMap();
+    desktopMedia.addEventListener('change', syncDesktopMap);
+    return () => desktopMedia.removeEventListener('change', syncDesktopMap);
+  }, []);
   
   // Search and Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -1124,7 +1142,7 @@ function ExploreContent() {
               {/* Dynamic list grid with micro-interactions */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <AnimatePresence mode="popLayout">
-                  {paginatedProperties.map((property) => (
+                  {paginatedProperties.map((property, index) => (
                     <motion.div
                       key={property.id}
                       layoutId={`prop-card-${property.id}`}
@@ -1135,7 +1153,11 @@ function ExploreContent() {
                       onMouseEnter={() => setHoveredPropertyId(property.id)}
                       onMouseLeave={() => setHoveredPropertyId(null)}
                     >
-                      <PropertyCard property={property} showOfferingBadges />
+                      <PropertyCard
+                        property={property}
+                        showOfferingBadges
+                        eagerImage={index < 2}
+                      />
                     </motion.div>
                   ))}
                 </AnimatePresence>
@@ -1168,11 +1190,13 @@ function ExploreContent() {
         <div className={`w-full lg:w-[460px] lg:sticky lg:top-28 shrink-0 rounded-3xl overflow-hidden border border-brand-gray-200/80 shadow-premium h-[420px] lg:h-[580px] bg-white transition-all ${
           mobileShowMap ? 'block' : 'hidden lg:block'
         }`}>
-          <InteractiveMap 
-            properties={filteredSortedProperties} 
-            hoveredPropertyId={hoveredPropertyId} 
-            mobileShowMap={mobileShowMap}
-          />
+          {(desktopMapEnabled || mobileShowMap) && (
+            <InteractiveMap
+              properties={filteredSortedProperties}
+              hoveredPropertyId={hoveredPropertyId}
+              mobileShowMap={mobileShowMap}
+            />
+          )}
         </div>
 
       </div>

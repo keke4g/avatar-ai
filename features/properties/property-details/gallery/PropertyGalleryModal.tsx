@@ -176,7 +176,7 @@ export const PropertyGalleryModal = memo(function PropertyGalleryModal({
                   onClick={() => selectGalleryItem(index)}
                   className={`relative w-16 h-12 rounded-lg overflow-hidden shrink-0 transition-all border-2 cursor-pointer ${galleryIndex === index ? 'border-brand-accent scale-105' : 'border-transparent opacity-50 hover:opacity-100'}`}
                 >
-                  {item.type === 'image' ? (
+                  {item.type === 'image' && Math.abs(index - galleryIndex) <= 4 ? (
                     <Image
                       src={item.url}
                       alt={`Thumbnail ${index + 1}`}
@@ -185,9 +185,18 @@ export const PropertyGalleryModal = memo(function PropertyGalleryModal({
                       className="object-cover"
                       unoptimized
                     />
+                  ) : item.type === 'image' ? (
+                    <span className="flex h-full w-full items-center justify-center bg-neutral-900 text-[9px] font-black text-white/55">
+                      {index + 1}
+                    </span>
+                  ) : item.thumbnailUrl ? (
+                    <div className="relative h-full w-full bg-brand-black">
+                      <Image src={item.thumbnailUrl} alt="" fill sizes="64px" unoptimized className="object-cover opacity-60" />
+                      <Play className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 fill-white text-white" />
+                    </div>
                   ) : item.type === 'video' ? (
                     <div className="w-full h-full bg-brand-black flex items-center justify-center relative">
-                      <video src={item.url} className="w-full h-full object-cover opacity-60" muted />
+                      <div className="h-full w-full bg-gradient-to-br from-neutral-800 to-black" />
                       <Play className="absolute w-4 h-4 text-white fill-white" />
                     </div>
                   ) : (

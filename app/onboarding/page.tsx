@@ -11,7 +11,7 @@ import {
   Sparkles, Compass, ShieldCheck, Check, ArrowRight, ArrowLeft,
   Upload, File, CheckCircle2, User, MapPin
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import { launchConfetti } from '@/components/runtime/launchConfetti';
 import ProfilePhotoUploader from '../../components/ProfilePhotoUploader';
 
 type StepType = 0 | 1 | 2 | 3;
@@ -190,7 +190,7 @@ export default function OnboardingPage() {
     try {
       await completeOnboardingMock(selectedCities, bio, avatarUrl, profileType);
 
-      confetti({
+      launchConfetti({
         particleCount: 180,
         spread: 80,
         origin: { y: 0.6 }

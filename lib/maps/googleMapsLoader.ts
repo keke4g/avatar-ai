@@ -15,11 +15,9 @@ async function waitForGoogleMaps(timeoutMs = 12_000) {
 async function ensureLibraries(candidate?: any) {
   const google = candidate?.maps?.importLibrary ? candidate : await waitForGoogleMaps();
   if (google?.maps?.importLibrary) {
-    await Promise.all([
-      google.maps.importLibrary('maps'),
-      google.maps.importLibrary('places'),
-      google.maps.importLibrary('marker'),
-    ]);
+    // Load only the renderer shared by public maps. Places and marker are
+    // requested by their actual consumers instead of blocking every map.
+    await google.maps.importLibrary('maps');
   }
   return google;
 }
@@ -34,7 +32,7 @@ export async function loadGoogleMaps(): Promise<any> {
   if (googleMapsPromise) return googleMapsPromise;
 
   googleMapsPromise = (async () => {
-    const configResponse = await fetch('/api/maps/config', { cache: 'no-store' });
+    const configResponse = await fetch('/api/maps/config', { cache: 'force-cache' });
     if (!configResponse.ok) throw new Error('La integración de Google Maps no está configurada.');
 
     const { apiKey } = await configResponse.json() as { apiKey?: string };
@@ -53,7 +51,7 @@ export async function loadGoogleMaps(): Promise<any> {
     await new Promise<void>((resolve, reject) => {
       const script = document.createElement('script');
       script.id = 'auraswap-google-maps';
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&loading=async&libraries=places&language=es&region=MX`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&loading=async&language=es&region=MX`;
       script.async = true;
       script.defer = true;
       script.onload = () => resolve();

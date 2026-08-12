@@ -6,7 +6,7 @@ import { useTranslation } from '../lib/context/LanguageContext';
 import { ServiceFactory } from '../lib/services/ServiceFactory';
 import { Upload, X, Loader2, Star, Maximize2, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import confetti from 'canvas-confetti';
+import { launchConfetti } from '@/components/runtime/launchConfetti';
 
 export interface ImageMetadata {
   originalName: string;
@@ -520,7 +520,7 @@ export default function ImageUploadDropzone({
         );
       }
 
-      confetti({
+      launchConfetti({
         particleCount: 40,
         spread: 30,
         origin: { y: 0.8 }

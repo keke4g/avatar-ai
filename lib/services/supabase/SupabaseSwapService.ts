@@ -2,11 +2,14 @@ import { supabase } from '../../supabaseClient';
 import type { SwapRequest, SwapStatus, SwapTravelDetails } from '../../types';
 import type { ISwapService } from '../types';
 
+const SWAP_COLUMNS = 'id,sender_id,sender_property_id,receiver_id,receiver_property_id,start_date,end_date,status,message,created_at,is_disputed,dispute_reason,sender_confirmed_complete,receiver_confirmed_complete';
+const TRAVEL_DETAIL_COLUMNS = 'id,swap_id,traveler_id,property_id,wifi_name,wifi_password,access_code,checkin_instructions,checkin_time,checkout_time,emergency_contact_name,emergency_contact_phone,host_notes,created_at';
+
 export class SupabaseSwapService implements ISwapService {
   async getAll(): Promise<SwapRequest[]> {
     const { data, error } = await supabase
       .from('swaps')
-      .select('*');
+      .select(SWAP_COLUMNS);
 
     if (error) {
       console.error('[SupabaseSwapService] Error fetching swaps:', error);
@@ -34,7 +37,7 @@ export class SupabaseSwapService implements ISwapService {
   async getById(id: string): Promise<SwapRequest | null> {
     const { data, error } = await supabase
       .from('swaps')
-      .select('*')
+      .select(SWAP_COLUMNS)
       .eq('id', id)
       .single();
 
@@ -74,14 +77,29 @@ export class SupabaseSwapService implements ISwapService {
         status: 'PENDING',
         message: swap.message || ''
       })
-      .select()
+      .select(SWAP_COLUMNS)
       .single();
 
     if (error) {
       throw new Error(`[SupabaseSwapService] Error creating swap request: ${error.message}`);
     }
 
-    return this.getById(data.id) as Promise<SwapRequest>;
+    return {
+      id: data.id,
+      senderId: data.sender_id,
+      senderPropertyId: data.sender_property_id,
+      receiverId: data.receiver_id,
+      receiverPropertyId: data.receiver_property_id,
+      startDate: data.start_date,
+      endDate: data.end_date,
+      status: data.status,
+      message: data.message || '',
+      createdAt: data.created_at,
+      isDisputed: data.is_disputed,
+      disputeReason: data.dispute_reason,
+      senderConfirmedComplete: data.sender_confirmed_complete,
+      receiverConfirmedComplete: data.receiver_confirmed_complete,
+    };
   }
 
   async updateStatus(id: string, status: SwapStatus): Promise<SwapRequest> {
@@ -89,14 +107,29 @@ export class SupabaseSwapService implements ISwapService {
       .from('swaps')
       .update({ status })
       .eq('id', id)
-      .select()
+      .select(SWAP_COLUMNS)
       .single();
 
     if (error) {
       throw new Error(`[SupabaseSwapService] Error updating swap status: ${error.message}`);
     }
 
-    return this.getById(data.id) as Promise<SwapRequest>;
+    return {
+      id: data.id,
+      senderId: data.sender_id,
+      senderPropertyId: data.sender_property_id,
+      receiverId: data.receiver_id,
+      receiverPropertyId: data.receiver_property_id,
+      startDate: data.start_date,
+      endDate: data.end_date,
+      status: data.status,
+      message: data.message || '',
+      createdAt: data.created_at,
+      isDisputed: data.is_disputed,
+      disputeReason: data.dispute_reason,
+      senderConfirmedComplete: data.sender_confirmed_complete,
+      receiverConfirmedComplete: data.receiver_confirmed_complete,
+    };
   }
 
   async confirmCompletion(id: string, userId: string): Promise<SwapRequest> {
@@ -202,7 +235,7 @@ export class SupabaseSwapService implements ISwapService {
   async getTravelDetails(swapId: string, travelerId: string): Promise<SwapTravelDetails | null> {
     const { data, error } = await supabase
       .from('swap_travel_details')
-      .select('*')
+      .select(TRAVEL_DETAIL_COLUMNS)
       .eq('swap_id', swapId)
       .eq('traveler_id', travelerId)
       .maybeSingle();
@@ -251,7 +284,7 @@ export class SupabaseSwapService implements ISwapService {
     const { data, error } = await supabase
       .from('swap_travel_details')
       .upsert(payload, { onConflict: 'swap_id,traveler_id' })
-      .select()
+      .select(TRAVEL_DETAIL_COLUMNS)
       .single();
 
     if (error) {
@@ -280,7 +313,7 @@ export class SupabaseSwapService implements ISwapService {
   async getAllTravelDetails(): Promise<SwapTravelDetails[]> {
     const { data, error } = await supabase
       .from('swap_travel_details')
-      .select('*');
+      .select(TRAVEL_DETAIL_COLUMNS);
 
     if (error) {
       console.error('[SupabaseSwapService] Error fetching all travel details:', error);

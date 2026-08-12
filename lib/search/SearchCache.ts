@@ -12,16 +12,39 @@ export function getCacheKey(filters: PropertySearchFilters): string {
 }
 
 export class SearchCache {
-  private store = new Map<string, SearchResult>();
+  private static readonly MAX_ENTRIES = 50;
+  private static readonly TTL_MS = 30_000;
+
+  private store = new Map<string, { result: SearchResult; expiresAt: number }>();
 
   get(filters: PropertySearchFilters): SearchResult | null {
     const key = getCacheKey(filters);
-    return this.store.get(key) || null;
+    const cached = this.store.get(key);
+    if (!cached) return null;
+    if (cached.expiresAt <= Date.now()) {
+      this.store.delete(key);
+      return null;
+    }
+
+    // Refresh insertion order so the bounded map behaves as an LRU cache.
+    this.store.delete(key);
+    this.store.set(key, cached);
+    return cached.result;
   }
 
   set(filters: PropertySearchFilters, result: SearchResult): void {
     const key = getCacheKey(filters);
-    this.store.set(key, result);
+    this.store.delete(key);
+    this.store.set(key, {
+      result,
+      expiresAt: Date.now() + SearchCache.TTL_MS,
+    });
+
+    while (this.store.size > SearchCache.MAX_ENTRIES) {
+      const oldestKey = this.store.keys().next().value as string | undefined;
+      if (!oldestKey) break;
+      this.store.delete(oldestKey);
+    }
   }
 
   clear(): void {

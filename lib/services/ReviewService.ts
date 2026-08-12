@@ -91,7 +91,7 @@ export class SupabaseReviewService implements IReviewService {
   async getAll(): Promise<Review[]> {
     const { data, error } = await supabase
       .from('reviews')
-      .select('*')
+      .select('id,swap_id,reviewer_id,reviewed_user_id,rating,comment,created_at')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -112,7 +112,7 @@ export class SupabaseReviewService implements IReviewService {
         rating: review.rating,
         comment: review.comment,
       })
-      .select('*')
+      .select('id,swap_id,reviewer_id,reviewed_user_id,rating,comment,created_at')
       .single();
 
     if (error) {
@@ -126,7 +126,7 @@ export class SupabaseReviewService implements IReviewService {
   async getReviewsForUser(userId: string): Promise<Review[]> {
     const { data, error } = await supabase
       .from('reviews')
-      .select('*')
+      .select('id,swap_id,reviewer_id,reviewed_user_id,rating,comment,created_at')
       .eq('reviewed_user_id', userId)
       .order('created_at', { ascending: false });
 
@@ -141,7 +141,7 @@ export class SupabaseReviewService implements IReviewService {
   async getReviewsBySwap(swapId: string): Promise<Review[]> {
     const { data, error } = await supabase
       .from('reviews')
-      .select('*')
+      .select('id,swap_id,reviewer_id,reviewed_user_id,rating,comment,created_at')
       .eq('swap_id', swapId);
 
     if (error) {

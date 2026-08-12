@@ -13,6 +13,7 @@ import { formatCount, formatBathrooms, formatPropertyLocation, formatPublishedAg
 interface PropertyCardProps {
   property: Property;
   showOfferingBadges?: boolean;
+  eagerImage?: boolean;
 }
 
 const OFFERING_BADGE_ORDER: PropertyOfferingMode[] = ['SWAP', 'SHORT_RENT', 'MONTHLY_RENT', 'SALE'];
@@ -36,7 +37,7 @@ const OFFERING_BADGE_LABELS: Record<PropertyOfferingMode, { es: string; en: stri
   },
 };
 
-export default function PropertyCard({ property, showOfferingBadges = false }: PropertyCardProps) {
+function PropertyCard({ property, showOfferingBadges = false, eagerImage = false }: PropertyCardProps) {
   const { favorites, toggleFavorite, reviews } = useSwap();
   const { t, language } = useTranslation();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -102,7 +103,7 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
     language === 'es' ? 'es' : 'en',
   );
 
-  useEffect(() => {
+  const warmAdjacentImages = React.useCallback(() => {
     if (property.images.length < 2 || typeof window === 'undefined') return;
 
     const previous = property.images[(currentImageIndex - 1 + property.images.length) % property.images.length];
@@ -163,7 +164,10 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
   return (
     <Link 
       id={`property-card-${property.id}`}
-      href={`/property/${property.id}`} 
+      href={`/property/${property.id}`}
+      prefetch={false}
+      onPointerEnter={warmAdjacentImages}
+      onFocus={warmAdjacentImages}
       className="group block"
     >
       <div className="flex flex-col gap-3">
@@ -204,7 +208,8 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
                     ? 'translate-x-[4%] opacity-0'
                     : '-translate-x-[4%] opacity-0'
               }`}
-              loading="lazy"
+              loading={eagerImage ? 'eager' : 'lazy'}
+              fetchPriority={eagerImage ? 'high' : 'auto'}
               decoding="async"
             />
           </div>
@@ -336,3 +341,5 @@ export default function PropertyCard({ property, showOfferingBadges = false }: P
     </Link>
   );
 }
+
+export default React.memo(PropertyCard);

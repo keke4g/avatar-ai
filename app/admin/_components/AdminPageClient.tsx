@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AnalyticsService } from '@/lib/services/AnalyticsService';
-import confetti from 'canvas-confetti';
+import { launchConfetti } from '@/components/runtime/launchConfetti';
 
 // Property media may come from arbitrary publisher-provided hosts. `unoptimized`
 // preserves those original URLs without opening an unsafe wildcard remotePattern.
@@ -475,7 +475,7 @@ export default function AdminPage() {
         availableEnd: '2026-12-31'
       });
       addAudit('PROPERTY', 'auditPropDesc', { name: currentUser.name, title: formTitle }, 'success');
-      confetti({
+      launchConfetti({
         particleCount: 50,
         spread: 45,
         origin: { y: 0.7 }

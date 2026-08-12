@@ -2,7 +2,7 @@
 
 import { FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
-import confetti from 'canvas-confetti';
+import { launchConfetti } from '@/components/runtime/launchConfetti';
 import { useTranslation } from '@/lib/context/LanguageContext';
 
 interface AdminReportsTabProps {
@@ -29,7 +29,7 @@ export function AdminReportsTab({
   const commissionRevenue = approvedSwaps * 150 * (commissionRate / 100);
 
   const handleExport = () => {
-    confetti({ particleCount: 60, spread: 45 });
+    launchConfetti({ particleCount: 60, spread: 45 });
     window.alert('Exporting Ledger PDF...');
   };
 

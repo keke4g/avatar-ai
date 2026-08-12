@@ -2987,14 +2987,9 @@ Explore actualizado: Redirecting to /explore`);
       // Re-verify in case user interacted during the delay
       if (chatHistoryRef.current.length > 0) return;
 
-      const part1 = language === 'es'
-        ? "Hola, soy Eterna. Puedes hablarme como le hablarías a una asesora."
-        : "Hi, I’m Eterna. You can talk to me just as you would talk to a real estate advisor.";
-      const part2 = language === 'es'
-        ? "Por ejemplo: “busco una casa en Guadalajara de hasta tres millones”. Yo encontraré opciones y te ayudaré con el siguiente paso."
-        : "For example: “I’m looking for a home in Guadalajara under three million pesos.” I’ll find options and help you with the next step.";
-
-      const welcomeMsg = part1 + " " + part2;
+      const welcomeMsg = language === 'es'
+        ? "Hola, soy Eterna. Puedes hablarme como le hablarías a una asesora. Por ejemplo: “busco una casa en Guadalajara de hasta tres millones”. Yo encontraré opciones y te ayudaré con el siguiente paso."
+        : "Hi, I’m Eterna. You can talk to me just as you would talk to a real estate advisor. For example: “I’m looking for a home in Guadalajara under three million pesos.” I’ll find options and help you with the next step.";
 
       // Add to chat history
       setChatHistory(prev => {
@@ -3009,32 +3004,27 @@ Explore actualizado: Redirecting to /explore`);
         },
       };
 
-      // Speak Part 1 first with the globally selected engine. If autoplay is
-      // blocked, the voice hook resumes it on the next user gesture.
-      speak(part1, () => {
-        // Highlight action cards exactly when Part 2 starts
+      // Generate and play the welcome as one stream. Splitting it previously
+      // caused two /api/voz calls, a gap between phrases and an unnecessary
+      // second TTS startup on every first home visit.
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('eterna-highlight-actions', { detail: true }));
+      }
+      speak(welcomeMsg, () => {
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('eterna-highlight-actions', { detail: true }));
+          if (welcomeBecameAudible) {
+            sessionStorage.setItem(ETERNA_HOME_INTRO_SESSION_KEY, 'true');
+          }
+          window.dispatchEvent(new CustomEvent('eterna-highlight-actions', { detail: false }));
         }
-
-        // Speak Part 2
-        speak(part2, () => {
-          if (typeof window !== 'undefined') {
-            if (welcomeBecameAudible) {
-              sessionStorage.setItem(ETERNA_HOME_INTRO_SESSION_KEY, 'true');
-            }
-            window.dispatchEvent(new CustomEvent('eterna-highlight-actions', { detail: false }));
-          }
-          setSimulatedStatus('idle');
-        }, welcomeSpeechOptions);
-
-        // Safety timeout to disable highlight after 8 seconds in case speech fails to end
-        safetyTimer = setTimeout(() => {
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('eterna-highlight-actions', { detail: false }));
-          }
-        }, 8000);
+        setSimulatedStatus('idle');
       }, welcomeSpeechOptions);
+
+      safetyTimer = setTimeout(() => {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('eterna-highlight-actions', { detail: false }));
+          }
+      }, 12_000);
 
     }, 1800);
 

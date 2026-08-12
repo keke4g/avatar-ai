@@ -6,7 +6,7 @@ export class SupabaseNotificationService implements INotificationService {
   async getAllForUser(userId: string): Promise<Notification[]> {
     const { data, error } = await supabase
       .from('notifications')
-      .select('*')
+      .select('id,user_id,title,content,is_read,created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
@@ -34,7 +34,7 @@ export class SupabaseNotificationService implements INotificationService {
         content: notification.content,
         is_read: false
       })
-      .select()
+      .select('id,user_id,title,content,is_read,created_at')
       .single();
 
     if (error) {

@@ -2,48 +2,52 @@ import { supabase } from '../../supabaseClient';
 import type { User } from '../../types';
 import type { IUserService } from '../types';
 
+const PUBLIC_PROFILE_COLUMNS = 'id,name,avatar_url,role,kyc_status,is_verified,created_at,company_id,office_id,profile_type';
+const PRIVATE_PROFILE_COLUMNS = `${PUBLIC_PROFILE_COLUMNS},email,bio,location`;
+
+const mapProfile = (data: any): User => ({
+  id: data.id,
+  name: data.name,
+  email: data.email,
+  avatar: data.avatar_url || '',
+  role: data.role,
+  isVerified: data.is_verified === true,
+  kycStatus: data.kyc_status,
+  joinDate: data.created_at?.split('T')[0],
+  swapsCount: 0,
+  isSuspended: false,
+  favorites: [],
+  bio: data.bio || '',
+  location: data.location || '',
+  companyId: data.company_id,
+  officeId: data.office_id,
+  profileType: data.profile_type,
+});
+
 export class SupabaseUserService implements IUserService {
   async getAll(): Promise<User[]> {
-    console.log('[SupabaseUserService] Querying public_profiles_view.getAll()...');
     const { data, error } = await supabase
       .from('public_profiles_view')
-      .select('*');
+      .select(PUBLIC_PROFILE_COLUMNS);
 
     if (error) {
       console.error('[SupabaseUserService] Error fetching profiles. Code:', error.code, 'Message:', error.message, 'Full Error:', error);
       return [];
     }
 
-    console.log('[SupabaseUserService] Query public_profiles_view.getAll() success. Row count:', data?.length, 'Exact Data Result:', data);
-    return (data || []).map((row) => ({
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      avatar: row.avatar_url || '',
-      role: row.role,
-      isVerified: row.is_verified === true,
-      kycStatus: row.kyc_status,
-      joinDate: row.created_at?.split('T')[0],
-      swapsCount: 0,
-      isSuspended: false,
-      favorites: [],
-      companyId: row.company_id,
-      officeId: row.office_id,
-      profileType: row.profile_type
-    }));
+    return (data || []).map(mapProfile);
   }
 
   async getById(id: string): Promise<User | null> {
-    console.log(`[SupabaseUserService] Querying profile.getById(${id})...`);
-    
-    // Dynamically query profiles table for self to see email, or public_profiles_view for others
-    const currentUser = (await supabase.auth.getUser()).data.user;
+    // Session state is local in the browser. RLS remains the authority for the
+    // private table, while avoiding a network getUser() before every profile.
+    const currentUser = (await supabase.auth.getSession()).data.session?.user;
     const isSelf = currentUser?.id === id;
     const targetSource = isSelf ? 'profiles' : 'public_profiles_view';
 
     const { data, error } = await supabase
       .from(targetSource)
-      .select('*')
+      .select(isSelf ? PRIVATE_PROFILE_COLUMNS : PUBLIC_PROFILE_COLUMNS)
       .eq('id', id)
       .single();
 
@@ -52,27 +56,7 @@ export class SupabaseUserService implements IUserService {
       return null;
     }
 
-    console.log(`[SupabaseUserService] Query profile.getById(${id}) from ${targetSource} success. Exact Data Result:`, data);
-
-
-    return data ? {
-      id: data.id,
-      name: data.name,
-      email: data.email,
-      avatar: data.avatar_url || '',
-      role: data.role,
-      isVerified: data.is_verified === true,
-      kycStatus: data.kyc_status,
-      joinDate: data.created_at?.split('T')[0],
-      swapsCount: 0,
-      isSuspended: false,
-      favorites: [],
-      bio: data.bio || '',
-      location: data.location || '',
-      companyId: data.company_id,
-      officeId: data.office_id,
-      profileType: data.profile_type
-    } : null;
+    return data ? mapProfile(data) : null;
   }
 
   async update(id: string, userData: Partial<User>): Promise<User> {
@@ -129,14 +113,14 @@ export class SupabaseUserService implements IUserService {
       .from('profiles')
       .update({ is_verified: isVerified, kyc_status: kycStatus })
       .eq('id', id)
-      .select()
+      .select(PRIVATE_PROFILE_COLUMNS)
       .single();
 
     if (error) {
       throw new Error(`[SupabaseUserService] Error updating profile verification: ${error.message}`);
     }
 
-    return this.getById(data.id) as Promise<User>;
+    return mapProfile(data);
   }
 }
 

@@ -114,6 +114,7 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
   const renderedMarkersRef = useRef<any[]>([]);
   const hoverHandlerRef = useRef(onHoverProperty);
   const [mapsApi, setMapsApi] = useState<any>(null);
+  const [shouldLoadMap, setShouldLoadMap] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState('');
   const mappableProperties = useMemo(() => properties.filter(hasValidCoordinates), [properties]);
@@ -123,16 +124,43 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
   }, [onHoverProperty]);
 
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const revealMap = () => setShouldLoadMap(true);
+    const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+    if (isDesktop || mobileShowMap) {
+      revealMap();
+      return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        revealMap();
+        observer.disconnect();
+      }
+    }, { rootMargin: '240px' });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [mobileShowMap]);
+
+  useEffect(() => {
+    if (!shouldLoadMap) return;
+    let cancelled = false;
     loadGoogleMaps()
       .then(async (namespace) => {
         const maps = await namespace.maps.importLibrary('maps');
-        setMapsApi({ namespace, maps });
+        if (!cancelled) setMapsApi({ namespace, maps });
       })
       .catch((error) => {
+        if (cancelled) return;
         console.error('[Google Maps Load Error]', error);
         setLoadError(error instanceof Error ? error.message : 'No se pudo cargar Google Maps.');
       });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldLoadMap]);
 
   useEffect(() => {
     if (!mapsApi || !containerRef.current || mapRef.current) return;
@@ -246,7 +274,14 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
     };
 
     renderMarkers();
-    const zoomListener = mapRef.current.addListener('zoom_changed', renderMarkers);
+    // Rebuilding every marker for each intermediate zoom frame makes trackpad
+    // and pinch gestures stutter. Debounce only zoom changes; map panning does
+    // not alter clusters and should not recreate markers at all.
+    let zoomTimer: number | null = null;
+    const zoomListener = mapRef.current.addListener('zoom_changed', () => {
+      if (zoomTimer) window.clearTimeout(zoomTimer);
+      zoomTimer = window.setTimeout(renderMarkers, 120);
+    });
 
     if (!bounds.isEmpty()) {
       mapRef.current.fitBounds(bounds, 48);
@@ -257,6 +292,7 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
 
     return () => {
       zoomListener.remove();
+      if (zoomTimer) window.clearTimeout(zoomTimer);
       clearRenderedMarkers();
     };
   }, [language, mapsApi, mappableProperties]);
@@ -372,6 +408,7 @@ export default function InteractiveMap({ properties, hoveredPropertyId, onHoverP
                 <span className="truncate text-[10px] font-bold uppercase tracking-wider text-brand-gray-500">{language === 'es' ? formatCount(selectedProperty.bedrooms || 0, 'habitación', 'habitaciones', 'feminine') : `${selectedProperty.bedrooms || 0} bedrooms`}</span>
                 <Link
                   href={`/property/${selectedProperty.id}`}
+                  prefetch={false}
                   className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-neutral-950 px-3.5 text-[9px] font-black uppercase tracking-[0.08em] text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-neutral-800"
                 >
                   {language === 'es' ? 'Ver propiedad' : 'View property'}

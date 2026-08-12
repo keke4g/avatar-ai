@@ -37,6 +37,8 @@ export const PropertyMediaItem = memo(function PropertyMediaItem({
       <video
         src={item.url}
         controls
+        playsInline
+        preload="metadata"
         className={className}
       />
     );

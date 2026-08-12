@@ -25,7 +25,6 @@ export const metadata: Metadata = {
     "Descubre, publica, compra, vende, renta o intercambia propiedades verificadas con Towers México.",
   keywords: ["propiedades en México", "inmuebles", "casas en venta", "departamentos", "renta", "Towers México"],
   icons: {
-    icon: "/towers-mexico-logo-blue.png",
     apple: "/towers-mexico-logo-blue.png",
   },
   openGraph: {

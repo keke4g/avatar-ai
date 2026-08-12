@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Mic, MicOff, Square } from 'lucide-react';
+import Image from 'next/image';
 
 import { VideoAvatar } from '@/components/VideoAvatar';
 
@@ -110,11 +111,26 @@ export function EternaLauncher({ actions, model }: EternaLauncherProps) {
             onClick={actions.onOpen}
             className="hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer relative select-none flex flex-col items-center gap-1"
           >
-            <VideoAvatar
-              status={activeStatus}
-              size={isPropertyPage ? 48 : 60}
-              hidePill={true}
-            />
+            {isListening || activeStatus === 'thinking' || activeStatus === 'talking' ? (
+              <VideoAvatar
+                status={activeStatus}
+                size={isPropertyPage ? 48 : 60}
+                hidePill={true}
+              />
+            ) : (
+              <span
+                className="relative block overflow-hidden rounded-full border-2 border-white bg-slate-950 shadow-premium"
+                style={{ width: isPropertyPage ? 48 : 60, height: isPropertyPage ? 48 : 60 }}
+              >
+                <Image
+                  src="/avatar.png"
+                  alt="Eterna Concierge"
+                  fill
+                  sizes={isPropertyPage ? '48px' : '60px'}
+                  className="object-cover object-[center_15%]"
+                />
+              </span>
+            )}
           </button>
         </motion.div>
       )}

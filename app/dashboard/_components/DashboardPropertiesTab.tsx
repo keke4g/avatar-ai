@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import Image from 'next/image';
 import { Clock, Edit, Eye, EyeOff, Loader2, Plus, Sparkles, Star } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import { launchConfetti } from '@/components/runtime/launchConfetti';
 
 import { useTranslation } from '@/lib/context/LanguageContext';
 import { formatBathrooms, formatCount, formatPropertyLocation } from '@/lib/textHelpers';
@@ -153,7 +153,7 @@ export function DashboardPropertiesTab({
                     type="button"
                     onClick={async () => {
                       await onTogglePublish(property.id);
-                      confetti({
+                      launchConfetti({
                         particleCount: 50,
                         spread: 40,
                         origin: { y: 0.8 },

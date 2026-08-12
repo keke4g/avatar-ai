@@ -6,7 +6,7 @@ export class SupabaseLeadService implements ILeadService {
   async getAllForUser(_userId: string): Promise<Lead[]> {
     const { data, error } = await supabase
       .from('leads')
-      .select('*')
+      .select('id,property_id,offering_id,user_id,lead_type,message,status,created_at')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -37,7 +37,7 @@ export class SupabaseLeadService implements ILeadService {
         message: lead.message,
         status: 'NEW',
       })
-      .select()
+      .select('id,property_id,offering_id,user_id,lead_type,message,status,created_at')
       .single();
 
     if (error) {

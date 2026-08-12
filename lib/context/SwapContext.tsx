@@ -15,7 +15,6 @@ import type { NewPropertyInput, OnboardingProfileType, SwapContextType, TravelDe
 import {
   loadMockSwapState,
   parseArchivedSwapIds,
-  parseStoredCurrentUser,
   persistSwapContextState,
 } from './swap/storage';
 import { useLatestRef } from './swap/useLatestRef';
@@ -69,16 +68,11 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
       queueMicrotask(() => setArchivedSwapIds(parseArchivedSwapIds(storedArchived)));
 
       if (useSupabase) {
-        // Load live data from Supabase via abstract ServiceFactory
-        const storedCurrentUser = localStorage.getItem('auraswap_current_user');
-        const initialUser = parseStoredCurrentUser(storedCurrentUser);
-        
-        const userId = initialUser?.id || '';
+        // Load only public/shared state here. Private user collections hydrate
+        // once the authenticated session has been verified below, avoiding a
+        // duplicate request burst based on potentially stale local storage.
         const propertiesRequest = ServiceFactory.getPropertyService().getAll().then(liveProps => {
           setProperties(liveProps);
-          if (initialUser) {
-            setMyProperties(liveProps.filter(p => p.hostId === initialUser.id));
-          }
           setLoading(false);
           return liveProps;
         });
@@ -86,21 +80,10 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
         Promise.all([
           propertiesRequest,
           ServiceFactory.getUserService().getAll(),
-          userId ? ServiceFactory.getSwapService().getAll() : Promise.resolve([]),
-          userId ? ServiceFactory.getMessageService().getAllForUser(userId) : Promise.resolve([]),
-          userId ? ServiceFactory.getNotificationService().getAllForUser(userId) : Promise.resolve([]),
-          userId ? ServiceFactory.getSwapService().getAllTravelDetails() : Promise.resolve([]),
           ServiceFactory.getReviewService().getAll(),
-          userId ? ServiceFactory.getLeadService().getAllForUser(userId) : Promise.resolve([])
-        ]).then(([, liveUsers, liveSwaps, liveMessages, liveNotifications, liveTravelDetails, liveReviews, liveLeads]) => {
+        ]).then(([, liveUsers, liveReviews]) => {
           setUsers(liveUsers);
-          setSwaps(liveSwaps);
-          setMessages(liveMessages);
-          setNotifications(liveNotifications);
-          setTravelDetails(liveTravelDetails);
           setReviews(liveReviews);
-          setLeads(liveLeads);
-          
           setIsLoaded(true);
         }).catch(err => {
           console.error('[SwapContext] Live Supabase initial fetch failed:', err);
@@ -151,31 +134,30 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (useSupabase && typeof window !== 'undefined') {
       const syncSupabaseProfile = async (userId: string) => {
         try {
-          const profile = await ServiceFactory.getUserService().getById(userId);
+          const [profile, favoritesResult, archivedResult] = await Promise.all([
+            ServiceFactory.getUserService().getById(userId),
+            supabase
+              .from('favorites')
+              .select('property_id')
+              .eq('user_id', userId),
+            supabase
+              .from('archived_conversations')
+              .select('swap_id')
+              .eq('user_id', userId),
+          ]);
+
           if (profile) {
             setCurrentUser(profile);
             localStorage.setItem('auraswap_current_user', JSON.stringify(profile));
 
-            // Sync user's favorites from Supabase junction table 'favorites'
-            const { data: favData, error: favError } = await supabase
-              .from('favorites')
-              .select('property_id')
-              .eq('user_id', userId);
-
-            if (!favError && favData) {
-              const favIds = favData.map((f: any) => f.property_id);
+            if (!favoritesResult.error && favoritesResult.data) {
+              const favIds = favoritesResult.data.map((favorite: { property_id: string }) => favorite.property_id);
               setFavorites(favIds);
               localStorage.setItem('auraswap_favorites', JSON.stringify(favIds));
             }
 
-            // Sync user's archived conversations
-            const { data: archData, error: archError } = await supabase
-              .from('archived_conversations')
-              .select('swap_id')
-              .eq('user_id', userId);
-
-            if (!archError && archData) {
-              const archIds = archData.map((a: any) => a.swap_id);
+            if (!archivedResult.error && archivedResult.data) {
+              const archIds = archivedResult.data.map((archive: { swap_id: string }) => archive.swap_id);
               setArchivedSwapIds(archIds);
               localStorage.setItem('auraswap_archived_swaps', JSON.stringify(archIds));
             }
@@ -185,19 +167,28 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       };
 
-      // 1. Initial Session Recovery
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          syncSupabaseProfile(session.user.id);
-        }
-      });
+      let lastSyncedUserId: string | null = null;
 
-      // 2. Real-Time Auth State Listening
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // onAuthStateChange emits INITIAL_SESSION, so a separate getSession()
+      // call would duplicate profile hydration. Keep async Supabase calls out
+      // of the auth callback itself to avoid holding the auth client lock.
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (session?.user) {
-          syncSupabaseProfile(session.user.id);
+          if (lastSyncedUserId === session.user.id && event !== 'USER_UPDATED') return;
+          lastSyncedUserId = session.user.id;
+          window.setTimeout(() => {
+            void syncSupabaseProfile(session.user.id);
+          }, 0);
         } else {
+          lastSyncedUserId = null;
           setCurrentUser(null);
+          setFavorites([]);
+          setArchivedSwapIds([]);
+          setSwaps([]);
+          setMessages([]);
+          setNotifications([]);
+          setTravelDetails([]);
+          setLeads([]);
           localStorage.removeItem('auraswap_current_user');
         }
       });

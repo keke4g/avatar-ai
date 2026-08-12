@@ -105,6 +105,7 @@ export const PropertyMultimediaSection = memo(function PropertyMultimediaSection
                     className="w-full h-full object-contain"
                     controls
                     playsInline
+                    preload="metadata"
                   />
                 ) : activeVideo.mediaType === 'VIMEO' ? (
                   <iframe

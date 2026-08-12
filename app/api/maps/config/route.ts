@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 300;
 
 export async function GET() {
   const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY
@@ -11,13 +11,12 @@ export async function GET() {
   if (!apiKey) {
     return NextResponse.json(
       { error: 'Google Maps no está configurado.' },
-      { status: 503, headers: { 'Cache-Control': 'no-store' } },
+      { status: 503, headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300' } },
     );
   }
 
   return NextResponse.json(
     { apiKey },
-    { headers: { 'Cache-Control': 'private, max-age=300' } },
+    { headers: { 'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800' } },
   );
 }
-

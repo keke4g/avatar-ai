@@ -14,6 +14,10 @@ import { SupabasePropertyMediaService } from './SupabasePropertyMediaService';
 
 type PublicPropertyRow = Record<string, unknown> & { id?: string };
 
+const PUBLIC_INVENTORY_SNAPSHOT_TTL_MS = 5_000;
+let publicInventoryRequest: Promise<PublicPropertyRow[]> | null = null;
+let publicInventorySnapshot: { rows: PublicPropertyRow[]; expiresAt: number } | null = null;
+
 const mapPublicValuationRow = (row: any): PropertyValuation => ({
   id: row.id,
   propertyId: row.property_id,
@@ -50,7 +54,7 @@ const mapPublicValuationRow = (row: any): PropertyValuation => ({
   comparables: Array.isArray(row.comparables) ? row.comparables : [],
 });
 
-const fetchSanitizedPublicPropertyRows = async (propertyId?: string): Promise<PublicPropertyRow[]> => {
+const loadSanitizedPublicPropertyRows = async (propertyId?: string): Promise<PublicPropertyRow[]> => {
   let propertyQuery = supabase
     .from('public_properties_view')
     .select('*');
@@ -147,6 +151,39 @@ const fetchSanitizedPublicPropertyRows = async (propertyId?: string): Promise<Pu
     publisher_contact: publisherContactsByProperty.get(row.id) || null,
     valuation: valuationsByProperty.get(row.id) || null,
   }));
+};
+
+const fetchSanitizedPublicPropertyRows = async (propertyId?: string): Promise<PublicPropertyRow[]> => {
+  if (propertyId) return loadSanitizedPublicPropertyRows(propertyId);
+
+  const now = Date.now();
+  if (publicInventorySnapshot && publicInventorySnapshot.expiresAt > now) {
+    return publicInventorySnapshot.rows;
+  }
+  if (publicInventoryRequest) return publicInventoryRequest;
+
+  publicInventoryRequest = loadSanitizedPublicPropertyRows()
+    .then((rows) => {
+      // Do not retain transient upstream failures, which are represented as an
+      // empty array by the public loader. Concurrent callers are still deduped.
+      if (rows.length > 0) {
+        publicInventorySnapshot = {
+          rows,
+          expiresAt: Date.now() + PUBLIC_INVENTORY_SNAPSHOT_TTL_MS,
+        };
+      }
+      return rows;
+    })
+    .finally(() => {
+      publicInventoryRequest = null;
+    });
+
+  return publicInventoryRequest;
+};
+
+const clearPropertyReadCaches = () => {
+  publicInventorySnapshot = null;
+  searchCache.clear();
 };
 
 const fetchAccessiblePropertyRows = async ({
@@ -378,10 +415,14 @@ export class SupabasePropertyService implements IPropertyService {
     return all.filter(p => p.hostId !== userId).slice(0, 4);
   }
   async getAll(): Promise<Property[]> {
-    const publicRows = await fetchSanitizedPublicPropertyRows();
+    // Public inventory and session verification are independent. Starting
+    // both together removes an avoidable auth-after-catalog waterfall.
+    const [publicRows, { data: authData }] = await Promise.all([
+      fetchSanitizedPublicPropertyRows(),
+      supabase.auth.getUser(),
+    ]);
     const publicProperties = publicRows.map(mapPostgresProperty);
 
-    const { data: authData } = await supabase.auth.getUser();
     const user = authData.user;
     if (!user) return publicProperties;
 
@@ -597,7 +638,7 @@ export class SupabasePropertyService implements IPropertyService {
       throw new Error(`[SupabasePropertyService] Error creating property offerings (rolled back property): ${offeringError.message}`);
     }
 
-    searchCache.clear();
+    clearPropertyReadCaches();
     return this.getById(data.id) as Promise<Property>;
   }
 
@@ -844,7 +885,7 @@ export class SupabasePropertyService implements IPropertyService {
       await this.syncLegacySwapOffering(id, property);
     }
 
-    searchCache.clear();
+    clearPropertyReadCaches();
     return this.getById(data.id) as Promise<Property>;
   }
 
@@ -858,7 +899,7 @@ export class SupabasePropertyService implements IPropertyService {
       console.error(`[SupabasePropertyService] Error deleting property ${id}:`, error);
       return false;
     }
-    searchCache.clear();
+    clearPropertyReadCaches();
     return true;
   }
 
@@ -889,7 +930,7 @@ export class SupabasePropertyService implements IPropertyService {
         throw new Error(`[SupabasePropertyService] Error approving property: ${approvalError.message}`);
       }
 
-      searchCache.clear();
+      clearPropertyReadCaches();
       const approvedProperty = await this.getById(id);
       if (!approvedProperty) {
         throw new Error('[SupabasePropertyService] The approved property could not be reloaded.');
@@ -921,7 +962,7 @@ export class SupabasePropertyService implements IPropertyService {
       console.error('[SupabasePropertyService] Error syncing SWAP offering publish status:', offeringError.message);
     }
 
-    searchCache.clear();
+    clearPropertyReadCaches();
     return this.getById(data.id) as Promise<Property>;
   }
 
@@ -951,7 +992,7 @@ export class SupabasePropertyService implements IPropertyService {
       console.error('[SupabasePropertyService] Error syncing SWAP offering feature status:', offeringError.message);
     }
 
-    searchCache.clear();
+    clearPropertyReadCaches();
     return this.getById(data.id) as Promise<Property>;
   }
 

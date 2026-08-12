@@ -11,7 +11,7 @@ import {
   Bot, Sparkles, Mic, MicOff, Wifi, WifiOff, Volume2, VolumeX,
   Activity, Award, ArrowUpRight, AlertCircle, Landmark, Minimize2
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import { launchConfetti } from '@/components/runtime/launchConfetti';
 import { VideoAvatar } from '../../components/VideoAvatar';
 import { useWebSocketStream, StreamStatus } from '../../hooks/useWebSocketStream';
 import {
@@ -559,7 +559,7 @@ REGLAS DE INTERCAMBIO:
     updateSwapStatus(activeSwapId, 'APPROVED');
     
     // Shower confetti
-    confetti({
+    launchConfetti({
       particleCount: 160,
       spread: 90,
       origin: { y: 0.5 }
