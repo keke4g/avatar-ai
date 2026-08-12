@@ -175,7 +175,7 @@ export default function EternaConcierge() {
       if (detail?.propertyId !== propertyId) return;
       setIsPropertyVisualActive(false);
       if (window.matchMedia('(max-width: 1023px)').matches) {
-        setConciergeMode('chat');
+        setConciergeMode('avatar');
         setIsCompact(false);
         setIsOpen(true);
       }
