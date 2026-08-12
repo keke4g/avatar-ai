@@ -35,6 +35,7 @@ interface DoubleBufferVideoPlayerProps {
   className?: string;
   style?: React.CSSProperties;
   onEnded?: () => void;
+  onInitialFrameReady?: () => void;
   objectPosition?: string;
 }
 
@@ -44,6 +45,7 @@ export function DoubleBufferVideoPlayer({
   className = '',
   style = {},
   onEnded,
+  onInitialFrameReady,
   objectPosition = "center 15%"
 }: DoubleBufferVideoPlayerProps) {
   const videoARef = useRef<HTMLVideoElement | null>(null);
@@ -63,6 +65,26 @@ export function DoubleBufferVideoPlayer({
   const switchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const transitionGenerationRef = useRef(0);
+  const initialFrameReportedRef = useRef(false);
+  const initialFrameCallbackScheduledRef = useRef(false);
+
+  const reportInitialFrame = useCallback((video: HTMLVideoElement) => {
+    if (initialFrameReportedRef.current || initialFrameCallbackScheduledRef.current) return;
+    initialFrameCallbackScheduledRef.current = true;
+
+    const reveal = () => {
+      if (initialFrameReportedRef.current) return;
+      initialFrameReportedRef.current = true;
+      onInitialFrameReady?.();
+    };
+
+    if ('requestVideoFrameCallback' in video) {
+      video.requestVideoFrameCallback(() => reveal());
+      return;
+    }
+
+    window.requestAnimationFrame(() => window.requestAnimationFrame(reveal));
+  }, [onInitialFrameReady]);
   
   useEffect(() => {
     const warm = () => warmTalkingAvatarVideo();
@@ -270,6 +292,13 @@ export function DoubleBufferVideoPlayer({
         autoPlay
         preload="auto"
         loop={loop}
+        controls={false}
+        disablePictureInPicture
+        controlsList="nodownload noplaybackrate nofullscreen"
+        tabIndex={-1}
+        aria-hidden="true"
+        onLoadedData={(event) => reportInitialFrame(event.currentTarget)}
+        onCanPlay={(event) => reportInitialFrame(event.currentTarget)}
         onEnded={activeBuffer === 'A' ? onEnded : undefined}
         className="absolute inset-0 w-full h-full object-cover"
         style={{
@@ -289,6 +318,11 @@ export function DoubleBufferVideoPlayer({
         autoPlay
         preload={srcB ? 'metadata' : 'none'}
         loop={loop}
+        controls={false}
+        disablePictureInPicture
+        controlsList="nodownload noplaybackrate nofullscreen"
+        tabIndex={-1}
+        aria-hidden="true"
         onEnded={activeBuffer === 'B' ? onEnded : undefined}
         className="absolute inset-0 w-full h-full object-cover"
         style={{

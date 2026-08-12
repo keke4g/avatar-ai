@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useCallback } from "react";
+import React, { useEffect, useRef, useCallback, useState } from "react";
 import { AvatarState } from "../../hooks/useAvatarState";
 import { useLiveContext } from "../../lib/context/LiveContext";
 import { DoubleBufferVideoPlayer } from "../DoubleBufferVideoPlayer";
@@ -10,6 +10,7 @@ interface HeroVideoProps {
 
 export default function HeroVideo({ avatarState }: HeroVideoProps) {
   const { startVoice } = useLiveContext();
+  const [isInitialFrameReady, setIsInitialFrameReady] = useState(false);
 
 
   const addDebugLog = useCallback((msg: string) => {
@@ -34,6 +35,9 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
   }, [addDebugLog]);
 
   const activationLockRef = useRef<boolean>(false);
+  const revealInitialFrame = useCallback(() => {
+    setIsInitialFrameReady(true);
+  }, []);
 
   const activateConversation = useCallback((sourceEvent: string) => {
     if (activationLockRef.current) return;
@@ -192,9 +196,64 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
         <DoubleBufferVideoPlayer
           state={avatarState === "WAITING" ? "IDLE" : avatarState}
           loop={true}
+          onInitialFrameReady={revealInitialFrame}
           className="w-full h-full object-cover rounded-[28px] bg-transparent shadow-xs"
           objectPosition="center 15%"
         />
+
+        {/*
+          This cover is server-rendered and weighs no extra image bytes. It
+          hides the native mobile video placeholder until the browser has
+          painted Eterna's first decoded frame, without blocking video, voice,
+          or the transparent activation layer above it.
+        */}
+        <div
+          aria-hidden="true"
+          className={`absolute inset-0 z-[15] overflow-hidden rounded-[28px] bg-[#080b10] transition-[opacity,visibility] duration-500 ease-out ${
+            isInitialFrameReady ? "invisible opacity-0" : "visible opacity-100"
+          }`}
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_34%,rgba(30,154,207,0.20),transparent_24%),radial-gradient(circle_at_74%_78%,rgba(99,102,241,0.12),transparent_34%),linear-gradient(155deg,#111721_0%,#080b10_52%,#050608_100%)]" />
+          <div className="absolute inset-0 opacity-[0.12] [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:42px_42px] [mask-image:linear-gradient(to_bottom,black,transparent_82%)]" />
+          <div className="absolute -left-20 top-[22%] h-56 w-56 rounded-full border border-sky-300/10" />
+          <div className="absolute -right-24 top-[8%] h-72 w-72 rounded-full border border-white/[0.06]" />
+
+          <div className="relative flex h-full flex-col px-7 pb-24 pt-8 sm:px-9 sm:pt-10">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.28em] text-sky-300/70">Towers México</p>
+                <p className="mt-1 text-[8px] font-bold uppercase tracking-[0.22em] text-white/30">Concierge inmobiliaria</p>
+              </div>
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-300 opacity-50 motion-reduce:animate-none" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-300" />
+              </span>
+            </div>
+
+            <div className="flex flex-1 items-center justify-center">
+              <div className="relative flex h-36 w-36 items-center justify-center sm:h-40 sm:w-40">
+                <div className="absolute inset-0 animate-[eterna-orbit_8s_linear_infinite] rounded-full border border-white/[0.08] motion-reduce:animate-none">
+                  <span className="absolute left-1/2 top-[-3px] h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(103,232,249,0.95)]" />
+                </div>
+                <div className="absolute inset-4 animate-[eterna-orbit_12s_linear_infinite_reverse] rounded-full border border-sky-300/15 motion-reduce:animate-none">
+                  <span className="absolute bottom-[11px] right-[8px] h-1 w-1 rounded-full bg-indigo-300 shadow-[0_0_14px_rgba(165,180,252,0.9)]" />
+                </div>
+                <div className="absolute inset-9 rounded-full border border-white/10 bg-white/[0.035] shadow-[inset_0_0_36px_rgba(56,189,248,0.08),0_0_48px_rgba(14,165,233,0.08)] backdrop-blur-sm" />
+                <div className="relative flex h-12 w-12 items-center justify-center rounded-[17px] border border-white/10 bg-white/[0.07] shadow-[0_14px_40px_rgba(0,0,0,0.35)]">
+                  <span className="h-2.5 w-2.5 rotate-45 rounded-[3px] bg-gradient-to-br from-white via-cyan-200 to-sky-500 shadow-[0_0_20px_rgba(103,232,249,0.55)]" />
+                </div>
+              </div>
+            </div>
+
+            <div className="mx-auto w-full max-w-[230px] text-center">
+              <p className="text-[11px] font-black uppercase tracking-[0.32em] text-white">Eterna</p>
+              <p className="mt-2 text-[9px] font-semibold tracking-[0.08em] text-white/42">Preparando tu experiencia</p>
+              <div className="mt-4 h-px overflow-hidden bg-white/10">
+                <span className="block h-full w-1/2 animate-[eterna-line_1.35s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-cyan-300 to-transparent motion-reduce:animate-none" />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Styles for dynamic thinking/talking border animations */}
@@ -216,6 +275,14 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
             box-shadow: 0 0 65px rgba(34, 197, 94, 0.65);
             transform: scale(1.006);
           }
+        }
+        @keyframes eterna-orbit {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes eterna-line {
+          0% { transform: translateX(-110%); opacity: 0.35; }
+          50% { opacity: 1; }
+          100% { transform: translateX(220%); opacity: 0.35; }
         }
         .animate-border-glow-pulse {
           animation: border-glow-pulse 3s infinite ease-in-out;
