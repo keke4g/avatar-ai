@@ -109,6 +109,7 @@ export interface EternaDrawerViewModel {
   isHome: boolean;
   isListening: boolean;
   isPropertyPage: boolean;
+  isPropertyVisualActive: boolean;
   mode: ConciergeMode;
   visible: boolean;
 }

@@ -14,11 +14,17 @@ export function usePropertyEternaVisual(propertyId: string) {
   const activeSectionRef = useRef<EternaPropertyVisualSection | null>(null);
   const summaryStartedTalkingRef = useRef(false);
 
-  const close = useCallback(() => {
+  const closeLocal = useCallback(() => {
     activeSectionRef.current = null;
     summaryStartedTalkingRef.current = false;
     setActiveSection(null);
   }, []);
+
+  const close = useCallback(() => {
+    window.dispatchEvent(new CustomEvent(ETERNA_CLOSE_PROPERTY_VISUAL_EVENT, {
+      detail: { propertyId, section: activeSectionRef.current || undefined },
+    }));
+  }, [propertyId]);
 
   useEffect(() => {
     const handleShow = (event: Event) => {
@@ -33,7 +39,7 @@ export function usePropertyEternaVisual(propertyId: string) {
       const detail = (event as CustomEvent<EternaClosePropertyVisualDetail>).detail;
       if (!detail || detail.propertyId !== propertyId) return;
       if (detail.section && detail.section !== activeSectionRef.current) return;
-      close();
+      closeLocal();
     };
 
     const handleEternaStatus = (event: Event) => {
@@ -54,7 +60,7 @@ export function usePropertyEternaVisual(propertyId: string) {
       window.removeEventListener(ETERNA_CLOSE_PROPERTY_VISUAL_EVENT, handleClose);
       window.removeEventListener('eterna-status', handleEternaStatus);
     };
-  }, [close, propertyId]);
+  }, [close, closeLocal, propertyId]);
 
   useEffect(() => {
     if (!activeSection) return;

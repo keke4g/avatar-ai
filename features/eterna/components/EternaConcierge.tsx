@@ -68,7 +68,9 @@ import {
   ETERNA_CLOSE_PROPERTY_VISUAL_EVENT,
   ETERNA_OPEN_PROPERTY_VIDEO_EVENT,
   ETERNA_SHOW_PROPERTY_VISUAL_EVENT,
+  type EternaClosePropertyVisualDetail,
   type EternaPropertyVisualSection,
+  type EternaShowPropertyVisualDetail,
 } from '@/lib/eterna/events';
 import { resolvePropertyVisualSection } from '@/lib/eterna/propertyVisuals';
 import { buildEternaSystemPrompt } from '@/lib/eterna/systemPrompt';
@@ -136,6 +138,7 @@ export default function EternaConcierge() {
   // Overlay state
   const [isOpen, setIsOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
+  const [isPropertyVisualActive, setIsPropertyVisualActive] = useState(false);
   const touchStartY = useRef<number | null>(null);
   const [showTooltip, setShowTooltip] = useState(true);
   const [typedInput, setTypedInput] = useState('');
@@ -154,6 +157,30 @@ export default function EternaConcierge() {
     if (typeof window === 'undefined') return false;
     return pathname !== '/' && !pathname.startsWith('/property/');
   }, [pathname]);
+
+  useEffect(() => {
+    if (!isPropertyPage) {
+      setIsPropertyVisualActive(false);
+      return;
+    }
+
+    const propertyId = liveContext.property?.id;
+    const handleShow = (event: Event) => {
+      const detail = (event as CustomEvent<EternaShowPropertyVisualDetail>).detail;
+      if (detail?.propertyId === propertyId) setIsPropertyVisualActive(true);
+    };
+    const handleClose = (event: Event) => {
+      const detail = (event as CustomEvent<EternaClosePropertyVisualDetail>).detail;
+      if (detail?.propertyId === propertyId) setIsPropertyVisualActive(false);
+    };
+
+    window.addEventListener(ETERNA_SHOW_PROPERTY_VISUAL_EVENT, handleShow);
+    window.addEventListener(ETERNA_CLOSE_PROPERTY_VISUAL_EVENT, handleClose);
+    return () => {
+      window.removeEventListener(ETERNA_SHOW_PROPERTY_VISUAL_EVENT, handleShow);
+      window.removeEventListener(ETERNA_CLOSE_PROPERTY_VISUAL_EVENT, handleClose);
+    };
+  }, [isPropertyPage, liveContext.property?.id]);
 
   // Eterna Search Concierge State
 
@@ -687,7 +714,7 @@ export default function EternaConcierge() {
       setConciergeMode('avatar');
       setShowTooltip(false);
       setIsCompact(false);
-      setIsOpen(window.matchMedia('(min-width: 768px)').matches);
+      setIsOpen(window.matchMedia('(min-width: 1024px)').matches);
       setChatHistory((previous) => (
         previous.some((message) => message.role === 'assistant' && message.content === presentation.speech)
           ? previous
@@ -1573,7 +1600,7 @@ Explore actualizado: Redirecting to /explore`);
       dispatchPropertyVisual(liveContext.property.id, 'location');
       setConciergeMode('avatar');
       setIsCompact(false);
-      setIsOpen(window.matchMedia('(min-width: 768px)').matches);
+      setIsOpen(window.matchMedia('(min-width: 1024px)').matches);
       return { status: 'completed' as const, target: 'property location' };
     }
 
@@ -1748,7 +1775,7 @@ Explore actualizado: Redirecting to /explore`);
       dispatchPropertyVisual(activeProperty.id, requestedVisualSection);
       setConciergeMode('avatar');
       setIsCompact(false);
-      setIsOpen(window.matchMedia('(min-width: 768px)').matches);
+      setIsOpen(window.matchMedia('(min-width: 1024px)').matches);
     }
 
     const activePropertyTitle = activeProperty
@@ -2044,7 +2071,7 @@ Explore actualizado: Redirecting to /explore`);
       dispatchPropertyVisual(activeProperty.id, 'location');
       setConciergeMode('avatar');
       setIsCompact(false);
-      setIsOpen(window.matchMedia('(min-width: 768px)').matches);
+      setIsOpen(window.matchMedia('(min-width: 1024px)').matches);
       speak(locationReply, () => setSimulatedStatus('idle'));
       return;
     }
@@ -3312,6 +3339,7 @@ Explore actualizado: Redirecting to /explore`);
           isHome,
           isListening,
           isPropertyPage,
+          isPropertyVisualActive,
           mode: conciergeMode,
           visible: isOpen && !isHome,
         }}

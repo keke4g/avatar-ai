@@ -139,9 +139,9 @@ function SummaryVisual({ language, property }: { language: LanguageType; propert
   ];
 
   return (
-    <div className="overflow-hidden rounded-[28px] border border-white/80 bg-white shadow-[0_28px_70px_-45px_rgba(15,23,42,0.65)]">
-      <div className="grid lg:min-h-[520px] lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="relative h-28 bg-neutral-100 sm:h-40 lg:h-auto lg:min-h-[520px]">
+    <div className="overflow-hidden rounded-[28px] border border-white/80 bg-white shadow-[0_28px_70px_-45px_rgba(15,23,42,0.65)] lg:h-full">
+      <div className="grid lg:h-full lg:min-h-0 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="relative h-28 bg-neutral-100 sm:h-40 lg:h-auto lg:min-h-0">
           {cover ? (
             <Image src={cover} alt={property.title} fill priority unoptimized sizes="(max-width: 1023px) 100vw, 40vw" className="object-cover" />
           ) : (
@@ -345,7 +345,7 @@ export const PropertyEternaVisualPanel = memo(function PropertyEternaVisualPanel
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[70] flex items-end bg-slate-950/68 backdrop-blur-md lg:items-center lg:pr-[430px]"
+          className="fixed inset-0 z-[5100] flex items-end bg-[#555862] lg:items-center lg:pr-[430px]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="eterna-property-visual-title"
@@ -358,7 +358,7 @@ export const PropertyEternaVisualPanel = memo(function PropertyEternaVisualPanel
             animate={{ y: 0, scale: 1 }}
             exit={{ y: 42, scale: 0.985 }}
             transition={{ type: 'spring', damping: 29, stiffness: 290 }}
-            className={`flex w-full flex-col overflow-hidden border border-white/70 bg-[#f6f6f3] shadow-[0_35px_110px_rgba(2,6,23,0.5)] lg:mx-auto lg:max-w-6xl lg:rounded-[34px] ${activeSection === 'summary' ? 'max-h-[88dvh] rounded-t-[30px]' : 'h-[93dvh] rounded-t-[30px] lg:h-auto lg:max-h-[92dvh]'}`}
+            className="flex h-[93dvh] w-full flex-col overflow-hidden rounded-t-[30px] border border-white/70 bg-[#f6f6f3] shadow-[0_35px_110px_rgba(2,6,23,0.5)] lg:mx-auto lg:h-[88dvh] lg:max-w-6xl lg:rounded-[34px]"
           >
             <header className="flex shrink-0 items-start justify-between gap-4 border-b border-neutral-200/80 bg-white px-4 py-3.5 sm:px-6 sm:py-5">
               <div className="flex min-w-0 items-start gap-3.5">
@@ -376,7 +376,7 @@ export const PropertyEternaVisualPanel = memo(function PropertyEternaVisualPanel
               </button>
             </header>
 
-            <div className={`${activeSection === 'summary' ? 'overflow-hidden p-3 sm:p-5' : 'overflow-y-auto p-4 sm:p-6'}`}>
+            <div className={`min-h-0 flex-1 ${activeSection === 'summary' ? 'overflow-hidden p-3 sm:p-5' : 'overflow-y-auto p-4 sm:p-6'}`}>
               {content}
             </div>
           </motion.section>

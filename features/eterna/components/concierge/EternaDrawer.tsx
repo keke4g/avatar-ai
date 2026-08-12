@@ -24,6 +24,7 @@ export function EternaDrawer({ actions, inputRef, model, textEndRef }: EternaDra
     isCompact,
     isListening,
     isPropertyPage,
+    isPropertyVisualActive,
     mode,
     visible,
   } = model;
@@ -31,7 +32,14 @@ export function EternaDrawer({ actions, inputRef, model, textEndRef }: EternaDra
   return (
     <AnimatePresence>
       {visible && (
-        <div data-eterna-ui className="fixed inset-x-2 bottom-2 md:bottom-6 md:right-6 md:left-auto z-[80] flex flex-col items-end pointer-events-none">
+        <div
+          data-eterna-ui
+          className={`fixed inset-x-2 bottom-2 flex flex-col items-end pointer-events-none md:bottom-6 md:right-6 md:left-auto ${
+            isPropertyPage && isPropertyVisualActive
+              ? 'z-[5200] lg:top-[6dvh] lg:bottom-[6dvh]'
+              : 'z-[80]'
+          }`}
+        >
           <motion.div
             initial={{ y: '100%', opacity: 0, scale: 0.95 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
@@ -42,7 +50,9 @@ export function EternaDrawer({ actions, inputRef, model, textEndRef }: EternaDra
                 ? 'bg-slate-950 border-transparent shadow-[0_20px_60px_rgba(0,0,0,0.3)] text-white p-[3.2px] cursor-pointer'
                 : 'bg-white/95 border-brand-gray-200/60 shadow-[0_20px_50px_rgba(0,0,0,0.12)] text-brand-black'
             } ${
-              isCompact && mode !== 'avatar'
+              isPropertyPage && isPropertyVisualActive
+                ? 'h-[25dvh] min-h-[160px] max-h-[220px] lg:h-full lg:min-h-0 lg:max-h-none'
+                : isCompact && mode !== 'avatar'
                 ? 'h-[136px] md:h-[170px]'
                 : (mode === 'avatar'
                     ? 'h-[25dvh] min-h-[160px] max-h-[220px] md:h-[580px] md:min-h-0 md:max-h-none'
