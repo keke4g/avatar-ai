@@ -62,7 +62,9 @@ const getPropertyTypeLabel = (type: Property['type'], lang: 'es' | 'en'): string
     'Beach House': { es: 'casa de playa', en: 'beach house' },
     Cabin: { es: 'cabaña', en: 'cabin' },
     Penthouse: { es: 'penthouse', en: 'penthouse' },
-    Villa: { es: 'villa', en: 'villa' },
+    // The catalog's legacy `Villa` value represents detached houses. Keep the
+    // internal value for compatibility, but describe it to customers plainly.
+    Villa: { es: 'casa', en: 'house' },
     Loft: { es: 'loft', en: 'loft' },
   };
 
@@ -135,7 +137,7 @@ export const buildPropertyPresentation = (
   const title = property.title?.trim() || (lang === 'es' ? 'esta propiedad' : 'this property');
   const { neighborhood, city, location } = getPublicLocationParts(property);
   const propertyType = getPropertyTypeLabel(property.type, lang);
-  const isFemininePropertyType = ['casa de playa', 'cabaña', 'villa', 'propiedad'].includes(propertyType);
+  const isFemininePropertyType = ['casa', 'casa de playa', 'cabaña', 'villa', 'propiedad'].includes(propertyType);
   const propertyArticle = isFemininePropertyType ? 'una' : 'un';
   const locatedAdjective = isFemininePropertyType ? 'ubicada' : 'ubicado';
   const variantIndex = Math.abs(hashString(`${property.id}:${visitVariant}`)) % 4;

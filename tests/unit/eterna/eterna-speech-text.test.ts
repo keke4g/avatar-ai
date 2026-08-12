@@ -65,6 +65,14 @@ test('Eterna speaks percentages, surfaces, terms and dates as words', () => {
     normalizeEternaSpeechText('Tiene 144 m² y 3 habitaciones. Corte: 31 jul 2026.'),
     'Tiene ciento cuarenta y cuatro metros cuadrados y tres habitaciones. Corte: treinta y uno de julio de dos mil veintiséis.',
   );
+  assert.equal(
+    normalizeEternaSpeechText('La construcción es de 154.85 metros cuadrados.'),
+    'La construcción es de ciento cincuenta y cuatro punto ochenta y cinco metros cuadrados.',
+  );
+  assert.equal(
+    normalizeEternaSpeechText('La terraza mide 42.05 m².'),
+    'La terraza mide cuarenta y dos punto cero cinco metros cuadrados.',
+  );
 });
 
 test('Eterna does not rewrite phone numbers as monetary or contextual amounts', () => {

@@ -307,6 +307,8 @@ test('Eterna presents a property briefly and leaves the conversation open', () =
   assert.ok(presentation.speech.length < 430);
   assert.ok(presentation.speech.endsWith('?'));
   assert.match(presentation.speech, /precio de venta de/);
+  assert.match(presentation.speech, /una casa/);
+  assert.doesNotMatch(presentation.speech, /una villa/);
   assert.doesNotMatch(presentation.speech, /baños completos y \$[\d,.]+/);
 });
 

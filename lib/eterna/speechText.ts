@@ -172,11 +172,20 @@ function speakContextNumber(rawNumber: string, beforeNoun = false): string {
   const compact = rawNumber.replace(/\s+/g, '');
   const decimalMatch = compact.match(/[.,](\d+)$/u);
   const decimalDigits = decimalMatch?.[1] || String(parsed).split('.')[1] || '';
-  const decimalWords = decimalDigits
-    .split('')
-    .map(digit => UNITS[Number(digit)])
-    .join(' ');
+  const decimalWords = decimalDigits.startsWith('0')
+    ? decimalDigits
+      .split('')
+      .map(digit => UNITS[Number(digit)])
+      .join(' ')
+    : integerToSpanish(Number(decimalDigits));
   return `${integerToSpanish(Math.floor(parsed))} punto ${decimalWords}`;
+}
+
+function speakSurfaceAmount(rawAmount: string): string {
+  const parsed = parseSpokenAmount(rawAmount);
+  return parsed === 1
+    ? `${speakContextNumber(rawAmount, true)} metro cuadrado`
+    : `${speakContextNumber(rawAmount, true)} metros cuadrados`;
 }
 
 const MONTH_NAMES: Record<string, string> = {
@@ -244,12 +253,11 @@ export function normalizeEternaSpeechText(text: string, language: 'es' | 'en' = 
     )
     .replace(
       new RegExp(String.raw`\b(${CONTEXT_NUMBER})\s*m(?:²|2)(?=\s|[.,;:!?)]|$)`, 'gi'),
-      (_match, amount: string) => {
-        const parsed = parseSpokenAmount(amount);
-        return parsed === 1
-          ? `${speakContextNumber(amount, true)} metro cuadrado`
-          : `${speakContextNumber(amount, true)} metros cuadrados`;
-      },
+      (_match, amount: string) => speakSurfaceAmount(amount),
+    )
+    .replace(
+      new RegExp(String.raw`\b(${CONTEXT_NUMBER})\s+metros?\s+cuadrados?\b`, 'gi'),
+      (_match, amount: string) => speakSurfaceAmount(amount),
     )
     .replace(
       /\bm(?:²|2)(?=\s|[.,;:!?)]|$)/gi,
