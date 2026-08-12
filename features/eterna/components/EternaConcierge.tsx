@@ -139,6 +139,7 @@ export default function EternaConcierge() {
   const [isOpen, setIsOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const [isPropertyVisualActive, setIsPropertyVisualActive] = useState(false);
+  const [conciergeMode, setConciergeMode] = useState<'avatar' | 'chat'>('avatar');
   const touchStartY = useRef<number | null>(null);
   const [showTooltip, setShowTooltip] = useState(true);
   const [typedInput, setTypedInput] = useState('');
@@ -171,7 +172,13 @@ export default function EternaConcierge() {
     };
     const handleClose = (event: Event) => {
       const detail = (event as CustomEvent<EternaClosePropertyVisualDetail>).detail;
-      if (detail?.propertyId === propertyId) setIsPropertyVisualActive(false);
+      if (detail?.propertyId !== propertyId) return;
+      setIsPropertyVisualActive(false);
+      if (window.matchMedia('(max-width: 1023px)').matches) {
+        setConciergeMode('chat');
+        setIsCompact(false);
+        setIsOpen(true);
+      }
     };
 
     window.addEventListener(ETERNA_SHOW_PROPERTY_VISUAL_EVENT, handleShow);
@@ -457,8 +464,6 @@ export default function EternaConcierge() {
 
   // Sync simulated status when WebSocket is active
   const activeStatus = (isConnected && !geminiActive) ? wsStatus : simulatedStatus;
-
-  const [conciergeMode, setConciergeMode] = useState<'avatar' | 'chat'>('avatar');
 
   // The compact drawer is useful as a passive voice indicator, but it leaves
   // the actual conversation with too little room. Entering Chat always opens

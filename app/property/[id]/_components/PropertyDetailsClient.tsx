@@ -1933,7 +1933,17 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
         loading={nearby.loading}
         error={nearby.error}
         language={language}
+        mortgageScenario={{
+          downPaymentPercent: downPaymentPct,
+          years: financingTermYears,
+          annualRatePercent: mortgageAnnualRatePct,
+        }}
         onClose={eternaVisual.close}
+        onMortgageScenarioChange={(scenario) => {
+          setDownPaymentPct(scenario.downPaymentPercent);
+          setFinancingTermYears(scenario.years);
+          setMortgageAnnualRatePct(scenario.annualRatePercent);
+        }}
         onOpenGallery={openGallery}
       />
       {/* Premium Lightbox Gallery Modal */}

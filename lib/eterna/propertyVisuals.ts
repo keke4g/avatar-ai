@@ -21,8 +21,12 @@ const VISUAL_RULES: VisualRule[] = [
     pattern: /\b(?:valuacion|avaluo|estimacion|valor de mercado|rango de valor|comparables?|precio por metro|precio por m2)\b/,
   },
   {
+    section: 'mortgage',
+    pattern: /\b(?:mensualidad|mensualidades|pago mensual|pagaria al mes|pagar al mes|cuanto pagaria|cuanto se paga al mes|simulador hipotecario|simulacion hipotecaria|calcular hipoteca|calcula(?:r)? (?:mi |la )?mensualidad|enganche|plazo|tasa anual|hipoteca)\b/,
+  },
+  {
     section: 'financing',
-    pattern: /\b(?:financiamiento|financiar|hipoteca|credito|enganche|mensualidad|infonavit|fovissste|metodos? de pago)\b/,
+    pattern: /\b(?:opciones? de pago|formas? de pago|metodos? de pago|opciones? de financiamiento|metodos? de financiamiento|financiamiento|financiar|credito bancario|infonavit|fovissste|recursos propios)\b/,
   },
   {
     section: 'legal',

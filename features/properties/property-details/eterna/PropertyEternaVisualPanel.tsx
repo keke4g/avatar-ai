@@ -9,7 +9,9 @@ import {
   Bath,
   BedDouble,
   Building2,
+  Calculator,
   Camera,
+  Clock3,
   Compass,
   FileCheck2,
   FileText,
@@ -21,6 +23,7 @@ import {
   MessageCircle,
   PhoneCall,
   Play,
+  Percent,
   Ruler,
   Scale,
   Sparkles,
@@ -42,6 +45,7 @@ import {
 } from '@/components/property/sections/TowersValuationPanel';
 import type { LanguageType } from '@/lib/context/LanguageContext';
 import type { EternaPropertyVisualSection } from '@/lib/eterna/events';
+import { calculateMortgage, type MortgageScenario } from '@/lib/finance/mortgage';
 import type { NearbyPlace } from '@/lib/maps/types';
 import { formatPropertyLocation } from '@/lib/textHelpers';
 import type { Property, PropertyOffering } from '@/lib/types';
@@ -62,7 +66,9 @@ interface PropertyEternaVisualPanelProps {
   error: string | null;
   language: LanguageType;
   loading: boolean;
+  mortgageScenario: MortgageScenario;
   onClose: () => void;
+  onMortgageScenarioChange: (scenario: MortgageScenario) => void;
   onOpenGallery: (index: number) => void;
   places?: NearbyPlace[];
   property: Property;
@@ -87,6 +93,7 @@ const SECTION_META: Record<EternaPropertyVisualSection, SectionMeta> = {
   media: { eyebrowEs: 'Multimedia', eyebrowEn: 'Media', titleEs: 'Videos, recorridos y planos', titleEn: 'Videos, tours & floor plans', icon: Play, accent: 'text-fuchsia-700' },
   location: { eyebrowEs: 'Ubicación interactiva', eyebrowEn: 'Interactive location', titleEs: 'Mapa y lugares cercanos', titleEn: 'Map & nearby places', icon: MapPin, accent: 'text-sky-700' },
   valuation: { eyebrowEs: 'Inteligencia de mercado', eyebrowEn: 'Market intelligence', titleEs: 'Estimación automatizada Towers', titleEn: 'Towers automated estimate', icon: Scale, accent: 'text-indigo-700' },
+  mortgage: { eyebrowEs: 'Escenario editable', eyebrowEn: 'Editable scenario', titleEs: 'Mensualidad y simulador hipotecario', titleEn: 'Monthly payment & mortgage simulator', icon: Calculator, accent: 'text-sky-700' },
   financing: { eyebrowEs: 'Adquisición', eyebrowEn: 'Acquisition', titleEs: 'Financiamiento y métodos de pago', titleEn: 'Financing & payment methods', icon: WalletCards, accent: 'text-emerald-700' },
   legal: { eyebrowEs: 'Debida diligencia', eyebrowEn: 'Due diligence', titleEs: 'Situación documental', titleEn: 'Document status', icon: FileCheck2, accent: 'text-amber-700' },
   contact: { eyebrowEs: 'Contacto verificado', eyebrowEn: 'Verified contact', titleEs: 'Responsable de la publicación', titleEn: 'Listing representative', icon: UserRound, accent: 'text-cyan-700' },
@@ -290,12 +297,167 @@ function CommercialVisual({ language, property }: { language: LanguageType; prop
   );
 }
 
+function MortgageSimulatorVisual({
+  language,
+  onScenarioChange,
+  property,
+  scenario,
+}: {
+  language: LanguageType;
+  onScenarioChange: (scenario: MortgageScenario) => void;
+  property: Property;
+  scenario: MortgageScenario;
+}) {
+  const saleOffering = (property.offerings || []).find((offering) => (
+    offering.mode === 'SALE'
+    && offering.status === 'ACTIVE'
+    && offering.visibility === 'PUBLIC'
+    && Number(offering.priceAmount) > 0
+  ));
+  const price = Number(saleOffering?.priceAmount || 0);
+  const mortgage = calculateMortgage(price, scenario);
+  const locale = language === 'es' ? 'es-MX' : 'en-US';
+  const currency = saleOffering?.currency || 'MXN';
+  const money = (value: number) => {
+    try {
+      return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency,
+        maximumFractionDigits: 0,
+      }).format(Math.round(value));
+    } catch {
+      return `$${Math.round(value).toLocaleString(locale)} ${currency}`;
+    }
+  };
+  const updateScenario = (change: Partial<MortgageScenario>) => {
+    onScenarioChange({ ...scenario, ...change });
+  };
+
+  if (!saleOffering || !mortgage) {
+    return (
+      <EmptyVisual
+        language={language}
+        message={language === 'es'
+          ? 'Se necesita un precio de venta publicado para calcular una mensualidad hipotecaria.'
+          : 'A published sale price is required to calculate a mortgage payment.'}
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[0.82fr_1.18fr]">
+      <section className="relative overflow-hidden rounded-[30px] bg-neutral-950 p-6 text-white shadow-[0_30px_75px_-42px_rgba(2,6,23,0.9)] sm:p-8">
+        <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-sky-400/15 blur-3xl" />
+        <div className="relative">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/15 bg-white/10">
+            <Calculator className="h-5 w-5 text-sky-300" aria-hidden="true" />
+          </span>
+          <p className="mt-7 text-[9px] font-black uppercase tracking-[0.18em] text-sky-300">
+            {language === 'es' ? 'Mensualidad estimada' : 'Estimated monthly payment'}
+          </p>
+          <p className="mt-2 text-4xl font-black tracking-[-0.045em] sm:text-5xl">
+            {money(mortgage.monthlyPayment)}
+          </p>
+          <p className="mt-2 text-xs font-bold text-white/55">
+            {language === 'es' ? 'al mes' : 'per month'} · {scenario.years} {language === 'es' ? 'años' : 'years'}
+          </p>
+
+          <dl className="mt-8 grid grid-cols-2 gap-2">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3.5">
+              <dt className="text-[8px] font-black uppercase tracking-[0.12em] text-white/45">{language === 'es' ? 'Precio' : 'Price'}</dt>
+              <dd className="mt-1.5 text-sm font-black">{money(price)}</dd>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3.5">
+              <dt className="text-[8px] font-black uppercase tracking-[0.12em] text-white/45">{language === 'es' ? 'Enganche' : 'Down payment'}</dt>
+              <dd className="mt-1.5 text-sm font-black">{money(mortgage.downPaymentAmount)}</dd>
+            </div>
+            <div className="col-span-2 rounded-2xl border border-white/10 bg-white/[0.06] p-3.5">
+              <dt className="text-[8px] font-black uppercase tracking-[0.12em] text-white/45">{language === 'es' ? 'Monto financiado' : 'Financed amount'}</dt>
+              <dd className="mt-1.5 text-sm font-black">{money(mortgage.loanAmount)}</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section className="rounded-[30px] border border-neutral-200 bg-white p-5 shadow-sm sm:p-7">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-neutral-400">{language === 'es' ? 'Ajusta el escenario' : 'Adjust the scenario'}</p>
+            <h3 className="mt-1 text-xl font-black tracking-tight text-neutral-950">{language === 'es' ? 'Simulador hipotecario' : 'Mortgage simulator'}</h3>
+          </div>
+          <span className="rounded-full bg-sky-50 px-3 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-sky-700">{language === 'es' ? 'Interactivo' : 'Interactive'}</span>
+        </div>
+
+        <div className="mt-7 space-y-7">
+          <label className="block">
+            <span className="flex items-center justify-between gap-3 text-xs font-black text-neutral-700">
+              <span className="flex items-center gap-2"><Percent className="h-4 w-4 text-sky-700" />{language === 'es' ? 'Enganche' : 'Down payment'}</span>
+              <span className="rounded-full bg-neutral-100 px-3 py-1 text-neutral-950">{scenario.downPaymentPercent}%</span>
+            </span>
+            <input
+              type="range"
+              min={10}
+              max={80}
+              step={5}
+              value={scenario.downPaymentPercent}
+              onChange={(event) => updateScenario({ downPaymentPercent: Number(event.target.value) })}
+              className="mt-4 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-neutral-200 accent-sky-600"
+            />
+            <span className="mt-2 flex justify-between text-[9px] font-bold text-neutral-400"><span>10%</span><span>80%</span></span>
+          </label>
+
+          <div>
+            <span className="flex items-center gap-2 text-xs font-black text-neutral-700"><Clock3 className="h-4 w-4 text-sky-700" />{language === 'es' ? 'Plazo' : 'Term'}</span>
+            <div className="mt-3 grid grid-cols-4 gap-2 rounded-2xl bg-neutral-100 p-1.5">
+              {[10, 15, 20, 25].map((years) => (
+                <button
+                  key={years}
+                  type="button"
+                  onClick={() => updateScenario({ years })}
+                  className={`min-h-10 rounded-xl text-[10px] font-black transition ${scenario.years === years ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-950'}`}
+                >
+                  {years} {language === 'es' ? 'años' : 'yrs'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <label className="block">
+            <span className="flex items-center justify-between gap-3 text-xs font-black text-neutral-700">
+              <span className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-sky-700" />{language === 'es' ? 'Tasa anual' : 'Annual rate'}</span>
+              <span className="rounded-full bg-neutral-100 px-3 py-1 text-neutral-950">{scenario.annualRatePercent.toFixed(1)}%</span>
+            </span>
+            <input
+              type="range"
+              min={5}
+              max={20}
+              step={0.1}
+              value={scenario.annualRatePercent}
+              onChange={(event) => updateScenario({ annualRatePercent: Number(event.target.value) })}
+              className="mt-4 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-neutral-200 accent-sky-600"
+            />
+            <span className="mt-2 flex justify-between text-[9px] font-bold text-neutral-400"><span>5%</span><span>20%</span></span>
+          </label>
+        </div>
+
+        <p className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[10px] font-semibold leading-relaxed text-amber-900">
+          {language === 'es'
+            ? 'Estimación orientativa sin seguros, comisiones bancarias ni gastos de escrituración. No constituye una oferta de crédito.'
+            : 'Illustrative estimate excluding insurance, bank fees, and closing costs. This is not a credit offer.'}
+        </p>
+      </section>
+    </div>
+  );
+}
+
 export const PropertyEternaVisualPanel = memo(function PropertyEternaVisualPanel({
   activeSection,
   error,
   language,
   loading,
+  mortgageScenario,
   onClose,
+  onMortgageScenarioChange,
   onOpenGallery,
   places,
   property,
@@ -329,6 +491,7 @@ export const PropertyEternaVisualPanel = memo(function PropertyEternaVisualPanel
             : activeSection === 'media' ? (hasMultimedia ? <PropertyMultimediaSection language={language} property={property} /> : <EmptyVisual language={language} />)
               : activeSection === 'location' ? (property.latitude !== null && property.longitude !== null ? <GooglePropertyLocation property={property} places={places || EMPTY_NEARBY_PLACES} loading={loading} error={error} language={language === 'es' ? 'es' : 'en'} /> : <EmptyVisual language={language} />)
                 : activeSection === 'valuation' ? <TowersValuationPanel property={property} valuation={valuation} language={language === 'es' ? 'es' : 'en'} />
+                  : activeSection === 'mortgage' ? <MortgageSimulatorVisual language={language} property={property} scenario={mortgageScenario} onScenarioChange={onMortgageScenarioChange} />
                   : activeSection === 'financing' ? <FinancingCompatibility property={property} language={language} />
                     : activeSection === 'legal' ? <LegalDossierSection property={property} language={language} />
                       : activeSection === 'contact' ? <ContactVisual language={language} property={property} />

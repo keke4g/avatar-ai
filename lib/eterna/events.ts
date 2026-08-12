@@ -11,6 +11,7 @@ export type EternaPropertyVisualSection =
   | 'media'
   | 'location'
   | 'valuation'
+  | 'mortgage'
   | 'financing'
   | 'legal'
   | 'contact'

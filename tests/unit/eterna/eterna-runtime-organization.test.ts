@@ -79,6 +79,10 @@ test('traduce preguntas de la ficha en secciones visuales deterministas', () => 
   assert.equal(resolvePropertyVisualSection('Muéstrame el mapa y qué hay cerca'), 'location');
   assert.equal(resolvePropertyVisualSection('Explícame la estimación y sus comparables'), 'valuation');
   assert.equal(resolvePropertyVisualSection('¿Cuánto cuesta y es negociable?'), 'commercial');
+  assert.equal(resolvePropertyVisualSection('Muéstrame las opciones de pago'), 'financing');
+  assert.equal(resolvePropertyVisualSection('¿Qué métodos de financiamiento aceptan?'), 'financing');
+  assert.equal(resolvePropertyVisualSection('¿Cuánto pagaría de mensualidad?'), 'mortgage');
+  assert.equal(resolvePropertyVisualSection('Calcula mi pago mensual a 20 años'), 'mortgage');
   assert.equal(resolvePropertyVisualSection('¿Cuántos metros cuadrados tiene?'), 'technical');
   assert.equal(resolvePropertyVisualSection('¿Tiene cuarto de servicio?', ['Cuarto de servicio']), 'amenities');
   assert.equal(resolvePropertyVisualSection('Hazme un resumen en pocas palabras'), 'summary');
