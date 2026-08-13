@@ -33,6 +33,12 @@ import {
   getPropertyPresentationCloseDelay,
 } from '../../../lib/eterna/propertyPresentationTiming';
 import { resolvePropertyVisualAnswer } from '../../../lib/eterna/actions/PropertyVisualActions';
+import {
+  clearAuthenticatedGreeting,
+  consumeAuthenticatedGreeting,
+  consumePropertySummaryPresentation,
+  getEternaFirstName,
+} from '../../../lib/eterna/sessionExperience';
 import type { Property } from '../../../lib/types';
 
 test('normaliza transcripciones y detecta ecos por tokens', () => {
@@ -88,6 +94,27 @@ test('construye un prompt actual, localizado y limitado a rutas reales', () => {
   assert.doesNotMatch(prompt.content, /El Wizard consta de 6/);
   assert.match(prompt.content, /3 o 4 oraciones breves/);
   assert.match(prompt.content, /UNA pregunta breve/);
+  assert.match(prompt.content, /beneficio cotidiano o la sensación/);
+});
+
+test('personaliza el saludo y conserva el resumen una sola vez por propiedad y pestaña', () => {
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  };
+
+  assert.equal(getEternaFirstName('  Christian   Arellano  ', 'otro@example.com'), 'Christian');
+  assert.equal(getEternaFirstName('', 'cristian@example.com'), 'cristian');
+  assert.equal(consumePropertySummaryPresentation(storage, 'property-1'), true);
+  assert.equal(consumePropertySummaryPresentation(storage, 'property-1'), false);
+  assert.equal(consumePropertySummaryPresentation(storage, 'property-2'), true);
+
+  assert.equal(consumeAuthenticatedGreeting(storage, 'user-1'), true);
+  assert.equal(consumeAuthenticatedGreeting(storage, 'user-1'), false);
+  clearAuthenticatedGreeting(storage, 'user-1');
+  assert.equal(consumeAuthenticatedGreeting(storage, 'user-1'), true);
 });
 
 test('protege el inicio PCM sin agregar una espera fija al salir del micrófono móvil', () => {
@@ -137,6 +164,7 @@ test('traduce preguntas de la ficha en secciones visuales deterministas', () => 
   assert.equal(resolvePropertyVisualSection('Calcula mi pago mensual a 20 años'), 'mortgage');
   assert.equal(resolvePropertyVisualSection('¿Cuántos metros cuadrados tiene?'), 'technical');
   assert.equal(resolvePropertyVisualSection('¿Tiene cuarto de servicio?', ['Cuarto de servicio']), 'amenities');
+  assert.equal(resolvePropertyVisualSection('¿Cómo se siente la sala y el comedor?'), 'amenities');
   assert.equal(resolvePropertyVisualSection('Hazme un resumen en pocas palabras'), 'summary');
   assert.equal(resolvePropertyVisualSection('Buenos días'), null);
 });
@@ -174,6 +202,16 @@ test('responde secciones visuales desde los datos de la propiedad sin esperar al
     latitude: 24.8,
     longitude: -107.4,
     surfaceBuilt: 154.85,
+    nearbyPlaces: [{
+      id: 'school-1',
+      name: 'Colegio del Valle',
+      category: 'school',
+      latitude: 24.81,
+      longitude: -107.41,
+      distanceMeters: 900,
+      durationSeconds: 240,
+      routeSource: 'google_routes',
+    }],
     offerings: [{
       id: 'offering-1',
       propertyId: 'property-fast-voice',
@@ -204,6 +242,8 @@ test('responde secciones visuales desde los datos de la propiedad sin esperar al
   });
   assert.match(amenities?.speech || '', /Alberca/);
   assert.match(amenities?.speech || '', /Gimnasio/);
+  assert.match(amenities?.speech || '', /relajarse/);
+  assert.match(amenities?.speech || '', /bienestar/);
   assert.match(amenities?.speech || '', /\?$/);
 
   const financing = resolvePropertyVisualAnswer({
@@ -222,4 +262,22 @@ test('responde secciones visuales desde los datos de la propiedad sin esperar al
     section: 'technical',
   });
   assert.match(technical?.speech || '', /154\.85 metros cuadrados/);
+
+  const school = resolvePropertyVisualAnswer({
+    language: 'es',
+    prompt: '¿Cuál es la escuela más cercana?',
+    property,
+    section: 'location',
+  });
+  assert.match(school?.speech || '', /Colegio del Valle/);
+  assert.match(school?.speech || '', /4 minutos en auto/);
+  assert.doesNotMatch(school?.speech || '', /Abrí el mapa/);
+
+  const generalLocation = resolvePropertyVisualAnswer({
+    language: 'es',
+    prompt: 'Muéstrame la ubicación',
+    property,
+    section: 'location',
+  });
+  assert.match(generalLocation?.speech || '', /Abrí el mapa/);
 });

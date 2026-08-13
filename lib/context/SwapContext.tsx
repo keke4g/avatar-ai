@@ -21,6 +21,36 @@ import { useLatestRef } from './swap/useLatestRef';
 
 const SwapContext = createContext<SwapContextType | undefined>(undefined);
 
+type SupabaseAuthUserSnapshot = {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+};
+
+const createSessionUser = (authUser: SupabaseAuthUserSnapshot): User => {
+  const metadata = authUser.user_metadata || {};
+  const metadataName = [metadata.name, metadata.full_name, metadata.display_name]
+    .find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  const email = authUser.email?.trim() || '';
+  const name = metadataName?.trim() || email.split('@')[0] || 'Usuario';
+  const metadataAvatar = [metadata.avatar_url, metadata.picture]
+    .find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
+  return {
+    id: authUser.id,
+    name,
+    email,
+    avatar: metadataAvatar?.trim() || '',
+    role: 'MEMBER',
+    isVerified: false,
+    kycStatus: 'PENDING',
+    joinDate: new Date().toLocaleDateString('es-ES'),
+    swapsCount: 0,
+    isSuspended: false,
+    favorites: [],
+  };
+};
+
 export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +62,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [favorites, setFavorites] = useState<string[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(!useSupabase);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -105,6 +136,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLeads(mockState.leads);
           setCurrentUser(initialUser);
           setTravelDetails(mockState.travelDetails);
+          setAuthReady(true);
 
           ServiceFactory.getReviewService().getAll().then(r => setReviews(r));
 
@@ -132,7 +164,9 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Synchronize Live Supabase Auth Session & Profiles
   useEffect(() => {
     if (useSupabase && typeof window !== 'undefined') {
-      const syncSupabaseProfile = async (userId: string) => {
+      let authVersion = 0;
+
+      const syncSupabaseProfile = async (userId: string, version: number) => {
         try {
           const [profile, favoritesResult, archivedResult] = await Promise.all([
             ServiceFactory.getUserService().getById(userId),
@@ -145,6 +179,8 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
               .select('swap_id')
               .eq('user_id', userId),
           ]);
+
+          if (version !== authVersion) return;
 
           if (profile) {
             setCurrentUser(profile);
@@ -174,12 +210,18 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // of the auth callback itself to avoid holding the auth client lock.
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (session?.user) {
+          const sessionUser = createSessionUser(session.user);
+          setCurrentUser((current) => current?.id === session.user.id ? current : sessionUser);
+          setAuthReady(true);
+
           if (lastSyncedUserId === session.user.id && event !== 'USER_UPDATED') return;
           lastSyncedUserId = session.user.id;
+          const version = ++authVersion;
           window.setTimeout(() => {
-            void syncSupabaseProfile(session.user.id);
+            void syncSupabaseProfile(session.user.id, version);
           }, 0);
         } else {
+          authVersion += 1;
           lastSyncedUserId = null;
           setCurrentUser(null);
           setFavorites([]);
@@ -190,10 +232,12 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setTravelDetails([]);
           setLeads([]);
           localStorage.removeItem('auraswap_current_user');
+          setAuthReady(true);
         }
       });
 
       return () => {
+        authVersion += 1;
         subscription.unsubscribe();
       };
     }
@@ -1143,6 +1187,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
             location: profile.location || '',
           };
           setCurrentUser(sessionUser);
+          setAuthReady(true);
           localStorage.setItem('auraswap_current_user', JSON.stringify(sessionUser));
           return true;
         }
@@ -1229,6 +1274,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
           favorites: []
         };
         setCurrentUser(registeredUser);
+        setAuthReady(true);
         localStorage.setItem('auraswap_current_user', JSON.stringify(registeredUser));
         return registeredUser;
       }
@@ -1258,6 +1304,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Set as active session
     setCurrentUser(newUser);
+    setAuthReady(true);
     localStorage.setItem('auraswap_current_user', JSON.stringify(newUser));
     return newUser;
   };
@@ -1631,6 +1678,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
         markNotificationAsRead,
         markAllNotificationsAsRead,
         isLoggingOut,
+        authReady,
         logoutToast,
         setLogoutToast,
         archivedSwapIds,

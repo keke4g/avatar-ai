@@ -46,7 +46,7 @@ const VISUAL_RULES: VisualRule[] = [
   },
   {
     section: 'amenities',
-    pattern: /\b(?:amenidades|comodidades|que ofrece|que incluye|equipamiento|alberca|piscina|jardin|gimnasio|roof garden|terraza|balcon|cocina|amueblada|amueblado|aire acondicionado|mascotas?)\b/,
+    pattern: /\b(?:amenidades|comodidades|que ofrece|que incluye|equipamiento|alberca|piscina|jardin|gimnasio|roof garden|terraza|balcon|cocina|sala|comedor|cuarto de lavado|lavanderia|estudio|oficina|cochera|patio|elevador|ascensor|vestidor|amueblada|amueblado|aire acondicionado|mascotas?)\b/,
   },
   {
     section: 'contact',

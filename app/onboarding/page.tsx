@@ -13,13 +13,14 @@ import {
 } from 'lucide-react';
 import { launchConfetti } from '@/components/runtime/launchConfetti';
 import ProfilePhotoUploader from '../../components/ProfilePhotoUploader';
+import AuthGuard from '../../components/AuthGuard';
 
 type StepType = 0 | 1 | 2 | 3;
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { t, language } = useTranslation();
-  const { currentUser, completeOnboardingMock } = useSwap();
+  const { currentUser, authReady, completeOnboardingMock } = useSwap();
 
   // Active Wizard Step
   const [step, setStep] = useState<StepType>(0);
@@ -206,12 +207,19 @@ export default function OnboardingPage() {
     }
   };
 
-  // Redirect to login if user is completely logged out (route protection simulation)
+  if (!authReady) {
+    return (
+      <div className="flex min-h-[85vh] items-center justify-center bg-brand-gray-50/50">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-brand-gray-200 border-t-brand-accent" />
+      </div>
+    );
+  }
+
+  // Let the shared guard handle a genuinely signed-out session. Waiting for
+  // authReady above prevents a freshly registered account from being sent
+  // back to login while Supabase is still hydrating its profile.
   if (!currentUser) {
-    if (typeof window !== 'undefined') {
-      router.push('/login');
-    }
-    return null;
+    return <AuthGuard />;
   }
 
   return (

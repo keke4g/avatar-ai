@@ -1,5 +1,6 @@
 import type { EternaPropertyVisualSection } from '../events';
 import type { Property, PropertyOffering } from '../../types';
+import type { NearbyPlaceCategory } from '../../maps/types';
 import { formatPropertyLocation } from '../../textHelpers';
 import {
   buildPropertyPresentation,
@@ -50,6 +51,104 @@ const cleanDescription = (value: string | null | undefined): string => {
   const shortened = compact.slice(0, 317);
   const lastBoundary = Math.max(shortened.lastIndexOf('. '), shortened.lastIndexOf(', '), shortened.lastIndexOf(' '));
   return `${shortened.slice(0, Math.max(180, lastBoundary)).trim()}…`;
+};
+
+const normalizePrompt = (value: string): string => value
+  .toLocaleLowerCase('es-MX')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const NEARBY_CATEGORY_REQUESTS: Array<{
+  category: NearbyPlaceCategory;
+  pattern: RegExp;
+}> = [
+  { category: 'school', pattern: /\b(?:escuela|escuelas|colegio|colegios|school|schools)\b/ },
+  { category: 'supermarket', pattern: /\b(?:supermercado|supermercados|tienda|tiendas|grocery|groceries|supermarket|supermarkets)\b/ },
+  { category: 'hospital', pattern: /\b(?:hospital|hospitales|clinica|clinicas|salud|hospital|hospitals|clinic|clinics|healthcare)\b/ },
+  { category: 'park', pattern: /\b(?:parque|parques|areas verdes|park|parks|green areas)\b/ },
+];
+
+const getRequestedNearbyCategories = (prompt: string): NearbyPlaceCategory[] => {
+  const normalized = normalizePrompt(prompt);
+  const explicit = NEARBY_CATEGORY_REQUESTS
+    .filter(({ pattern }) => pattern.test(normalized))
+    .map(({ category }) => category);
+
+  if (explicit.length > 0) return explicit;
+  if (/\b(?:servicios|service|services)\b/.test(normalized)) {
+    return ['supermarket', 'hospital'];
+  }
+  if (/\b(?:que hay cerca|lugares cercanos|alrededores|around here|nearby places)\b/.test(normalized)) {
+    return ['school', 'supermarket', 'hospital', 'park'];
+  }
+  return [];
+};
+
+const getNearbyCategoryLabel = (
+  category: NearbyPlaceCategory,
+  language: 'es' | 'en',
+): string => {
+  const labels: Record<NearbyPlaceCategory, { es: string; en: string }> = {
+    school: { es: 'escuelas', en: 'schools' },
+    supermarket: { es: 'supermercados', en: 'supermarkets' },
+    hospital: { es: 'hospitales', en: 'hospitals' },
+    park: { es: 'parques', en: 'parks' },
+  };
+  return labels[category][language];
+};
+
+const getAmenityExperience = (
+  amenity: string,
+  language: 'es' | 'en',
+): string => {
+  const normalized = normalizePrompt(amenity);
+  const copy = language === 'es'
+    ? [
+        { pattern: /\b(?:sala|living|estancia)\b/, text: `${amenity} favorece momentos cómodos de convivencia y descanso` },
+        { pattern: /\b(?:comedor|dining)\b/, text: `${amenity} crea un lugar natural para compartir comidas y conversaciones` },
+        { pattern: /\b(?:cocina|kitchen|isla)\b/, text: `${amenity} hace más práctica la rutina diaria y puede convertirse en un punto de reunión` },
+        { pattern: /\b(?:balcon|terraza|roof garden|azotea|patio)\b/, text: `${amenity} ofrece una pausa al aire libre y una sensación de mayor amplitud` },
+        { pattern: /\b(?:jardin|garden)\b/, text: `${amenity} aporta contacto con el exterior y un ambiente más sereno` },
+        { pattern: /\b(?:lavado|lavanderia|laundry)\b/, text: `${amenity} ayuda a mantener la rutina doméstica ordenada y fuera de las áreas sociales` },
+        { pattern: /\b(?:alberca|piscina|pool)\b/, text: `${amenity} invita a relajarse y disfrutar momentos de recreación sin salir del entorno residencial` },
+        { pattern: /\b(?:gimnasio|gym)\b/, text: `${amenity} facilita integrar bienestar y actividad física a la vida diaria` },
+        { pattern: /\b(?:seguridad|vigilancia|control de acceso|privada)\b/, text: `${amenity} aporta tranquilidad y mayor control en los accesos` },
+        { pattern: /\b(?:estacionamiento|cochera|garage|parking)\b/, text: `${amenity} hace más cómoda y ordenada la llegada a casa` },
+        { pattern: /\b(?:estudio|oficina|workspace)\b/, text: `${amenity} brinda un espacio separado para concentrarse, trabajar o estudiar` },
+        { pattern: /\b(?:aire acondicionado|minisplit|climatizacion)\b/, text: `${amenity} ayuda a conservar una temperatura agradable durante el día` },
+        { pattern: /\b(?:elevador|ascensor|elevator)\b/, text: `${amenity} mejora la accesibilidad y simplifica los desplazamientos cotidianos` },
+        { pattern: /\b(?:bodega|almacenamiento|closet|vestidor)\b/, text: `${amenity} facilita mantener los espacios despejados y bien organizados` },
+        { pattern: /\b(?:vista|ocean view|city view)\b/, text: `${amenity} suma luz, perspectiva y una experiencia visual más agradable` },
+        { pattern: /\b(?:amueblado|amueblada|muebles|furnished)\b/, text: `${amenity} permite imaginar una instalación más sencilla y con menos pendientes iniciales` },
+        { pattern: /\b(?:mascota|pet friendly|pets)\b/, text: `${amenity} hace más fácil integrar a las mascotas en la vida cotidiana` },
+      ]
+    : [
+        { pattern: /\b(?:sala|living|estancia)\b/, text: `${amenity} creates a comfortable setting for connection and rest` },
+        { pattern: /\b(?:comedor|dining)\b/, text: `${amenity} provides a natural place for shared meals and conversation` },
+        { pattern: /\b(?:cocina|kitchen|isla)\b/, text: `${amenity} makes everyday routines easier and can become a social hub` },
+        { pattern: /\b(?:balcon|terraza|roof garden|azotea|patio)\b/, text: `${amenity} offers an outdoor pause and a greater sense of openness` },
+        { pattern: /\b(?:jardin|garden)\b/, text: `${amenity} adds a calmer connection with the outdoors` },
+        { pattern: /\b(?:lavado|lavanderia|laundry)\b/, text: `${amenity} keeps household routines organized and away from social areas` },
+        { pattern: /\b(?:alberca|piscina|pool)\b/, text: `${amenity} encourages relaxation and recreation within the residential setting` },
+        { pattern: /\b(?:gimnasio|gym)\b/, text: `${amenity} makes daily wellness and exercise more convenient` },
+        { pattern: /\b(?:seguridad|vigilancia|control de acceso|privada)\b/, text: `${amenity} adds peace of mind and greater access control` },
+        { pattern: /\b(?:estacionamiento|cochera|garage|parking)\b/, text: `${amenity} makes arriving home easier and more orderly` },
+        { pattern: /\b(?:estudio|oficina|workspace)\b/, text: `${amenity} provides a dedicated place to focus, work, or study` },
+        { pattern: /\b(?:aire acondicionado|minisplit|climatizacion)\b/, text: `${amenity} helps maintain a comfortable indoor temperature` },
+        { pattern: /\b(?:elevador|ascensor|elevator)\b/, text: `${amenity} improves accessibility and everyday movement` },
+        { pattern: /\b(?:bodega|almacenamiento|closet|vestidor)\b/, text: `${amenity} helps keep living areas clear and organized` },
+        { pattern: /\b(?:vista|ocean view|city view)\b/, text: `${amenity} adds light, perspective, and a more enjoyable outlook` },
+        { pattern: /\b(?:amueblado|amueblada|muebles|furnished)\b/, text: `${amenity} can make moving in simpler with fewer initial decisions` },
+        { pattern: /\b(?:mascota|pet friendly|pets)\b/, text: `${amenity} makes it easier to include pets in everyday life` },
+      ];
+
+  return copy.find(({ pattern }) => pattern.test(normalized))?.text
+    || (language === 'es'
+      ? `${amenity} aporta funcionalidad y hace más cómoda la experiencia cotidiana`
+      : `${amenity} adds practical value and makes everyday living more comfortable`);
 };
 
 const answer = (
@@ -156,10 +255,19 @@ export function resolvePropertyVisualAnswer({
   }
 
   if (section === 'amenities') {
-    const amenities = [...new Set([
+    const amenityMap = new Map<string, string>();
+    [
       ...(property.amenities || []),
       ...((property.metadata?.customAmenities as string[] | undefined) || []),
-    ].map((item) => item.trim()).filter(Boolean))];
+    ].map((item) => item.trim()).filter(Boolean).forEach((amenity) => {
+      amenityMap.set(normalizePrompt(amenity), amenity);
+    });
+    const normalizedRequest = normalizePrompt(prompt);
+    const amenities = [...amenityMap.values()].sort((left, right) => {
+      const leftRequested = normalizedRequest.includes(normalizePrompt(left)) ? 1 : 0;
+      const rightRequested = normalizedRequest.includes(normalizePrompt(right)) ? 1 : 0;
+      return rightRequested - leftRequested;
+    });
     if (amenities.length === 0) {
       return answer(
         isSpanish
@@ -168,13 +276,14 @@ export function resolvePropertyVisualAnswer({
         isSpanish ? ['Ver descripción', 'Ver ficha técnica'] : ['View description', 'View technical profile'],
       );
     }
-    const visibleAmenities = amenities.slice(0, 7);
-    const remaining = amenities.length - visibleAmenities.length;
-    const detail = `${joinNaturally(visibleAmenities, language)}${remaining > 0 ? (isSpanish ? `, además de ${remaining} adicionales` : `, plus ${remaining} more`) : ''}`;
+    const experientialAmenities = amenities.slice(0, 3).map((amenity) => (
+      getAmenityExperience(amenity, language)
+    ));
+    const remaining = amenities.length - experientialAmenities.length;
     return answer(
       isSpanish
-        ? `Abrí las amenidades de “${title}”. El anuncio confirma ${detail}. En pantalla puedes revisar la lista completa sin perder la conversación. ¿Quieres que te explique alguna amenidad en particular o pasamos a los espacios y superficies?`
-        : `I opened the amenities for “${title}”. The listing confirms ${detail}. You can review the complete list on screen without leaving the conversation. Would you like me to explain a specific feature or move on to spaces and surfaces?`,
+        ? `Abrí las amenidades de “${title}”. Más que una lista de equipamiento: ${joinNaturally(experientialAmenities, language)}.${remaining > 0 ? ` La ficha muestra ${remaining} ${remaining === 1 ? 'amenidad adicional' : 'amenidades adicionales'} para completar la experiencia.` : ''} Todo lo mencionado está confirmado en el anuncio. ¿Cuál de estos espacios te gustaría imaginar en tu rutina diaria?`
+        : `I opened the amenities for “${title}”. More than a feature list: ${joinNaturally(experientialAmenities, language)}.${remaining > 0 ? ` The listing shows ${remaining} additional ${remaining === 1 ? 'amenity' : 'amenities'} to complete the experience.` : ''} Every feature mentioned is confirmed in the listing. Which of these spaces would you like to picture in your daily routine?`,
       isSpanish ? ['Ver ficha técnica', 'Ver fotos'] : ['View technical profile', 'View photos'],
     );
   }
@@ -231,7 +340,39 @@ export function resolvePropertyVisualAnswer({
 
   if (section === 'location') {
     const publicLocation = formatPropertyLocation(property.location, property.country);
-    const nearby = selectEternaNearbyHighlights(property.nearbyPlaces || []).slice(0, 3);
+    const allNearby = selectEternaNearbyHighlights(property.nearbyPlaces || []);
+    const requestedCategories = getRequestedNearbyCategories(prompt);
+
+    if (requestedCategories.length > 0) {
+      const requestedHighlights = requestedCategories.flatMap((category) => {
+        const place = allNearby.find((candidate) => candidate.category === category);
+        if (!place) return [];
+        return [{ ...place, categoryLabel: getNearbyCategoryLabel(category, language) }];
+      });
+      const missingCategories = requestedCategories
+        .filter((category) => !requestedHighlights.some((place) => place.category === category))
+        .map((category) => getNearbyCategoryLabel(category, language));
+      const facts = requestedHighlights.map((place) => (
+        isSpanish
+          ? `${place.categoryLabel}: ${place.name}, a ${place.drivingMinutes} ${place.drivingMinutes === 1 ? 'minuto' : 'minutos'} en auto`
+          : `${place.categoryLabel}: ${place.name}, ${place.drivingMinutes} ${place.drivingMinutes === 1 ? 'minute' : 'minutes'} by car`
+      ));
+
+      return answer(
+        facts.length > 0
+          ? (isSpanish
+              ? `Encontré ${facts.length === 1 ? 'esta referencia cercana verificada' : 'estas referencias cercanas verificadas'}: ${joinNaturally(facts, language)}. ${missingCategories.length > 0 ? `Todavía no hay un dato confirmado para ${joinNaturally(missingCategories, language)}. ` : ''}El mapa permanece abierto para que puedas ubicar cada punto y valorar el traslado con contexto. ¿Quieres que comparemos otra categoría cercana?`
+              : `I found ${facts.length === 1 ? 'this verified nearby reference' : 'these verified nearby references'}: ${joinNaturally(facts, language)}. ${missingCategories.length > 0 ? `There is not yet a confirmed result for ${joinNaturally(missingCategories, language)}. ` : ''}The map remains open so you can locate each place and assess the trip in context. Would you like to compare another nearby category?`)
+          : (isSpanish
+              ? `En los datos actuales no aparece una referencia verificada para ${joinNaturally(missingCategories, language)}. Prefiero no inventar un lugar o un tiempo de traslado; el mapa permanece disponible para revisar visualmente el entorno publicado. ¿Quieres consultar otra categoría cercana?`
+              : `The current data does not include a verified reference for ${joinNaturally(missingCategories, language)}. I would rather not invent a place or travel time; the map remains available to review the published area visually. Would you like to check another nearby category?`),
+        isSpanish
+          ? ['Hospitales cercanos', 'Escuelas cercanas', 'Supermercados cercanos', 'Parques cercanos']
+          : ['Nearby hospitals', 'Nearby schools', 'Nearby supermarkets', 'Nearby parks'],
+      );
+    }
+
+    const nearby = allNearby.slice(0, 3);
     const nearbyText = nearby.map((place) => (
       isSpanish
         ? `${place.name}, a ${place.drivingMinutes} ${place.drivingMinutes === 1 ? 'minuto' : 'minutos'} en auto`

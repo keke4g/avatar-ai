@@ -82,6 +82,12 @@ import {
 } from '@/lib/eterna/searchIntentResolution';
 import { resolveCatalogPriceRequest } from '@/lib/eterna/actions/CatalogPriceActions';
 import { resolvePropertyVisualAnswer } from '@/lib/eterna/actions/PropertyVisualActions';
+import {
+  clearAuthenticatedGreeting,
+  consumeAuthenticatedGreeting,
+  consumePropertySummaryPresentation,
+  getEternaFirstName,
+} from '@/lib/eterna/sessionExperience';
 // ────────────────────────────────────────────────
 // MAIN COMPONENT
 // ────────────────────────────────────────────────
@@ -98,7 +104,6 @@ type ThinkingContext = 'property_search' | 'property_detail' | 'publish_property
 
 const ETERNA_CONVERSATION_SESSION_KEY = 'eterna_conversation_session_v2';
 const ETERNA_HOME_INTRO_SESSION_KEY = 'eterna_home_intro_v4';
-const ETERNA_PROPERTY_VISIT_PREFIX = 'eterna_property_visit_v1';
 
 const dispatchPropertyVisual = (
   propertyId: string,
@@ -300,9 +305,11 @@ export default function EternaConcierge() {
   const geminiAbortControllerRef = useRef<AbortController | null>(null);
   const homeSearchAbortControllerRef = useRef<AbortController | null>(null);
   const lastPropertySummaryRef = useRef<string | null>(null);
-  // A property opened by an Eterna command must receive its arrival speech
-  // even when the same listing was previously visited in this session.
+  // Tracks navigation initiated by Eterna without bypassing the per-property
+  // session rule: an automatic summary is still shown only once per tab.
   const pendingPropertyPresentationRef = useRef<string | null>(null);
+  const previousAuthenticatedUserIdRef = useRef<string | null>(null);
+  const authGreetingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const propertyPresentationStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const propertyPresentationSafetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [propertyPresentation, setPropertyPresentation] = useState<EternaPropertyPresentation | null>(null);
@@ -499,6 +506,10 @@ export default function EternaConcierge() {
 
   useEffect(() => () => {
     clearPropertyPresentationTimers();
+    if (authGreetingTimerRef.current) {
+      clearTimeout(authGreetingTimerRef.current);
+      authGreetingTimerRef.current = null;
+    }
   }, [clearPropertyPresentationTimers]);
 
   const closeEternaCompletely = useCallback(() => {
@@ -627,6 +638,53 @@ export default function EternaConcierge() {
     return pureResolveIntent(prompt, intentContext, language);
   }, [intentContext, language]);
 
+  // Greet an authenticated user once per login session, after leaving the
+  // login screen. The name comes from the live Supabase profile/session and
+  // the marker is cleared on logout so the next login receives a new welcome.
+  useEffect(() => {
+    const previousUserId = previousAuthenticatedUserIdRef.current;
+
+    if (!currentUser) {
+      if (authGreetingTimerRef.current) {
+        clearTimeout(authGreetingTimerRef.current);
+        authGreetingTimerRef.current = null;
+      }
+      if (previousUserId) {
+        clearAuthenticatedGreeting(sessionStorage, previousUserId);
+      }
+      previousAuthenticatedUserIdRef.current = null;
+      return;
+    }
+
+    previousAuthenticatedUserIdRef.current = currentUser.id;
+    if (pathname === '/login' || isPropertyPage) return;
+    if (!consumeAuthenticatedGreeting(sessionStorage, currentUser.id)) return;
+
+    const firstName = getEternaFirstName(currentUser.name, currentUser.email);
+    const greeting = language === 'es'
+      ? `Hola${firstName ? ` ${firstName}` : ''}. Soy Eterna y estoy lista para acompañarte a encontrar, comparar o revisar una propiedad. ¿Qué te gustaría hacer primero?`
+      : `Hi${firstName ? ` ${firstName}` : ''}. I’m Eterna, ready to help you find, compare, or review a property. What would you like to do first?`;
+
+    setChatHistory((previous) => [
+      ...previous,
+      { role: 'assistant', content: greeting },
+    ]);
+    setConciergeMode('avatar');
+
+    authGreetingTimerRef.current = setTimeout(() => {
+      authGreetingTimerRef.current = null;
+      setSimulatedStatus('talking');
+      speak(greeting, () => setSimulatedStatus('idle'));
+    }, 450);
+  }, [
+    currentUser,
+    isPropertyPage,
+    language,
+    pathname,
+    setChatHistory,
+    speak,
+  ]);
+
   const analyzeHomeConversationWithGemini = useCallback(async (
     prompt: string,
     memory: ConversationMemory,
@@ -694,19 +752,19 @@ export default function EternaConcierge() {
         pendingPropertyPresentationRef.current = null;
       }
 
-      const visitStorageKey = `${ETERNA_PROPERTY_VISIT_PREFIX}:${activeProperty.id}`;
-      let visitVariant = 0;
-      try {
-        visitVariant = Number(sessionStorage.getItem(visitStorageKey) || '0');
-        sessionStorage.setItem(visitStorageKey, String(visitVariant + 1));
-      } catch {
-        // A presentation still works when private browsing blocks storage.
+      if (!consumePropertySummaryPresentation(sessionStorage, activeProperty.id)) {
+        clearPropertyPresentationTimers();
+        lastPropertySummaryRef.current = presentationKey;
+        pendingPropertyPresentationRef.current = null;
+        setPropertyPresentation(null);
+        closePropertyVisual(activeProperty.id, 'summary');
+        return;
       }
 
       const presentation = buildPropertyPresentation(
         activeProperty,
         language === 'es' ? 'es' : 'en',
-        visitVariant,
+        0,
       );
       let audibleSpeechStartedAt: number | null = null;
       const finishPresentation = () => {
@@ -3104,6 +3162,7 @@ Explore actualizado: Redirecting to /explore`);
   // Automatic welcome greeting presentation flow (Phase 6)
   useEffect(() => {
     if (pathname !== '/') return;
+    if (currentUser) return;
 
     // Check if introduction was already presented in this session
     if (typeof window !== 'undefined') {
@@ -3165,7 +3224,7 @@ Explore actualizado: Redirecting to /explore`);
       clearTimeout(timer);
       if (safetyTimer) clearTimeout(safetyTimer);
     };
-  }, [chatHistory.length, chatHistoryRef, language, pathname, setChatHistory, setSimulatedStatus, speak]);
+  }, [chatHistory.length, chatHistoryRef, currentUser, language, pathname, setChatHistory, setSimulatedStatus, speak]);
 
   // Execute commands from LiveContext (Home Experience Context actions)
   useEffect(() => {

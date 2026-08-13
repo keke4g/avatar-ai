@@ -21,7 +21,7 @@ export default function AuthGuard({
   requireAdmin = false,
   allowedRoles,
 }: AuthGuardProps) {
-  const { currentUser, isLoggingOut } = useSwap();
+  const { currentUser, isLoggingOut, authReady } = useSwap();
   const { t } = useTranslation();
   const router = useRouter();
   const isHydrated = useSyncExternalStore(
@@ -30,7 +30,7 @@ export default function AuthGuard({
     () => false,
   );
 
-  if (!isHydrated) {
+  if (!isHydrated || !authReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-brand-gray-50/50 px-6">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-brand-gray-200 border-t-brand-accent" />

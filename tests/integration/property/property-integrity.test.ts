@@ -1268,7 +1268,7 @@ test('production valuation gate exposes three-comparable guidance without openin
   const migration = readFileSync(
     resolve(
       process.cwd(),
-      'supabase/migrations/20260813055916_simplify_market_guidance.sql',
+      'supabase/migrations/20260813063000_simplify_market_guidance.sql',
     ),
     'utf8',
   );

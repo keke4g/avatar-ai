@@ -179,7 +179,8 @@ function LoginForm() {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('auraswap_pending_verification_email');
         }
-        router.push(intentPublish ? safeNext : '/onboarding');
+        router.replace(intentPublish ? safeNext : '/onboarding');
+        router.refresh();
       } catch (err: any) {
         setLoading(false);
         const message = String(err?.message || '');
