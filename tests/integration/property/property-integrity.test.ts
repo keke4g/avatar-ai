@@ -36,6 +36,7 @@ import {
   ValuationEngine,
 } from '../../../lib/valuation/ValuationEngine';
 import { mapMarketObservationToCatalogProperty } from '../../../lib/valuation/MarketObservationMapper';
+import { buildPresentationValuation } from '../../../features/properties/property-details/propertyValuation';
 
 const offering: PropertyOffering = {
   id: 'offering-1',
@@ -721,7 +722,7 @@ test('Villas del Oriente II resolves to its Tonalá market despite the legacy Tl
   assert.equal(getPropertyMicroMarketKey(legacy), getPropertyMicroMarketKey(portal));
 });
 
-test('valuation engine keeps a five-comparable sample hidden', () => {
+test('valuation engine publishes an initial commercial estimate from three coherent comparables', () => {
   const target = {
     ...validProperty(),
     id: 'stable-target',
@@ -762,21 +763,94 @@ test('valuation engine keeps a five-comparable sample hidden', () => {
     comparable(1, 4_800_000, 0.001),
     comparable(2, 5_000_000, -0.001),
     comparable(3, 5_100_000, 0.0015),
-    comparable(4, 5_250_000, -0.0015),
-    comparable(5, 5_400_000, 0.002),
   ];
 
   const result = ValuationEngine.evaluate(target, catalog, {
     now: new Date('2026-08-03T00:00:00.000Z'),
   });
 
-  assert.equal(result.saleComparableCount, 5);
+  assert.equal(result.saleComparableCount, 3);
   assert.equal(result.estimatedSaleValue, null);
-  assert.equal(result.confidence, 'INSUFFICIENT');
+  assert.ok(result.areaReferenceValue);
+  assert.ok(result.areaRangeLow);
+  assert.ok(result.areaRangeHigh);
+  assert.equal(result.evidenceTier, 'AREA_REFERENCE');
+  assert.equal(result.confidence, 'LOW');
   assert.match(result.modelVersion, /v5$/);
 });
 
-test('external observations without coordinates never receive an invented distance or estimate', () => {
+test('two comparables remain insufficient for a public commercial estimate', () => {
+  const target = {
+    ...validProperty(),
+    id: 'two-comparable-target',
+    type: 'Villa',
+    neighborhood: 'Montebello',
+    location: 'Montebello, Culiacán Rosales',
+    surfaceBuilt: 200,
+    surfaceTotal: 250,
+    offerings: [{ ...offering, propertyId: 'two-comparable-target', priceAmount: 5_100_000 }],
+  } as Property;
+  const comparable = (index: number, price: number) => ({
+    ...target,
+    id: `two-comparable-${index}`,
+    surfaceBuilt: 198 + index,
+    offerings: [{
+      ...offering,
+      id: `two-comparable-offering-${index}`,
+      propertyId: `two-comparable-${index}`,
+      priceAmount: price,
+    }],
+    publishedAt: '2026-07-15T00:00:00.000Z',
+    updatedAt: '2026-08-02T00:00:00.000Z',
+  }) as Property;
+
+  const result = ValuationEngine.evaluate(target, [
+    target,
+    comparable(1, 4_900_000),
+    comparable(2, 5_200_000),
+  ], { now: new Date('2026-08-03T00:00:00.000Z') });
+
+  assert.equal(result.areaReferenceValue, null);
+  assert.equal(result.evidenceTier, 'INSUFFICIENT');
+  assert.equal(result.confidence, 'INSUFFICIENT');
+  assert.match(result.warnings.join(' '), /3 propiedades comparables/i);
+});
+
+test('three incoherent prices remain hidden despite meeting the raw count', () => {
+  const target = {
+    ...validProperty(),
+    id: 'dispersed-target',
+    type: 'Villa',
+    neighborhood: 'Montebello',
+    location: 'Montebello, Culiacán Rosales',
+    surfaceBuilt: 200,
+    surfaceTotal: 250,
+    offerings: [{ ...offering, propertyId: 'dispersed-target', priceAmount: 5_000_000 }],
+  } as Property;
+  const prices = [1_000_000, 5_000_000, 12_000_000];
+  const comparables = prices.map((price, index) => ({
+    ...target,
+    id: `dispersed-${index}`,
+    offerings: [{
+      ...offering,
+      id: `dispersed-offering-${index}`,
+      propertyId: `dispersed-${index}`,
+      priceAmount: price,
+    }],
+    publishedAt: '2026-07-15T00:00:00.000Z',
+    updatedAt: '2026-08-02T00:00:00.000Z',
+  }) as Property);
+
+  const result = ValuationEngine.evaluate(target, [target, ...comparables], {
+    now: new Date('2026-08-03T00:00:00.000Z'),
+  });
+
+  assert.equal(result.areaReferenceValue, null);
+  assert.equal(result.confidence, 'INSUFFICIENT');
+  assert.match(result.warnings.join(' '), /dispersión|retirar una propiedad/i);
+});
+
+test('external observations without coordinates publish only a commercial estimate and never invent distance', () => {
   const target = {
     ...validProperty(),
     id: 'market-target',
@@ -843,10 +917,12 @@ test('external observations without coordinates never receive an invented distan
 
   assert.equal(result.saleComparableCount, 8);
   assert.equal(result.estimatedSaleValue, null);
-  assert.equal(result.confidence, 'INSUFFICIENT');
+  assert.ok(result.areaReferenceValue);
+  assert.equal(result.evidenceTier, 'AREA_REFERENCE');
+  assert.equal(result.confidence, 'LOW');
   assert.ok(result.comparables.every((item) => item.marketObservationId));
   assert.ok(result.comparables.every((item) => item.distanceMeters === null));
-  assert.match(result.warnings.join(' '), /10 viviendas únicas/i);
+  assert.match(result.warnings.join(' '), /estimación comercial aproximada/i);
 });
 
 test('valuation engine publishes only a current, geolocated and source-diverse authorized sample', () => {
@@ -972,7 +1048,7 @@ test('valuation engine can use a current, minimal and source-diverse research sa
   assert.match(result.methodology, /investigación/i);
 });
 
-test('valuation engine rejects a geographically thin internal sample', () => {
+test('commercial estimate does not require point distance when the exact micromarket matches', () => {
   const target = {
     ...validProperty(),
     id: 'dominated-target',
@@ -1008,8 +1084,9 @@ test('valuation engine rejects a geographically thin internal sample', () => {
   ]);
 
   assert.equal(result.estimatedSaleValue, null);
-  assert.equal(result.confidence, 'INSUFFICIENT');
-  assert.match(result.warnings.join(' '), /10 viviendas únicas/i);
+  assert.ok(result.areaReferenceValue);
+  assert.equal(result.evidenceTier, 'AREA_REFERENCE');
+  assert.equal(result.confidence, 'LOW');
 });
 
 test('valuation engine refuses to invent a value without surface or enough comparables', () => {
@@ -1093,7 +1170,7 @@ test('valuation engine publishes a separate low-confidence area reference withou
   assert.ok(result.comparables.every((item) => item.distanceMeters === null));
 });
 
-test('Eterna calls an area reference asking-price guidance, not an appraisal or estimate', () => {
+test('Eterna calls an area reference an approximate commercial estimate, not an appraisal', () => {
   const property = {
     ...valuedProperty(),
     valuation: {
@@ -1119,11 +1196,47 @@ test('Eterna calls an area reference asking-price guidance, not an appraisal or 
   } as unknown as Property;
 
   const answer = resolveValuationQuestion('¿Cuánto vale esta propiedad?', property, 'es');
-  assert.match(answer?.reply || '', /referencia orientativa de precios anunciados/i);
+  assert.match(answer?.reply || '', /estimación comercial aproximada/i);
   assert.match(answer?.reply || '', /\$5,200,000/);
-  assert.match(answer?.reply || '', /no es un avalúo ni un precio de cierre/i);
-  assert.doesNotMatch(answer?.reply || '', /estimación automatizada de Towers/i);
-  assert.match(JSON.stringify(getEternaValuationDossier(property)), /REFERENCIA_ORIENTATIVA_DE_OFERTA/);
+  assert.match(answer?.reply || '', /no sustituye un avalúo/i);
+  assert.match(JSON.stringify(getEternaValuationDossier(property)), /ESTIMACION_COMERCIAL_ORIENTATIVA/);
+});
+
+test('property valuation presentation classifies a low listing against the commercial range', () => {
+  const automatedValuation = {
+    ...valuedProperty().valuation!,
+    estimatedSaleValue: null,
+    saleRangeLow: null,
+    saleRangeHigh: null,
+    salePricePerM2: null,
+    areaReferenceValue: 5_200_000,
+    areaRangeLow: 4_700_000,
+    areaRangeHigh: 5_900_000,
+    areaPricePerM2: 26_000,
+    areaReferenceOperation: 'SALE' as const,
+    areaLocationBasis: 'NEIGHBORHOOD' as const,
+    evidenceTier: 'AREA_REFERENCE' as const,
+    confidence: 'LOW' as const,
+    confidenceScore: 54,
+    comparableCount: 3,
+  };
+  const listingOffering = {
+    ...offering,
+    priceAmount: 4_500_000,
+  };
+
+  const presentation = buildPresentationValuation({
+    automatedValuation,
+    language: 'es',
+    offerings: [listingOffering],
+    selectedMode: 'SALE',
+  });
+
+  assert.equal(presentation?.status, 'REFERENCE_ONLY');
+  assert.equal(presentation?.estimatedValue, 5_200_000);
+  assert.equal(presentation?.marketPosition, 'BELOW');
+  assert.equal(presentation?.differencePercent, -13.46);
+  assert.equal(presentation?.confidenceLabel, 'Estimación inicial');
 });
 
 test('valuation recalculation reads private subject overrides through a service-only RPC', () => {
@@ -1149,4 +1262,28 @@ test('valuation recalculation reads private subject overrides through a service-
     rpcMigration,
     /grant execute on function public\.get_verified_property_subject_overrides\(\)[\s\S]*to service_role;/,
   );
+});
+
+test('production valuation gate exposes three-comparable guidance without opening write access', () => {
+  const migration = readFileSync(
+    resolve(
+      process.cwd(),
+      'supabase/migrations/20260813055916_simplify_market_guidance.sql',
+    ),
+    'utf8',
+  );
+
+  assert.match(migration, /new\.comparable_count >= 3/);
+  assert.match(migration, /new\.confidence_score between 30 and 64/);
+  assert.match(migration, /persisted\.source_count >= 1/);
+  assert.match(migration, /security definer[\s\S]*set search_path = pg_catalog, public, valuation/);
+  assert.match(
+    migration,
+    /revoke all on function public\.save_market_valuation_run\(jsonb\) from public, anon, authenticated;/,
+  );
+  assert.match(
+    migration,
+    /grant execute on function public\.save_market_valuation_run\(jsonb\) to service_role;/,
+  );
+  assert.match(migration, /property_valuation_runs_property_created_idx/);
 });

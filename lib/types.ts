@@ -157,8 +157,8 @@ export interface PropertyValuation {
   listingPrice: number | null;
   listingVsEstimatePct: number | null;
   /**
-   * A lower-confidence reference derived from asking prices in the exact
-   * micromarket. It is deliberately separate from an estimated market value.
+   * A lower-confidence commercial estimate derived from asking prices in the
+   * exact micromarket. It remains separate from the stricter geolocated model.
    */
   areaReferenceValue: number | null;
   areaRangeLow: number | null;

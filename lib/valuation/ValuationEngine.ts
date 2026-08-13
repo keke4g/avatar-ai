@@ -22,17 +22,20 @@ const MIN_SOURCE_QUALITY_SCORE = 75;
 const MIN_PUBLIC_CONFIDENCE_SCORE = 65;
 const MAX_LISTING_AGE_DAYS = 180;
 const MAX_VERIFICATION_AGE_DAYS = 30;
-const MIN_AREA_REFERENCE_COMPARABLES = 10;
-const MIN_AREA_EFFECTIVE_SAMPLE_SIZE = 7;
-const MAX_AREA_COMPARABLE_WEIGHT_SHARE = 0.20;
-const MAX_AREA_LEAVE_ONE_OUT_VARIATION = 0.10;
-const MAX_AREA_ADJUSTED_PRICE_SPREAD = 0.40;
-const MAX_AREA_SOURCE_MEDIAN_RATIO = 1.25;
-const MIN_AREA_SOURCE_COUNT = 2;
+// The public product is a commercial asking-price guide, not a certified
+// appraisal. Three coherent comparables are enough to publish an initial
+// range; more observations improve the evidence label shown by the UI.
+const MIN_AREA_REFERENCE_COMPARABLES = 3;
+const MIN_AREA_EFFECTIVE_SAMPLE_SIZE = 2.15;
+const MAX_AREA_COMPARABLE_WEIGHT_SHARE = 0.50;
+const MAX_AREA_LEAVE_ONE_OUT_VARIATION = 0.25;
+const MAX_AREA_ADJUSTED_PRICE_SPREAD = 0.70;
+const MAX_AREA_SOURCE_MEDIAN_RATIO = 1.45;
+const MIN_AREA_SOURCE_COUNT = 1;
 const MIN_AREA_COMPARABLES_PER_SOURCE = 3;
-const MIN_AREA_CRITICAL_COMPLETENESS = 0.85;
-const MIN_AREA_ROOM_COMPLETENESS = 0.80;
-const MIN_AREA_EVIDENCE_SCORE = 45;
+const MIN_AREA_CRITICAL_COMPLETENESS = 0.70;
+const MIN_AREA_ROOM_COMPLETENESS = 0.50;
+const MIN_AREA_EVIDENCE_SCORE = 30;
 
 export interface ValuationEngineOptions {
   minComparables?: number;
@@ -265,8 +268,9 @@ const median = (values: number[]): number => quantile([...values].sort((a, b) =>
 
 const removeAdjustedPriceOutliers = (candidates: ComparableCandidate[]): ComparableCandidate[] => {
   // With fewer than five observations there is not enough evidence to decide
-  // which point is the outlier. The quality gate below rejects that sample.
-  if (candidates.length < DEFAULT_MIN_VALUATION_COMPARABLES) return candidates;
+  // which point is an outlier. Small samples are instead bounded by the
+  // dispersion and leave-one-out stability gates below.
+  if (candidates.length < 5) return candidates;
   const logPrices = candidates.map((candidate) => Math.log(candidate.adjustedPrice));
   const center = median(logPrices);
   const deviations = logPrices.map((value) => Math.abs(value - center));
@@ -764,14 +768,16 @@ const estimateAreaReference = (
   const roomCompleteness = candidates.length > 0
     ? candidates.reduce((sum, candidate) => sum + candidate.roomCompleteness, 0) / candidates.length
     : 0;
+  const sampleScore = candidates.length >= 8 ? 18 : candidates.length >= 5 ? 15 : candidates.length >= 3 ? 12 : 0;
+  const sourceScore = diagnostics.sourceCount >= 2 ? 8 : diagnostics.sourceCount === 1 ? 4 : 0;
   const confidenceScore = Math.min(64, Math.round(
-    Math.min(18, candidates.length / MIN_AREA_REFERENCE_COMPARABLES * 18)
-      + Math.min(14, diagnostics.effectiveSampleSize / MIN_AREA_EFFECTIVE_SAMPLE_SIZE * 14)
-      + Math.max(0, 16 * (1 - adjustedPriceSpread / MAX_AREA_ADJUSTED_PRICE_SPREAD))
-      + Math.max(0, 10 * (1 - Math.max(0, sourceMedianRatio - 1) / (MAX_AREA_SOURCE_MEDIAN_RATIO - 1)))
+    sampleScore
+      + Math.min(12, diagnostics.effectiveSampleSize / MIN_AREA_EFFECTIVE_SAMPLE_SIZE * 12)
+      + Math.max(0, 14 * (1 - adjustedPriceSpread / MAX_AREA_ADJUSTED_PRICE_SPREAD))
+      + sourceScore
       + 8 * diagnostics.criticalCompleteness
-      + 8 * roomCompleteness
-      + Math.max(0, 10 * (1 - diagnostics.leaveOneOutVariation / MAX_AREA_LEAVE_ONE_OUT_VARIATION))
+      + 6 * roomCompleteness
+      + Math.max(0, 8 * (1 - diagnostics.leaveOneOutVariation / MAX_AREA_LEAVE_ONE_OUT_VARIATION))
   ));
   const rejectionReasons: string[] = [];
   const targetMarketKey = getPropertyMicroMarketKey(target);
@@ -783,31 +789,31 @@ const estimateAreaReference = (
     rejectionReasons.push('Falta un micromercado exacto; una ciudad completa no se usa como referencia.');
   }
   if (candidates.length < MIN_AREA_REFERENCE_COMPARABLES) {
-    rejectionReasons.push(`La referencia por área requiere ${MIN_AREA_REFERENCE_COMPARABLES} viviendas únicas; se encontraron ${candidates.length}.`);
+    rejectionReasons.push(`La estimación comercial requiere ${MIN_AREA_REFERENCE_COMPARABLES} propiedades comparables; se encontraron ${candidates.length}.`);
   }
   if (diagnostics.sourceCount < MIN_AREA_SOURCE_COUNT || diagnostics.qualifiedSourceCount < MIN_AREA_SOURCE_COUNT) {
-    rejectionReasons.push(`Se requieren ${MIN_AREA_SOURCE_COUNT} fuentes con al menos ${MIN_AREA_COMPARABLES_PER_SOURCE} viviendas únicas cada una.`);
+    rejectionReasons.push(`Se requiere al menos ${MIN_AREA_SOURCE_COUNT} fuente con ${MIN_AREA_COMPARABLES_PER_SOURCE} propiedades comparables.`);
   }
   if (diagnostics.effectiveSampleSize < MIN_AREA_EFFECTIVE_SAMPLE_SIZE) {
     rejectionReasons.push(`El tamaño efectivo del área es ${diagnostics.effectiveSampleSize.toFixed(1)}; debe ser al menos ${MIN_AREA_EFFECTIVE_SAMPLE_SIZE}.`);
   }
   if (diagnostics.maxWeightShare > MAX_AREA_COMPARABLE_WEIGHT_SHARE) {
-    rejectionReasons.push('Una vivienda concentra más del 20% del peso de la referencia por área.');
+    rejectionReasons.push('Una propiedad concentra más del 50% del peso de la estimación comercial.');
   }
   if (diagnostics.leaveOneOutVariation > MAX_AREA_LEAVE_ONE_OUT_VARIATION) {
-    rejectionReasons.push('La referencia por área cambia más del 10% al retirar una vivienda.');
+    rejectionReasons.push('La estimación cambia más del 25% al retirar una propiedad comparable.');
   }
   if (adjustedPriceSpread > MAX_AREA_ADJUSTED_PRICE_SPREAD) {
-    rejectionReasons.push('La dispersión ponderada del rango de oferta supera el 40%.');
+    rejectionReasons.push('La dispersión de los precios comparables supera el 70%.');
   }
-  if (sourceMedianRatio > MAX_AREA_SOURCE_MEDIAN_RATIO) {
-    rejectionReasons.push('Las medianas de las fuentes difieren más del 25%.');
+  if (sourceMedians.length > 1 && sourceMedianRatio > MAX_AREA_SOURCE_MEDIAN_RATIO) {
+    rejectionReasons.push('Las medianas entre fuentes difieren más del 45%.');
   }
   if (diagnostics.criticalCompleteness < MIN_AREA_CRITICAL_COMPLETENESS) {
-    rejectionReasons.push('La completitud media de los comparables es menor al 85%.');
+    rejectionReasons.push('La completitud media de los comparables es menor al 70%.');
   }
   if (roomCompleteness < MIN_AREA_ROOM_COMPLETENESS) {
-    rejectionReasons.push('Menos del 80% de los comparables informa recámaras y baños.');
+    rejectionReasons.push('Menos de la mitad de los comparables informa recámaras y baños.');
   }
   if (areaPrecisionShare < 1) {
     rejectionReasons.push('La muestra incluye ubicaciones a nivel ciudad o sin micromercado verificable.');
@@ -940,7 +946,7 @@ export class ValuationEngine {
       ? Number((rentStrict.estimate * 12 / saleStrict.estimate * 100).toFixed(2))
       : null;
     if (primaryMarket.evidenceTier === 'AREA_REFERENCE') {
-      warnings.push('Referencia orientativa basada en precios anunciados del micromercado; no usa distancias punto a punto ni representa operaciones cerradas.');
+      warnings.push('Estimación comercial aproximada basada en precios anunciados del mismo micromercado; no es un avalúo ni representa operaciones cerradas.');
     } else {
       warnings.push(...primaryMarket.rejectionReasons);
     }
@@ -1010,7 +1016,7 @@ export class ValuationEngine {
       dataAsOf: newestEvidenceDate(primaryMarket.comparables, now),
       modelVersion: VALUATION_MODEL_VERSION,
       methodology: isAreaReference
-        ? 'Towers Area Reference v1: precios anunciados del mismo micromercado, tipo y operación; deduplicación conservadora entre portales, homologación de superficie, pesos equilibrados por fuente y controles de muestra efectiva, dispersión, acuerdo entre fuentes y estabilidad. Es una referencia orientativa de oferta, no una estimación de valor de cierre ni un avalúo.'
+        ? 'Towers Estimación Comercial v1: desde tres precios anunciados del mismo micromercado, tipo y operación; elimina posibles duplicados, homologa superficies y controla dispersión y estabilidad. Es un rango aproximado de mercado, no un avalúo ni un precio de cierre garantizado.'
         : 'Towers Market v5: inventario autorizado y observaciones públicas de investigación del mismo micromercado y tipo con distancias verificadas, vigencia, deduplicación, homologación de terreno y construcción, diversidad de fuentes, dispersión, dominancia y estabilidad. Los anuncios son precios solicitados, no operaciones cerradas ni avalúos certificados.',
       warnings: [...new Set(warnings)],
       comparables: combinedComparables,

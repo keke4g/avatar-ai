@@ -217,10 +217,15 @@ export function getEternaValuationDossier(property: Property): Record<string, un
     || (valuation.confidence === 'LOW' && !isAreaReference)
     || valuation.modelVersion !== 'towers-market-v5'
   ) return null;
+  const areaReference = finiteNumber(valuation.areaReferenceValue);
+  const listingPrice = finiteNumber(valuation.listingPrice);
+  const areaDifference = isAreaReference && areaReference && listingPrice
+    ? Number(((listingPrice - areaReference) / areaReference * 100).toFixed(2))
+    : null;
   return {
-    tipo: isAreaReference ? 'REFERENCIA_ORIENTATIVA_DE_OFERTA' : 'ESTIMACION_AUTOMATIZADA_DE_VALOR',
+    tipo: isAreaReference ? 'ESTIMACION_COMERCIAL_ORIENTATIVA' : 'ESTIMACION_AUTOMATIZADA_DE_VALOR',
     aviso: isAreaReference
-      ? 'Es una referencia de precios anunciados del micromercado, no un valor de cierre ni un avalúo.'
+      ? 'Es una estimación comercial aproximada basada en precios anunciados del micromercado; no es un avalúo.'
       : 'No es un avalúo oficial ni sustituye la inspección y firma de un perito autorizado.',
     moneda: valuation.currency || 'MXN',
     valorVentaEstimado: finiteNumber(valuation.estimatedSaleValue),
@@ -236,12 +241,12 @@ export function getEternaValuationDossier(property: Property): Record<string, un
     },
     rentaEstimadaM2: finiteNumber(valuation.rentPricePerM2),
     capRateEstimadoPct: finiteNumber(valuation.estimatedCapRate) || finiteNumber(valuation.grossRentalYield),
-    precioPublicado: finiteNumber(valuation.listingPrice),
+    precioPublicado: listingPrice,
     diferenciaPublicadoVsEstimadoPct: typeof valuation.listingVsEstimatePct === 'number'
       && Number.isFinite(valuation.listingVsEstimatePct)
       ? valuation.listingVsEstimatePct
-      : null,
-    referenciaOrientativa: finiteNumber(valuation.areaReferenceValue),
+      : areaDifference,
+    referenciaOrientativa: areaReference,
     rangoReferenciaOrientativa: {
       minimo: finiteNumber(valuation.areaRangeLow),
       maximo: finiteNumber(valuation.areaRangeHigh),
@@ -300,45 +305,45 @@ export function resolveValuationQuestion(
 
     if (intent === 'cap_rate') {
       const reply = language === 'es'
-        ? 'Esta ficha tiene una referencia orientativa de precios anunciados, no una estimación de valor de cierre. Por eso no calculo cap rate con ella. ¿Quieres revisar la referencia y su rango?'
-        : 'This listing has an indicative asking-price reference, not an estimated closing value. I therefore do not calculate cap rate from it. Would you like to review the reference and its range?';
-      return { reply, speech: reply, suggestedReplies: language === 'es' ? ['Ver referencia de mercado', '¿Cómo se calculó?'] : ['See market reference', 'How was it calculated?'] };
+        ? 'La ficha tiene una estimación comercial de venta, pero todavía no una estimación de renta compatible; sin ambas cifras no sería responsable calcular el cap rate. ¿Quieres revisar el precio estimado y su rango?'
+        : 'This listing has a commercial sale estimate, but not yet a compatible rent estimate; without both figures, calculating cap rate would not be responsible. Would you like to review the estimated price and range?';
+      return { reply, speech: reply, suggestedReplies: language === 'es' ? ['Ver precio estimado', '¿Cómo se calculó?'] : ['See estimated price', 'How was it calculated?'] };
     }
 
     if (intent === 'comparison') {
       const listed = finiteNumber(valuation.listingPrice);
-      const listedText = listed
-        ? (language === 'es'
-            ? `El precio publicado es ${formatMoney(listed, currency, language)}. `
-            : `The listing price is ${formatMoney(listed, currency, language)}. `)
-        : '';
+      const difference = listed
+        ? Number(((listed - reference) / reference * 100).toFixed(2))
+        : null;
+      const visualComparison = comparisonPhrase(difference, language);
+      const spokenComparison = comparisonPhrase(difference, language, true);
       const reply = language === 'es'
-        ? `${listedText}La referencia central de anuncios comparables es ${formatMoney(reference, currency, language)}, pero no la uso para declarar que la propiedad está cara o barata: son precios solicitados, no cierres. ¿Quieres ver el rango orientativo?`
-        : `${listedText}The central comparable-listing reference is ${formatMoney(reference, currency, language)}, but I do not use it to declare the property expensive or cheap: these are asking prices, not closings. Would you like the indicative range?`;
+        ? `${listed ? `El precio publicado es ${formatMoney(listed, currency, language)} y la estimación comercial central es ${formatMoney(reference, currency, language)}. ` : ''}${visualComparison ? `${visualComparison}. ` : ''}El rango es aproximado y se basa en precios anunciados comparables. ¿Quieres que te muestre el rango completo?`
+        : `${listed ? `The listing price is ${formatMoney(listed, currency, language)} and the central commercial estimate is ${formatMoney(reference, currency, language)}. ` : ''}${visualComparison ? `${visualComparison}. ` : ''}The range is approximate and based on comparable asking prices. Would you like the full range?`;
       const speech = language === 'es'
-        ? `${listed ? `El precio publicado es ${formatSpokenMoney(listed, currency, language)}. ` : ''}La referencia central de anuncios comparables es ${formatSpokenMoney(reference, currency, language)}, pero no la uso para declarar que la propiedad está cara o barata porque son precios solicitados, no cierres. ¿Quieres ver el rango orientativo?`
-        : `${listed ? `The listing price is ${formatSpokenMoney(listed, currency, language)}. ` : ''}The central comparable listing reference is ${formatSpokenMoney(reference, currency, language)}, but I do not use it to declare the property expensive or cheap because these are asking prices, not closings. Would you like the indicative range?`;
-      return { reply, speech, suggestedReplies: language === 'es' ? ['Ver rango orientativo', '¿Cómo se calculó?'] : ['See indicative range', 'How was it calculated?'] };
+        ? `${listed ? `El precio publicado es ${formatSpokenMoney(listed, currency, language)} y la estimación comercial central es ${formatSpokenMoney(reference, currency, language)}. ` : ''}${spokenComparison ? `${spokenComparison}. ` : ''}El rango es aproximado y se basa en precios anunciados comparables. ¿Quieres que te muestre el rango completo?`
+        : `${listed ? `The listing price is ${formatSpokenMoney(listed, currency, language)} and the central commercial estimate is ${formatSpokenMoney(reference, currency, language)}. ` : ''}${spokenComparison ? `${spokenComparison}. ` : ''}The range is approximate and based on comparable asking prices. Would you like the full range?`;
+      return { reply, speech, suggestedReplies: language === 'es' ? ['Ver rango estimado', '¿Cómo se calculó?'] : ['See estimated range', 'How was it calculated?'] };
     }
 
     if (intent === 'methodology') {
       const count = Math.round(finiteNumber(valuation.comparableCount) || 0);
       const date = formatDate(valuation.dataAsOf, language);
       const reply = language === 'es'
-        ? `Es una referencia orientativa de oferta, no un avalúo. Usó ${count} viviendas del mismo micromercado, tipo y operación; eliminó posibles duplicados, homologó superficies y equilibró el peso de cada fuente${date ? `, con datos al ${date}` : ''}. No inventa distancias cuando el portal sólo informa la colonia. ¿Quieres revisar el valor central o el rango?`
-        : `This is indicative asking-price guidance, not an appraisal. It used ${count} homes in the same micro-market, type and operation; removed likely duplicates, adjusted areas and balanced each source${date ? `, with data through ${date}` : ''}. It does not invent distances when a portal only identifies the neighborhood. Would you like the central reference or range?`;
-      return { reply, speech: reply, suggestedReplies: language === 'es' ? ['Ver referencia central', 'Ver rango orientativo'] : ['See central reference', 'See indicative range'] };
+        ? `Es una estimación comercial aproximada, no un avalúo. Usó ${count} propiedades del mismo micromercado, tipo y operación; eliminó posibles duplicados y ajustó las diferencias de superficie${date ? `, con datos al ${date}` : ''}. No exige coordenadas exactas cuando la colonia está identificada. ¿Quieres revisar el precio central o el rango?`
+        : `This is an approximate commercial estimate, not an appraisal. It used ${count} properties in the same micro-market, type and operation; removed likely duplicates and adjusted area differences${date ? `, with data through ${date}` : ''}. It does not require exact coordinates when the neighborhood is identified. Would you like the central price or range?`;
+      return { reply, speech: reply, suggestedReplies: language === 'es' ? ['Ver precio estimado', 'Ver rango estimado'] : ['See estimated price', 'See estimated range'] };
     }
 
     const visualRange = referenceLow && referenceHigh
       ? (language === 'es'
-          ? `, con un rango orientativo de ${formatMoney(referenceLow, currency, language)} a ${formatMoney(referenceHigh, currency, language)}`
-          : `, with an indicative range from ${formatMoney(referenceLow, currency, language)} to ${formatMoney(referenceHigh, currency, language)}`)
+          ? `, con un rango estimado de ${formatMoney(referenceLow, currency, language)} a ${formatMoney(referenceHigh, currency, language)}`
+          : `, with an estimated range from ${formatMoney(referenceLow, currency, language)} to ${formatMoney(referenceHigh, currency, language)}`)
       : '';
     const spokenRange = referenceLow && referenceHigh
       ? (language === 'es'
-          ? `, con un rango orientativo entre ${formatSpokenMoney(referenceLow, currency, language)} y ${formatSpokenMoney(referenceHigh, currency, language)}`
-          : `, with an indicative range between ${formatSpokenMoney(referenceLow, currency, language)} and ${formatSpokenMoney(referenceHigh, currency, language)}`)
+          ? `, con un rango estimado entre ${formatSpokenMoney(referenceLow, currency, language)} y ${formatSpokenMoney(referenceHigh, currency, language)}`
+          : `, with an estimated range between ${formatSpokenMoney(referenceLow, currency, language)} and ${formatSpokenMoney(referenceHigh, currency, language)}`)
       : '';
     const visualPerM2 = referencePerM2
       ? (language === 'es' ? ` La referencia por m² es ${formatMoney(referencePerM2, currency, language)}.` : ` The reference per m² is ${formatMoney(referencePerM2, currency, language)}.`)
@@ -347,11 +352,11 @@ export function resolveValuationQuestion(
       ? (language === 'es' ? ` La referencia por metro cuadrado es ${formatSpokenMoney(referencePerM2, currency, language)}.` : ` The reference per square meter is ${formatSpokenMoney(referencePerM2, currency, language)}.`)
       : '';
     const reply = language === 'es'
-      ? `La referencia orientativa de precios anunciados en este micromercado es ${formatMoney(reference, currency, language)}${visualRange}.${visualPerM2} Se basó en ${Math.round(finiteNumber(valuation.comparableCount) || 0)} comparables y no es un avalúo ni un precio de cierre. ¿Quieres saber cómo se calculó?`
-      : `The indicative asking-price reference in this micro-market is ${formatMoney(reference, currency, language)}${visualRange}.${visualPerM2} It used ${Math.round(finiteNumber(valuation.comparableCount) || 0)} comparables and is not an appraisal or closing price. Would you like to know how it was calculated?`;
+      ? `La estimación comercial aproximada de esta propiedad es ${formatMoney(reference, currency, language)}${visualRange}.${visualPerM2} Se basó en ${Math.round(finiteNumber(valuation.comparableCount) || 0)} comparables y no sustituye un avalúo. ¿Quieres saber cómo se calculó?`
+      : `The approximate commercial estimate for this property is ${formatMoney(reference, currency, language)}${visualRange}.${visualPerM2} It used ${Math.round(finiteNumber(valuation.comparableCount) || 0)} comparables and does not replace an appraisal. Would you like to know how it was calculated?`;
     const speech = language === 'es'
-      ? `La referencia orientativa de precios anunciados en este micromercado es ${formatSpokenMoney(reference, currency, language)}${spokenRange}.${spokenPerM2} Se basó en ${Math.round(finiteNumber(valuation.comparableCount) || 0)} comparables y no es un avalúo ni un precio de cierre. ¿Quieres saber cómo se calculó?`
-      : `The indicative asking price reference in this micro market is ${formatSpokenMoney(reference, currency, language)}${spokenRange}.${spokenPerM2} It used ${Math.round(finiteNumber(valuation.comparableCount) || 0)} comparables and is not an appraisal or closing price. Would you like to know how it was calculated?`;
+      ? `La estimación comercial aproximada de esta propiedad es ${formatSpokenMoney(reference, currency, language)}${spokenRange}.${spokenPerM2} Se basó en ${Math.round(finiteNumber(valuation.comparableCount) || 0)} comparables y no sustituye un avalúo. ¿Quieres saber cómo se calculó?`
+      : `The approximate commercial estimate for this property is ${formatSpokenMoney(reference, currency, language)}${spokenRange}.${spokenPerM2} It used ${Math.round(finiteNumber(valuation.comparableCount) || 0)} comparables and does not replace an appraisal. Would you like to know how it was calculated?`;
     return { reply, speech, suggestedReplies: language === 'es' ? ['¿Cómo se calculó?', 'Ver características'] : ['How was it calculated?', 'Review property details'] };
   }
 

@@ -34,12 +34,22 @@ export function buildPresentationValuation({
     && offering.visibility === 'PUBLIC'
   ));
   const publishedPrice = publishedOffering?.priceAmount || null;
-  const differencePercent = !isAreaReference && publishedPrice && estimatedReference
+  const estimatedMin = isAreaReference
+    ? automatedValuation.areaRangeLow
+    : rentalMode
+      ? automatedValuation.rentRangeLow
+      : automatedValuation.saleRangeLow;
+  const estimatedMax = isAreaReference
+    ? automatedValuation.areaRangeHigh
+    : rentalMode
+      ? automatedValuation.rentRangeHigh
+      : automatedValuation.saleRangeHigh;
+  const differencePercent = publishedPrice && estimatedReference
     ? Number(((publishedPrice - estimatedReference) / estimatedReference * 100).toFixed(2))
     : null;
   const marketPosition = differencePercent === null
     ? null
-    : Math.abs(differencePercent) <= 8
+    : Math.abs(differencePercent) < 1
       ? 'IN_RANGE' as const
       : differencePercent < 0
         ? 'BELOW' as const
@@ -56,16 +66,8 @@ export function buildPresentationValuation({
     mode: selectedMode || undefined,
     currency: automatedValuation.currency || publishedOffering?.currency || 'MXN',
     estimatedValue: estimatedReference,
-    estimatedMin: isAreaReference
-      ? automatedValuation.areaRangeLow
-      : rentalMode
-        ? automatedValuation.rentRangeLow
-        : automatedValuation.saleRangeLow,
-    estimatedMax: isAreaReference
-      ? automatedValuation.areaRangeHigh
-      : rentalMode
-        ? automatedValuation.rentRangeHigh
-        : automatedValuation.saleRangeHigh,
+    estimatedMin,
+    estimatedMax,
     estimatedPricePerM2: isAreaReference
       ? automatedValuation.areaPricePerM2
       : rentalMode
@@ -82,7 +84,11 @@ export function buildPresentationValuation({
     grossCapRate: automatedValuation.estimatedCapRate || automatedValuation.grossRentalYield,
     confidenceScore: isAreaReference ? null : automatedValuation.confidenceScore,
     confidenceLabel: isAreaReference
-      ? (language === 'es' ? 'Referencia orientativa' : 'Indicative reference')
+      ? automatedValuation.comparableCount >= 8
+        ? (language === 'es' ? 'Estimación respaldada' : 'Broad market estimate')
+        : automatedValuation.comparableCount >= 5
+          ? (language === 'es' ? 'Estimación orientativa' : 'Indicative market estimate')
+          : (language === 'es' ? 'Estimación inicial' : 'Initial market estimate')
       : language === 'es'
         ? `Confianza ${automatedValuation.confidence === 'HIGH' ? 'alta' : automatedValuation.confidence === 'MEDIUM' ? 'media' : 'insuficiente'}`
         : `${automatedValuation.confidence.toLocaleLowerCase()} confidence`,
@@ -98,7 +104,7 @@ export function buildPresentationValuation({
     methodology: automatedValuation.methodology,
     sourceLabels: automatedValuation.sourceLabels?.length
       ? automatedValuation.sourceLabels
-      : ['Referencias autorizadas de precios anunciados'],
+      : ['Precios anunciados de propiedades comparables'],
     insufficiencyReasons: automatedValuation.warnings,
   };
 }
