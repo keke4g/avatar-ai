@@ -146,6 +146,19 @@ export const buildHomeMarketRadar = (
     });
   }
 
+  const highestPublishedSale = [...saleMxn]
+    .reverse()
+    .find(({ property }) => !selected.some((candidate) => candidate.property.id === property.id));
+  if (highestPublishedSale) {
+    pushUnique({
+      ...highestPublishedSale,
+      tag: language === 'es' ? 'Mayor valor' : 'Highest listing',
+      insight: language === 'es'
+        ? 'La propiedad con el precio de venta publicado más alto del catálogo actual.'
+        : 'The property with the highest published sale price in the current catalog.',
+    });
+  }
+
   const newest = [...priced]
     .sort((left, right) => getPublishedTimestamp(right.property) - getPublishedTimestamp(left.property))
     .find(({ property }) => !selected.some((candidate) => candidate.property.id === property.id));
@@ -168,7 +181,7 @@ export const buildHomeMarketRadar = (
     if (selected.length >= 3) return;
     pushUnique({
       ...candidate,
-      tag: language === 'es' ? 'Para comparar' : 'Worth comparing',
+      tag: language === 'es' ? 'Selección destacada' : 'Featured selection',
       insight: language === 'es'
         ? 'Una alternativa útil para ampliar tu comparación de mercado.'
         : 'A useful alternative for a broader market comparison.',

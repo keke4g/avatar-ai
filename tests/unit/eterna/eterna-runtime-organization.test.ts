@@ -47,6 +47,10 @@ import {
   buildHomeMarketRadar,
   getHomePropertyTypeLabel,
 } from '../../../components/home/homeExperienceData';
+import {
+  consumeInstantTopNavigation,
+  requestInstantTopNavigation,
+} from '../../../lib/navigation/instantTopNavigation';
 
 test('normaliza transcripciones y detecta ecos por tokens', () => {
   assert.equal(normalizeVoiceText('¡Casa en MÉXICO, por favor!'), 'casa en mexico por favor');
@@ -388,6 +392,8 @@ test('el Home construye un radar real y conserva los filtros al abrir Explorer',
   assert.equal(radar.length, 3);
   assert.equal(radar[0]?.property.id, 'accessible');
   assert.equal(radar[0]?.tag, 'Más accesible');
+  assert.equal(radar.find((entry) => entry.tag === 'Mayor valor')?.property.id, 'expensive');
+  assert.equal(radar.some((entry) => entry.tag === 'Para comparar'), false);
   assert.equal(getHomePropertyTypeLabel(radar[0]!.property, 'es'), 'Casa');
   assert.equal(
     buildHomeExploreUrl({
@@ -399,4 +405,18 @@ test('el Home construye un radar real y conserva los filtros al abrir Explorer',
     }),
     '/explore?search=Lomas+de+Angel%C3%B3polis&offering=SALE&budget=5000000&rooms=3&sort=price_asc',
   );
+});
+
+test('la navegación Home a Explorer consume una sola restauración instantánea', () => {
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  };
+
+  assert.equal(consumeInstantTopNavigation(storage), false);
+  requestInstantTopNavigation(storage);
+  assert.equal(consumeInstantTopNavigation(storage), true);
+  assert.equal(consumeInstantTopNavigation(storage), false);
 });

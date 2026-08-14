@@ -8,21 +8,18 @@ import {
   ArrowRight,
   BedDouble,
   Building2,
-  Check,
-  CircleAlert,
   House,
-  LoaderCircle,
   MapPin,
   MessageCircle,
   Search,
   Send,
-  Sparkles,
   WalletCards,
   X,
 } from "lucide-react";
 import { useLiveContext } from "../../lib/context/LiveContext";
 import { useSwap } from "../../lib/context/SwapContext";
 import { getPropertyPriceSnapshot } from "../../lib/search/propertyPrice";
+import { requestInstantTopNavigation } from "../../lib/navigation/instantTopNavigation";
 import {
   buildHomeExploreUrl,
   buildHomeMarketRadar,
@@ -199,17 +196,14 @@ export default function HomeSearchBrief({
     ready: language === "es" ? "Búsqueda actualizada" : "Search updated",
     error: language === "es" ? "Revisa los criterios" : "Review your criteria",
   }[searchBrief.status];
-  const StatusIcon = searchBrief.status === "searching"
-    ? LoaderCircle
-    : searchBrief.status === "error"
-      ? CircleAlert
-      : searchBrief.status === "ready"
-        ? Check
-        : Sparkles;
   const resultCount = searchBrief.status === "ready"
     ? searchBrief.resultCount
     : properties.filter((property) => property.isPublished !== false && property.isDemo !== true && property.is_demo !== true).length;
   const exploreUrl = buildHomeExploreUrl(activeSearch?.filters);
+  const handleExplore = () => {
+    requestInstantTopNavigation(window.sessionStorage);
+    router.push(exploreUrl, { scroll: false });
+  };
 
   const criteria = [
     {
@@ -267,7 +261,7 @@ export default function HomeSearchBrief({
             : "border-zinc-200/85 bg-white/88 shadow-[0_22px_60px_rgba(24,24,27,0.07)]"
         }`}
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
           <div>
             <span className={`text-[8px] font-extrabold uppercase tracking-[0.16em] ${isDark ? "text-sky-300/60" : "text-sky-700/65"}`}>
               {language === "es" ? "Brief en vivo" : "Live brief"}
@@ -276,9 +270,6 @@ export default function HomeSearchBrief({
               {language === "es" ? "Lo que Eterna entendió" : "What Eterna understood"}
             </h3>
           </div>
-          <span className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isDark ? "bg-sky-400/10 text-sky-300" : "bg-sky-50 text-sky-700"}`}>
-            <StatusIcon className={`h-3.5 w-3.5 ${searchBrief.status === "searching" ? "animate-spin" : ""}`} aria-hidden="true" />
-          </span>
         </div>
 
         <div className={`mt-4 flex items-center gap-2 rounded-full border px-3 py-2 ${isDark ? "border-white/[0.06] bg-white/[0.025]" : "border-zinc-200/80 bg-zinc-50/80"}`}>
@@ -352,7 +343,7 @@ export default function HomeSearchBrief({
         <div className="mt-4 space-y-2.5">
           <button
             type="button"
-            onClick={() => router.push(exploreUrl)}
+            onClick={handleExplore}
             className={`flex h-10 w-full items-center justify-between rounded-full px-4 text-[9px] font-black uppercase tracking-[0.12em] transition-all hover:-translate-y-0.5 ${isDark ? "bg-white text-zinc-950 hover:bg-sky-50" : "bg-zinc-950 text-white hover:bg-zinc-800"}`}
           >
             <span>{activeSearch ? (language === "es" ? "Ver búsqueda completa" : "View full search") : (language === "es" ? "Explorar catálogo" : "Explore listings")}</span>

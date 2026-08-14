@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import React, { useState, useMemo, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useSwap } from '../../lib/context/SwapContext';
 import { useTranslation } from '../../lib/context/LanguageContext';
@@ -22,6 +22,7 @@ import { ServiceFactory } from '../../lib/services/ServiceFactory';
 import { PropertySearchFilters, SearchSort } from '../../lib/search/types';
 import { searchLogger } from '../../lib/search/searchLogger';
 import { getCacheKey } from '../../lib/search/SearchCache';
+import { consumeInstantTopNavigation } from '../../lib/navigation/instantTopNavigation';
 
 const InteractiveMap = dynamic(() => import('../../components/InteractiveMap'), {
   ssr: false,
@@ -76,6 +77,23 @@ function ExploreContent() {
     });
   }, [allProperties]);
   const catalogLoading = propertiesLoading && allProperties.length === 0;
+
+  useLayoutEffect(() => {
+    if (!consumeInstantTopNavigation(window.sessionStorage)) return;
+
+    const root = document.documentElement;
+    const previousScrollBehavior = root.style.scrollBehavior;
+    root.style.scrollBehavior = 'auto';
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+
+    const frame = window.requestAnimationFrame(() => {
+      root.style.scrollBehavior = previousScrollBehavior;
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      root.style.scrollBehavior = previousScrollBehavior;
+    };
+  }, []);
   
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchBudget, setSearchBudget] = useState('');
