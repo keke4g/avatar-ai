@@ -86,6 +86,7 @@ import {
   clearAuthenticatedGreeting,
   consumeAuthenticatedGreeting,
   consumePropertySummaryPresentation,
+  getConfirmedEternaUserName,
   getEternaFirstName,
 } from '@/lib/eterna/sessionExperience';
 // ────────────────────────────────────────────────
@@ -130,8 +131,9 @@ export default function EternaConcierge() {
   const isPropertyPage = pathname?.startsWith('/property/') === true;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { properties, swaps, currentUser, messages, reviews, travelDetails, activeSearch, setActiveSearch } = useSwap();
+  const { properties, swaps, currentUser, authProfileReady, messages, reviews, travelDetails, activeSearch, setActiveSearch } = useSwap();
   const { t, language } = useTranslation();
+  const confirmedUserName = getConfirmedEternaUserName(authProfileReady, currentUser?.name);
   const { 
     liveContext, 
     setPendingIntent, 
@@ -569,7 +571,7 @@ export default function EternaConcierge() {
       unreadMessages: unreadMessages.length,
       myPropertiesCount: myProps.length,
       pendingReviews: pendingReviews.length,
-      userName: currentUser?.name || 'Usuario',
+      userName: confirmedUserName || 'Usuario',
       swaps,
       properties,
       currentUser,
@@ -577,7 +579,7 @@ export default function EternaConcierge() {
       reviews,
       travelDetails: travelDetails || [],
     };
-  }, [properties, swaps, messages, reviews, currentUser, travelDetails]);
+  }, [properties, swaps, messages, reviews, currentUser, confirmedUserName, travelDetails]);
 
   const contextBridgeJSON = useMemo(() => {
     const myProps = properties.filter(p => p.hostId === currentUser?.id);
@@ -588,7 +590,7 @@ export default function EternaConcierge() {
     const myReviews = reviews.filter(r => r.reviewedUserId === currentUser?.id);
 
     return JSON.stringify({
-      user: currentUser?.name || 'Usuario',
+      user: confirmedUserName || 'Usuario',
       userId: currentUser?.id || '',
       properties: myProps.map(p => `${p.title} (${formatPropertyLocation(p.location, p.country)})`),
       propertiesCount: myProps.length,
@@ -605,7 +607,7 @@ export default function EternaConcierge() {
       totalReviews: myReviews.length,
       pendingReviews: intentContext.pendingReviews,
     });
-  }, [properties, swaps, reviews, currentUser, intentContext]);
+  }, [properties, swaps, reviews, currentUser, confirmedUserName, intentContext]);
 
   // 1. Zero-Configuration RAG Auto-Syncing disabled for LOCAL ONLY MODE
   useEffect(() => {
@@ -625,8 +627,8 @@ export default function EternaConcierge() {
     contextBridgeJson: contextBridgeJSON,
     currentPage: pathname || '/',
     language: language === 'es' ? 'es' : 'en',
-    userName: currentUser?.name,
-  }), [contextBridgeJSON, currentUser?.name, language, pathname]);
+    userName: confirmedUserName,
+  }), [confirmedUserName, contextBridgeJSON, language, pathname]);
 
 
 
@@ -657,6 +659,7 @@ export default function EternaConcierge() {
     }
 
     previousAuthenticatedUserIdRef.current = currentUser.id;
+    if (!authProfileReady) return;
     if (pathname === '/login' || isPropertyPage) return;
     if (!consumeAuthenticatedGreeting(sessionStorage, currentUser.id)) return;
 
@@ -677,6 +680,7 @@ export default function EternaConcierge() {
       speak(greeting, () => setSimulatedStatus('idle'));
     }, 450);
   }, [
+    authProfileReady,
     currentUser,
     isPropertyPage,
     language,
@@ -833,7 +837,7 @@ export default function EternaConcierge() {
   // ────────────────────────────────────────────────
 
   useEffect(() => {
-    if (isOpen && !greetingTriggeredRef.current && chatHistory.length === 0 && currentUser) {
+    if (isOpen && authProfileReady && !greetingTriggeredRef.current && chatHistory.length === 0 && currentUser) {
       greetingTriggeredRef.current = true;
 
       // Build personalized greeting with real data
@@ -917,7 +921,7 @@ export default function EternaConcierge() {
         greetingTimerRef.current = null;
       }
     };
-  }, [chatHistory.length, chatHistoryRef, currentUser, intentContext, isOpen, language, setChatHistory, speak]);
+  }, [authProfileReady, chatHistory.length, chatHistoryRef, currentUser, intentContext, isOpen, language, setChatHistory, speak]);
 
   // Reset greeting when panel closes, but ONLY if there is no chat history
   useEffect(() => {
@@ -980,7 +984,7 @@ export default function EternaConcierge() {
   // 1. Post-Login Recovery and Flow Activation
   useEffect(() => {
     const pending = liveContext.eterna.pendingIntent;
-    if (currentUser && pending) {
+    if (currentUser && authProfileReady && pending) {
       if (Date.now() - pending.timestamp < 10 * 60 * 1000) {
         // Clear pending intent to prevent loops
         setPendingIntent(null);
@@ -1015,7 +1019,7 @@ export default function EternaConcierge() {
         setPendingIntent(null);
       }
     }
-  }, [currentUser, getCatalogMessage, language, liveContext.eterna.pendingIntent, router, setActiveGuidedFlow, setChatHistory, setPendingIntent, speak]);
+  }, [authProfileReady, currentUser, getCatalogMessage, language, liveContext.eterna.pendingIntent, router, setActiveGuidedFlow, setChatHistory, setPendingIntent, speak]);
 
   // 2. Guided Flow Custom Event Listeners (profile_saved, property_created)
   useEffect(() => {
@@ -2108,8 +2112,8 @@ Explore actualizado: Redirecting to /explore`);
       const hasVideo = activePropertyVideos.length > 0;
       const videoReply = hasVideo
         ? (language === 'es'
-            ? `Abrí el video de la propiedad en pantalla completa. El expediente incluye ${activePropertyVideos.length === 1 ? 'un recorrido publicado' : `${activePropertyVideos.length} recorridos publicados`} para que observes mejor la distribución y los acabados. Puedes reproducirlo y cerrar el visor cuando quieras. ¿Quieres que después revisemos la ubicación o las amenidades?`
-            : `I opened the property video in the full-screen viewer. The listing includes ${activePropertyVideos.length === 1 ? 'one published tour' : `${activePropertyVideos.length} published tours`} so you can examine the layout and finishes more closely. You can play it and close the viewer whenever you want. Would you like to review the location or amenities afterward?`)
+            ? `El expediente incluye ${activePropertyVideos.length === 1 ? 'un recorrido publicado' : `${activePropertyVideos.length} recorridos publicados`} para que observes mejor la distribución y los acabados. Puedes reproducirlo y cerrar el visor cuando quieras. ¿Quieres que después revisemos la ubicación o las amenidades?`
+            : `The listing includes ${activePropertyVideos.length === 1 ? 'one published tour' : `${activePropertyVideos.length} published tours`} so you can examine the layout and finishes more closely. You can play it and close the viewer whenever you want. Would you like to review the location or amenities afterward?`)
         : (language === 'es'
             ? 'Esta propiedad no tiene videos publicados por ahora. La galería de fotografías sí permite revisar sus espacios y acabados, y el mapa muestra el entorno disponible. Puedo abrir cualquiera de esas dos secciones sin perder esta conversación. ¿Prefieres ver las fotos o la ubicación?'
             : 'This property does not have any published videos yet. Its photo gallery still lets you review the spaces and finishes, while the map shows the available neighborhood context. I can open either section without losing this conversation. Would you prefer the photos or the location?');
@@ -2151,8 +2155,8 @@ Explore actualizado: Redirecting to /explore`);
             ? 'El mapa conserva la ubicación publicada y permite explorar visualmente el entorno disponible.'
             : 'The map preserves the published location and lets you explore the available neighborhood context visually.');
       const locationReply = language === 'es'
-        ? `Abrí el mapa de la propiedad con los lugares cercanos y sus tiempos de traslado. ${nearbySentence} Así puedes valorar la conectividad de la zona sin salir de la ficha. ¿Quieres que revisemos escuelas, servicios o algún punto del entorno en particular?`
-        : `I opened the property map with nearby places and travel times. ${nearbySentence} This lets you assess the area's connectivity without leaving the listing. Would you like to review schools, services, or a specific nearby place?`;
+        ? `${nearbySentence} Así puedes valorar la conectividad de la zona sin salir de la ficha. ¿Quieres que revisemos escuelas, servicios o algún punto del entorno en particular?`
+        : `${nearbySentence} This lets you assess the area's connectivity without leaving the listing. Would you like to review schools, services, or a specific nearby place?`;
       setThinkingContext('property_detail');
       setChatHistory((previous) => [...previous, {
         role: 'assistant',
@@ -3148,6 +3152,21 @@ Explore actualizado: Redirecting to /explore`);
 
   // Synchronize local states to LiveContext (Theme/Chat sync)
   useEffect(() => {
+    const isCollectingPropertySearch = (
+      conversationalSession.activeIntent === ConversationIntent.PROPERTY_SEARCH
+      && conversationalSession.status === ConversationStatus.COLLECTING
+    );
+    const memory = conversationalSession.memory;
+    const filters = activeSearch?.filters;
+    const preferences = [
+      memory.pool?.value ? (language === 'es' ? 'Alberca' : 'Pool') : null,
+      memory.garden?.value ? (language === 'es' ? 'Jardín' : 'Garden') : null,
+      memory.pets?.value ? (language === 'es' ? 'Acepta mascotas' : 'Pet friendly') : null,
+      memory.oceanView?.value ? (language === 'es' ? 'Vista al mar' : 'Ocean view') : null,
+      memory.preferences?.value,
+      memory.extras?.value,
+    ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
     setEternaChatState({
       isOpen,
       isListening,
@@ -3155,9 +3174,52 @@ Explore actualizado: Redirecting to /explore`);
       isVoiceStarting: isCheckingMicPermission,
       isAvatarSpeaking,
       status: activeStatus,
-      chatHistory
+      chatHistory,
+      searchBrief: {
+        status: activeSearch?.loading
+          ? 'searching'
+          : isCollectingPropertySearch
+            ? 'collecting'
+            : activeSearch?.error
+              ? 'error'
+              : activeSearch
+                ? 'ready'
+                : 'idle',
+        operation: isCollectingPropertySearch
+          ? memory.operation?.value
+          : filters?.operation || memory.operation?.value,
+        city: isCollectingPropertySearch
+          ? memory.zone?.value || memory.city?.value
+          : filters?.city || memory.zone?.value || memory.city?.value,
+        propertyType: isCollectingPropertySearch
+          ? memory.propertyType?.value
+          : filters?.type || memory.propertyType?.value,
+        budget: isCollectingPropertySearch
+          ? memory.budget?.value
+          : filters?.budget ?? memory.budget?.value,
+        minBudget: isCollectingPropertySearch ? undefined : filters?.minBudget,
+        rooms: isCollectingPropertySearch
+          ? memory.rooms?.value
+          : filters?.rooms ?? memory.rooms?.value,
+        preferences,
+        resultCount: isCollectingPropertySearch ? 0 : activeSearch?.results.length || 0,
+      },
     });
-  }, [isOpen, isListening, voiceMode, isCheckingMicPermission, isAvatarSpeaking, activeStatus, chatHistory, setEternaChatState]);
+  }, [
+    activeSearch,
+    activeStatus,
+    chatHistory,
+    conversationalSession.activeIntent,
+    conversationalSession.memory,
+    conversationalSession.status,
+    isAvatarSpeaking,
+    isCheckingMicPermission,
+    isListening,
+    isOpen,
+    language,
+    setEternaChatState,
+    voiceMode,
+  ]);
 
   // Automatic welcome greeting presentation flow (Phase 6)
   useEffect(() => {

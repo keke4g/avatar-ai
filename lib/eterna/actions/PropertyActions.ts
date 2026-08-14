@@ -1,5 +1,5 @@
 import { Property, PropertyOfferingMode } from '../../types';
-import { formatCount, formatPropertyLocation } from '../../textHelpers';
+import { formatBathrooms, formatCount, formatPropertyLocation } from '../../textHelpers';
 import { formatGooglePlaceName } from '../../maps/placeNames';
 import type { NearbyPlace, NearbyPlaceCategory } from '../../maps/types';
 
@@ -147,10 +147,8 @@ export const buildPropertyPresentation = (
         ? formatCount(property.bedrooms, 'recámara', 'recámaras', 'feminine', true)
         : `${property.bedrooms} ${property.bedrooms === 1 ? 'bedroom' : 'bedrooms'}`)
       : null,
-    property.bathrooms > 0
-      ? (lang === 'es'
-        ? formatCount(property.bathrooms, 'baño completo', 'baños completos', 'masculine', true)
-        : `${property.bathrooms} ${property.bathrooms === 1 ? 'full bathroom' : 'full bathrooms'}`)
+    property.bathrooms > 0 || (property.halfBathrooms || 0) > 0
+      ? formatBathrooms(property.bathrooms, property.halfBathrooms, lang)
       : null,
     property.parkingSpaces !== undefined && property.parkingSpaces !== null && property.parkingSpaces > 0
       ? (lang === 'es'

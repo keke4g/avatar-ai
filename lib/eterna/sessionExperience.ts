@@ -64,3 +64,12 @@ export const getEternaFirstName = (
   if (normalizedName) return normalizedName.split(' ')[0];
   return email?.trim().split('@')[0] || '';
 };
+
+export const getConfirmedEternaUserName = (
+  profileReady: boolean,
+  profileName?: string | null,
+): string | undefined => {
+  if (!profileReady) return undefined;
+  const normalizedName = profileName?.trim().replace(/\s+/g, ' ');
+  return normalizedName || undefined;
+};

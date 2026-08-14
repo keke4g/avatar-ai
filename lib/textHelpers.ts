@@ -81,22 +81,46 @@ export function formatSentencePart(items: CountItem[], spelledOut: boolean = tru
 /**
  * Formats full and half bathrooms into a natural language string.
  * Example:
- * - formatBathrooms(2, 1, 'es') => '2 baños y 1 medio baño'
- * - formatBathrooms(1, 0, 'es') => 'un baño'
- * - formatBathrooms(2, 0, 'en') => '2 bathrooms'
+ * - formatBathrooms(2, 1, 'es') => '2 baños completos y medio baño'
+ * - formatBathrooms(1, 0, 'es') => 'un baño completo'
+ * - formatBathrooms(2, 0, 'en') => '2 full bathrooms'
  */
-export function formatBathrooms(bathrooms: number, halfBathrooms: number = 0, lang: 'es' | 'en' = 'es'): string {
-  const cleanFull = Math.floor(bathrooms);
-  const cleanHalf = Math.floor(halfBathrooms);
+export function getBathroomCounts(
+  bathrooms: number,
+  halfBathrooms: number = 0,
+): { full: number; half: number } {
+  const safeBathrooms = Number.isFinite(bathrooms) ? Math.max(0, bathrooms) : 0;
+  const safeHalfBathrooms = Number.isFinite(halfBathrooms) ? Math.max(0, halfBathrooms) : 0;
+  const full = Math.floor(safeBathrooms);
+  const embeddedHalf = safeBathrooms - full >= 0.25 ? 1 : 0;
 
-  const fullText = lang === 'es'
-    ? formatCount(cleanFull, 'baño', 'baños', 'masculine')
-    : `${cleanFull} bathroom${cleanFull !== 1 ? 's' : ''}`;
+  return {
+    full,
+    // Some legacy listings store 2.5 in `bathrooms`; newer ones store
+    // bathrooms=2 and halfBathrooms=1. Treat both schemas identically and do
+    // not double-count when both values are present.
+    half: Math.max(Math.floor(safeHalfBathrooms), embeddedHalf),
+  };
+}
+
+export function formatBathrooms(bathrooms: number, halfBathrooms: number = 0, lang: 'es' | 'en' = 'es'): string {
+  const { full: cleanFull, half: cleanHalf } = getBathroomCounts(bathrooms, halfBathrooms);
+
+  if (cleanFull === 0 && cleanHalf === 0) {
+    return lang === 'es' ? '0 baños completos' : '0 full bathrooms';
+  }
+
+  const fullText = cleanFull > 0
+    ? (lang === 'es'
+        ? formatCount(cleanFull, 'baño completo', 'baños completos', 'masculine')
+        : `${cleanFull} full bathroom${cleanFull !== 1 ? 's' : ''}`)
+    : '';
   
   if (cleanHalf > 0) {
     const halfText = lang === 'es'
       ? formatCount(cleanHalf, 'medio baño', 'medios baños', 'masculine')
       : `${cleanHalf} half bathroom${cleanHalf !== 1 ? 's' : ''}`;
+    if (!fullText) return halfText;
     return lang === 'es' ? `${fullText} y ${halfText}` : `${fullText} and ${halfText}`;
   }
   

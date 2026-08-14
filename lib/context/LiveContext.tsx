@@ -71,6 +71,20 @@ export interface ChatMessage {
   suggestedReplies?: string[];
 }
 
+export type EternaSearchBriefStatus = 'idle' | 'collecting' | 'searching' | 'ready' | 'error';
+
+export interface EternaSearchBrief {
+  status: EternaSearchBriefStatus;
+  operation?: 'sale' | 'rent' | 'swap';
+  city?: string;
+  propertyType?: string;
+  budget?: string | number;
+  minBudget?: number;
+  rooms?: number;
+  preferences: string[];
+  resultCount: number;
+}
+
 export interface EternaChatState {
   isOpen: boolean;
   isListening: boolean;
@@ -79,6 +93,7 @@ export interface EternaChatState {
   isAvatarSpeaking: boolean;
   status: string;
   chatHistory: ChatMessage[];
+  searchBrief: EternaSearchBrief;
 }
 
 export interface EternaCommand {
@@ -141,7 +156,12 @@ export function LiveContextProvider({ children }: { children: React.ReactNode })
     isVoiceStarting: false,
     isAvatarSpeaking: false,
     status: 'disconnected',
-    chatHistory: []
+    chatHistory: [],
+    searchBrief: {
+      status: 'idle',
+      preferences: [],
+      resultCount: 0,
+    },
   });
   const [eternaCommand, setEternaCommand] = useState<EternaCommand | null>(null);
 

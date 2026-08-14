@@ -2,16 +2,15 @@
 import React, { useState, useEffect } from "react";
 import Navbar from "../Navbar";
 import HomeHero from "./HomeHero";
-import Conversation from "./Conversation";
 import EternaPromptRail from "./EternaPromptRail";
+import HomeMarketRadar from "./HomeMarketRadar";
+import HomeSearchBrief from "./HomeSearchBrief";
 import { useLayoutContext } from "../../lib/context/LayoutContext";
-import { useLiveContext } from "../../lib/context/LiveContext";
 import { useTranslation } from "../../lib/context/LanguageContext";
-import { Home, Search, Building2, Landmark, Globe, MessageSquare, Sun, Moon } from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 
 export default function HomeExperience() {
   const { setHideHeader, setHideFooter } = useLayoutContext();
-  const { sendPrompt, startVoice } = useLiveContext();
   const { language } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [navbarHeight, setNavbarHeight] = useState(80);
@@ -111,24 +110,6 @@ export default function HomeExperience() {
     };
   }, []);
 
-  const actions = [
-    { icon: Home, text: "Quiero vender mi casa", sub: "Obtén una valoración con IA", action: 'prompt' as const },
-    { icon: Search, text: "Busco una propiedad", sub: "Encuentra tu hogar ideal", action: 'prompt' as const },
-    { icon: Building2, text: "Quiero invertir", sub: "Maximiza tus rendimientos", action: 'prompt' as const },
-    { icon: Landmark, text: "Valorar mi propiedad", sub: "Estima su valor de mercado", action: 'prompt' as const },
-    { icon: Globe, text: "Buscar propiedades internacionales", sub: "Explora opciones globales", action: 'prompt' as const },
-    { icon: MessageSquare, text: "Hablar con Eterna", sub: "Enciende el micrófono y conversa", action: 'voice' as const },
-  ];
-
-  const handleCardClick = (text: string, action: 'prompt' | 'voice') => {
-    if (action === 'voice') {
-      startVoice();
-      return;
-    }
-
-    sendPrompt(text);
-  };
-
   return (
     <div 
       className={`relative w-full min-h-dvh lg:h-dvh flex flex-col justify-start overflow-x-hidden lg:overflow-y-hidden pb-6 lg:pb-0 transition-colors duration-300 ${
@@ -177,56 +158,15 @@ export default function HomeExperience() {
         }}
       >
         {/* Main 3-Column Layout Grid */}
-        <div className="flex w-full flex-1 flex-col select-none lg:min-h-0 lg:grid lg:grid-cols-[240px_minmax(280px,1fr)_340px] lg:gap-8 lg:items-stretch xl:grid-cols-[260px_minmax(300px,1fr)_400px] xl:gap-12">
+        <div className="flex w-full flex-1 flex-col select-none lg:min-h-0 lg:grid lg:grid-cols-[minmax(225px,270px)_minmax(300px,1fr)_minmax(330px,390px)] lg:items-stretch lg:gap-7 xl:grid-cols-[280px_minmax(320px,1fr)_400px] xl:gap-10">
         
-        {/* Left Column: Acciones recomendadas */}
+        {/* Left Column: live market radar */}
         <div className="order-2 mx-auto mt-10 flex w-full max-w-[340px] flex-col items-center self-start lg:order-1 lg:mt-0 lg:h-full lg:max-w-none lg:min-h-0 lg:items-start lg:pt-[88px]">
-          <h3 className={`text-[10px] font-bold tracking-[0.2em] uppercase mt-2 lg:mt-1 mb-5 lg:mb-3 select-none w-full text-center lg:text-left h-4 flex items-center transition-colors duration-300 ${
-            isDark ? "text-white/40" : "text-zinc-500/80"
-          }`}>
-            Acciones recomendadas
-          </h3>
-          <div className={`p-[1.2px] rounded-[20px] transition-all duration-500 w-full ${
-            highlightActions ? 'animate-rainbow-border shadow-[0_0_25px_rgba(59,130,246,0.15)] scale-[1.015]' : 'bg-transparent'
-          }`}>
-            <div className={`flex flex-col gap-4 lg:gap-2.5 w-full rounded-[19px] p-1.5 lg:p-1 transition-colors duration-500 ${
-              highlightActions 
-                ? (isDark ? 'bg-zinc-950/90' : 'bg-white/95') 
-                : 'bg-transparent'
-            }`}>
-              {actions.map((act) => {
-                const IconComp = act.icon;
-                return (
-                  <button
-                    key={act.text}
-                    type="button"
-                    onClick={() => handleCardClick(act.text, act.action)}
-                    className={`group relative w-full rounded-2xl p-3 lg:px-3 lg:py-2.5 cursor-pointer flex items-center gap-4 lg:gap-3 hover:-translate-y-[3px] transition-all duration-300 ${
-                      isDark
-                        ? "bg-white/[0.02] border border-white/5 hover:border-blue-500/15 hover:bg-white/[0.05] hover:shadow-[0_0_15px_rgba(59,130,246,0.04)]"
-                        : "bg-white border border-zinc-200/80 hover:border-blue-500/35 hover:bg-zinc-50/50 hover:shadow-[0_4px_20px_rgba(0,0,0,0.02)]"
-                    }`}
-                  >
-                    <IconComp className={`w-4 h-4 transition-colors shrink-0 ${
-                      isDark ? "text-white/50 group-hover:text-blue-400" : "text-zinc-400 group-hover:text-blue-500"
-                    }`} />
-                    <div className="flex flex-col text-left">
-                      <span className={`text-xs sm:text-sm transition-colors font-medium tracking-wide ${
-                        isDark ? "text-white/70 group-hover:text-white" : "text-zinc-700 group-hover:text-zinc-950"
-                      }`}>
-                        {act.text}
-                      </span>
-                      <span className={`text-[10px] transition-colors font-light mt-0.5 ${
-                        isDark ? "text-white/30 group-hover:text-white/40" : "text-zinc-400 group-hover:text-zinc-500"
-                      }`}>
-                        {act.sub}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <HomeMarketRadar
+            isDark={isDark}
+            language={language}
+            highlighted={highlightActions}
+          />
         </div>
 
         {/* Center Column: Eterna prompt guide + avatar */}
@@ -235,42 +175,19 @@ export default function HomeExperience() {
           <HomeHero />
         </div>
 
-        {/* Right Column: Conversación log (containing headers and buscador) */}
+        {/* Right Column: live search brief, with conversation as a secondary layer */}
         <div className="order-3 mx-auto mt-10 w-full max-w-[340px] self-start lg:order-3 lg:mx-0 lg:mt-0 lg:h-full lg:max-w-none lg:min-h-0 lg:pt-[88px]">
-          <Conversation searchInput={searchInput} setSearchInput={setSearchInput} isDark={isDark} />
+          <HomeSearchBrief
+            searchInput={searchInput}
+            setSearchInput={setSearchInput}
+            isDark={isDark}
+            language={language}
+          />
         </div>
 
         </div>
       </main>
 
-      {/* Styles for dynamic rainbow border animation on highlight */}
-      <style jsx global>{`
-        @keyframes rainbow-border {
-          0% {
-            background-position: 0% 50%;
-          }
-          50% {
-            background-position: 100% 50%;
-          }
-          100% {
-            background-position: 0% 50%;
-          }
-        }
-        .animate-rainbow-border {
-          background: linear-gradient(
-            270deg,
-            #ff5e62,
-            #ff9966,
-            #ffdb58,
-            #66ff99,
-            #33ccff,
-            #9966ff,
-            #ff5e62
-          );
-          background-size: 300% 300%;
-          animation: rainbow-border 6s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 }

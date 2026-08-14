@@ -33,13 +33,20 @@ import {
   getPropertyPresentationCloseDelay,
 } from '../../../lib/eterna/propertyPresentationTiming';
 import { resolvePropertyVisualAnswer } from '../../../lib/eterna/actions/PropertyVisualActions';
+import { normalizeEternaSpeechText } from '../../../lib/eterna/speechText';
 import {
   clearAuthenticatedGreeting,
   consumeAuthenticatedGreeting,
   consumePropertySummaryPresentation,
+  getConfirmedEternaUserName,
   getEternaFirstName,
 } from '../../../lib/eterna/sessionExperience';
 import type { Property } from '../../../lib/types';
+import {
+  buildHomeExploreUrl,
+  buildHomeMarketRadar,
+  getHomePropertyTypeLabel,
+} from '../../../components/home/homeExperienceData';
 
 test('normaliza transcripciones y detecta ecos por tokens', () => {
   assert.equal(normalizeVoiceText('¡Casa en MÉXICO, por favor!'), 'casa en mexico por favor');
@@ -262,6 +269,23 @@ test('responde secciones visuales desde los datos de la propiedad sin esperar al
     section: 'technical',
   });
   assert.match(technical?.speech || '', /154\.85 metros cuadrados/);
+  assert.match(
+    normalizeEternaSpeechText(technical?.speech || ''),
+    /ciento cincuenta y cuatro punto ochenta y cinco metros cuadrados/,
+  );
+
+  const legacyBathrooms = resolvePropertyVisualAnswer({
+    language: 'es',
+    prompt: '¿Cuántos baños tiene?',
+    property: { ...property, bathrooms: 2.5, halfBathrooms: 0 },
+    section: 'technical',
+  });
+  assert.match(legacyBathrooms?.speech || '', /2 baños completos y medio baño/);
+  assert.doesNotMatch(legacyBathrooms?.speech || '', /2\.5 baños/);
+  assert.match(
+    normalizeEternaSpeechText(legacyBathrooms?.speech || ''),
+    /dos baños completos y medio baño/,
+  );
 
   const school = resolvePropertyVisualAnswer({
     language: 'es',
@@ -279,5 +303,100 @@ test('responde secciones visuales desde los datos de la propiedad sin esperar al
     property,
     section: 'location',
   });
-  assert.match(generalLocation?.speech || '', /Abrí el mapa/);
+  assert.match(generalLocation?.speech || '', /La propiedad se ubica en/);
+
+  const visualSections = [
+    'description',
+    'amenities',
+    'technical',
+    'gallery',
+    'media',
+    'location',
+    'financing',
+    'commercial',
+    'legal',
+    'contact',
+    'valuation',
+    'mortgage',
+  ] as const;
+  visualSections.forEach((section) => {
+    const result = resolvePropertyVisualAnswer({ language: 'es', prompt: 'Muéstrame', property, section });
+    assert.doesNotMatch(result?.speech || '', /\bAbrí\b/i, `La sección ${section} no debe narrar que abrió una ventana`);
+  });
+});
+
+test('Eterna waits for the confirmed Towers profile before using a name', () => {
+  assert.equal(getConfirmedEternaUserName(false, 'Christian Arellano'), undefined);
+  assert.equal(getConfirmedEternaUserName(true, '  Gardens & Towers  '), 'Gardens & Towers');
+});
+
+test('el Home construye un radar real y conserva los filtros al abrir Explorer', () => {
+  const makeProperty = (id: string, price: number, createdAt: string): Property => ({
+    id,
+    title: `Casa ${id}`,
+    description: 'Propiedad de prueba',
+    type: 'Villa',
+    location: 'Culiacán Rosales, Sinaloa',
+    country: 'México',
+    valueRating: 'Premium',
+    images: [`https://example.com/${id}.jpg`],
+    amenities: [],
+    auraScore: 90,
+    bedrooms: 3,
+    bathrooms: 2,
+    maxGuests: 4,
+    hostId: 'host-1',
+    hostName: 'Towers',
+    hostAvatar: '',
+    hostVerified: true,
+    hostRating: 5,
+    hostReviewsCount: 1,
+    availableStart: '',
+    availableEnd: '',
+    latitude: 24.8,
+    longitude: -107.4,
+    createdAt,
+    isPublished: true,
+    offerings: [{
+      id: `offering-${id}`,
+      propertyId: id,
+      mode: 'SALE',
+      status: 'ACTIVE',
+      visibility: 'PUBLIC',
+      priceAmount: price,
+      currency: 'MXN',
+      billingPeriod: 'TOTAL',
+      acceptsBankCredit: false,
+      acceptsCash: true,
+      isPriceNegotiable: false,
+      acceptsOffers: false,
+      requiresApproval: false,
+      allowInstantRequest: false,
+      swapPreferences: {},
+      isFeatured: false,
+      featuredRank: 0,
+      metadata: {},
+    }],
+  } as Property);
+
+  const radar = buildHomeMarketRadar([
+    makeProperty('expensive', 4_500_000, '2026-08-01T00:00:00.000Z'),
+    makeProperty('accessible', 1_500_000, '2026-07-01T00:00:00.000Z'),
+    makeProperty('newest', 3_100_000, '2026-08-12T00:00:00.000Z'),
+  ], 'es');
+
+  assert.equal(radar.length, 3);
+  assert.equal(radar[0]?.property.id, 'accessible');
+  assert.equal(radar[0]?.tag, 'Más accesible');
+  assert.equal(getHomePropertyTypeLabel(radar[0]!.property, 'es'), 'Casa');
+  assert.equal(
+    buildHomeExploreUrl({
+      city: 'Lomas de Angelópolis',
+      operation: 'sale',
+      budget: 5_000_000,
+      rooms: 3,
+      sort: 'price_asc',
+    }),
+    '/explore?search=Lomas+de+Angel%C3%B3polis&offering=SALE&budget=5000000&rooms=3&sort=price_asc',
+  );
 });

@@ -63,6 +63,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(!useSupabase);
+  const [authProfileReady, setAuthProfileReady] = useState(!useSupabase);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -137,6 +138,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCurrentUser(initialUser);
           setTravelDetails(mockState.travelDetails);
           setAuthReady(true);
+          setAuthProfileReady(true);
 
           ServiceFactory.getReviewService().getAll().then(r => setReviews(r));
 
@@ -168,8 +170,21 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const syncSupabaseProfile = async (userId: string, version: number) => {
         try {
+          const fetchConfirmedProfile = async (): Promise<User | null> => {
+            const retryDelays = [0, 200, 500];
+            for (const delayMs of retryDelays) {
+              if (delayMs > 0) {
+                await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+              }
+              if (version !== authVersion) return null;
+              const profile = await ServiceFactory.getUserService().getById(userId);
+              if (profile) return profile;
+            }
+            return null;
+          };
+
           const [profile, favoritesResult, archivedResult] = await Promise.all([
-            ServiceFactory.getUserService().getById(userId),
+            fetchConfirmedProfile(),
             supabase
               .from('favorites')
               .select('property_id')
@@ -184,6 +199,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (profile) {
             setCurrentUser(profile);
+            setAuthProfileReady(true);
             localStorage.setItem('auraswap_current_user', JSON.stringify(profile));
 
             if (!favoritesResult.error && favoritesResult.data) {
@@ -215,6 +231,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setAuthReady(true);
 
           if (lastSyncedUserId === session.user.id && event !== 'USER_UPDATED') return;
+          setAuthProfileReady(false);
           lastSyncedUserId = session.user.id;
           const version = ++authVersion;
           window.setTimeout(() => {
@@ -233,6 +250,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLeads([]);
           localStorage.removeItem('auraswap_current_user');
           setAuthReady(true);
+          setAuthProfileReady(true);
         }
       });
 
@@ -1188,6 +1206,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
           setCurrentUser(sessionUser);
           setAuthReady(true);
+          setAuthProfileReady(true);
           localStorage.setItem('auraswap_current_user', JSON.stringify(sessionUser));
           return true;
         }
@@ -1275,6 +1294,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         setCurrentUser(registeredUser);
         setAuthReady(true);
+        setAuthProfileReady(true);
         localStorage.setItem('auraswap_current_user', JSON.stringify(registeredUser));
         return registeredUser;
       }
@@ -1305,6 +1325,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set as active session
     setCurrentUser(newUser);
     setAuthReady(true);
+    setAuthProfileReady(true);
     localStorage.setItem('auraswap_current_user', JSON.stringify(newUser));
     return newUser;
   };
@@ -1679,6 +1700,7 @@ export const SwapProvider: React.FC<{ children: React.ReactNode }> = ({ children
         markAllNotificationsAsRead,
         isLoggingOut,
         authReady,
+        authProfileReady,
         logoutToast,
         setLogoutToast,
         archivedSwapIds,

@@ -91,6 +91,7 @@ export interface SwapContextType {
   markAllNotificationsAsRead: () => Promise<void>;
   isLoggingOut: boolean;
   authReady: boolean;
+  authProfileReady: boolean;
   logoutToast: boolean;
   setLogoutToast: (val: boolean) => void;
   archivedSwapIds: string[];
