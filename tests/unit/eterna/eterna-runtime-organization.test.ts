@@ -33,6 +33,7 @@ import {
   getPropertyPresentationCloseDelay,
 } from '../../../lib/eterna/propertyPresentationTiming';
 import { resolvePropertyVisualAnswer } from '../../../lib/eterna/actions/PropertyVisualActions';
+import { buildAmenityNarrative } from '../../../lib/eterna/amenityIntelligence';
 import { normalizeEternaSpeechText } from '../../../lib/eterna/speechText';
 import {
   clearAuthenticatedGreeting,
@@ -51,6 +52,7 @@ import {
   consumeInstantTopNavigation,
   requestInstantTopNavigation,
 } from '../../../lib/navigation/instantTopNavigation';
+import { AMENITY_OPTIONS } from '../../../lib/propertyFeatures';
 
 test('normaliza transcripciones y detecta ecos por tokens', () => {
   assert.equal(normalizeVoiceText('¡Casa en MÉXICO, por favor!'), 'casa en mexico por favor');
@@ -176,6 +178,10 @@ test('traduce preguntas de la ficha en secciones visuales deterministas', () => 
   assert.equal(resolvePropertyVisualSection('¿Cuántos metros cuadrados tiene?'), 'technical');
   assert.equal(resolvePropertyVisualSection('¿Tiene cuarto de servicio?', ['Cuarto de servicio']), 'amenities');
   assert.equal(resolvePropertyVisualSection('¿Cómo se siente la sala y el comedor?'), 'amenities');
+  assert.equal(resolvePropertyVisualSection('¿Qué tal el Pet Center?'), 'amenities');
+  assert.equal(resolvePropertyVisualSection('¿Cómo es el cuarto de juegos?'), 'amenities');
+  assert.equal(resolvePropertyVisualSection('Muéstrame los espacios interiores'), 'amenities');
+  assert.equal(resolvePropertyVisualSection('¿Qué áreas exteriores tiene?'), 'amenities');
   assert.equal(resolvePropertyVisualSection('Hazme un resumen en pocas palabras'), 'summary');
   assert.equal(resolvePropertyVisualSection('Buenos días'), null);
 });
@@ -185,6 +191,23 @@ test('el resumen es la única experiencia visual temporal', () => {
   assert.equal(isTemporaryPropertyVisualSection('amenities'), false);
   assert.equal(isTemporaryPropertyVisualSection('location'), false);
   assert.equal(isTemporaryPropertyVisualSection('commercial'), false);
+});
+
+test('responde de forma específica a cada amenidad del catálogo sin añadir distractores', () => {
+  AMENITY_OPTIONS.forEach((amenity) => {
+    const distractor = amenity === 'Balcón' ? 'Pet center' : 'Balcón';
+    const narrative = buildAmenityNarrative({
+      amenities: [amenity, distractor],
+      language: 'es',
+      prompt: `¿Qué tal ${amenity}?`,
+    });
+
+    assert.ok(narrative, `Debe crear una respuesta para ${amenity}`);
+    assert.match(narrative.reply, new RegExp(amenity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+    assert.doesNotMatch(narrative.reply, new RegExp(distractor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+    assert.doesNotMatch(narrative.reply, /Más que una lista|amenidades adicionales/i);
+    assert.match(narrative.reply, /\?$/);
+  });
 });
 
 test('responde secciones visuales desde los datos de la propiedad sin esperar al agente remoto', () => {
@@ -197,7 +220,15 @@ test('responde secciones visuales desde los datos de la propiedad sin esperar al
     country: 'México',
     valueRating: 'Premium',
     images: ['https://example.com/cover.jpg', 'https://example.com/kitchen.jpg'],
-    amenities: ['Alberca', 'Gimnasio', 'Balcón'],
+    amenities: [
+      'Alberca',
+      'Gimnasio',
+      'Balcón',
+      'Cocina integral',
+      'Cuarto de lavado',
+      'Pet center',
+      'Game room',
+    ],
     auraScore: 90,
     bedrooms: 3,
     bathrooms: 2,
@@ -252,10 +283,59 @@ test('responde secciones visuales desde los datos de la propiedad sin esperar al
     section: 'amenities',
   });
   assert.match(amenities?.speech || '', /Alberca/);
-  assert.match(amenities?.speech || '', /Gimnasio/);
-  assert.match(amenities?.speech || '', /relajarse/);
-  assert.match(amenities?.speech || '', /bienestar/);
+  assert.match(amenities?.speech || '', /espacios del inmueble/);
+  assert.match(amenities?.speech || '', /amenidades compartidas/);
   assert.match(amenities?.speech || '', /\?$/);
+
+  const petCenter = resolvePropertyVisualAnswer({
+    language: 'es',
+    prompt: 'Qué tal el Pet Center',
+    property,
+    section: 'amenities',
+  });
+  assert.match(petCenter?.speech || '', /Pet center/);
+  assert.match(petCenter?.speech || '', /convivir con tu mascota/);
+  assert.doesNotMatch(petCenter?.speech || '', /Balcón|Cuarto de lavado|amenidades adicionales/);
+  assert.match(petCenter?.speech || '', /no detalla su equipamiento/);
+
+  const gameRoom = resolvePropertyVisualAnswer({
+    language: 'es',
+    prompt: '¿Cómo es el cuarto de juegos?',
+    property,
+    section: 'amenities',
+  });
+  assert.match(gameRoom?.speech || '', /Game room/);
+  assert.match(gameRoom?.speech || '', /jugar, convivir o recibir visitas/);
+  assert.doesNotMatch(gameRoom?.speech || '', /Balcón|Cuarto de lavado|amenidades adicionales/);
+
+  const missingAmenity = resolvePropertyVisualAnswer({
+    language: 'es',
+    prompt: '¿Tiene sauna?',
+    property,
+    section: 'amenities',
+  });
+  assert.match(missingAmenity?.speech || '', /no confirma Sauna/);
+  assert.doesNotMatch(missingAmenity?.speech || '', /Alberca|Gimnasio|Balcón/);
+
+  const interiors = resolvePropertyVisualAnswer({
+    language: 'es',
+    prompt: 'Muéstrame los interiores',
+    property,
+    section: 'amenities',
+  });
+  assert.match(interiors?.speech || '', /Cocina integral/);
+  assert.match(interiors?.speech || '', /Cuarto de lavado/);
+  assert.doesNotMatch(interiors?.speech || '', /Pet center|Game room|Balcón/);
+
+  const exteriors = resolvePropertyVisualAnswer({
+    language: 'es',
+    prompt: '¿Qué exteriores tiene?',
+    property,
+    section: 'amenities',
+  });
+  assert.match(exteriors?.speech || '', /Balcón/);
+  assert.match(exteriors?.speech || '', /Alberca/);
+  assert.doesNotMatch(exteriors?.speech || '', /Cocina integral|Cuarto de lavado|Game room/);
 
   const financing = resolvePropertyVisualAnswer({
     language: 'es',

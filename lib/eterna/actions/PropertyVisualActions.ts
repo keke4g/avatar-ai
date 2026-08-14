@@ -2,6 +2,7 @@ import type { EternaPropertyVisualSection } from '../events';
 import type { Property, PropertyOffering } from '../../types';
 import type { NearbyPlaceCategory } from '../../maps/types';
 import { formatBathrooms, formatCount, formatPropertyLocation } from '../../textHelpers';
+import { buildAmenityNarrative } from '../amenityIntelligence';
 import {
   buildPropertyPresentation,
   selectEternaNearbyHighlights,
@@ -98,57 +99,6 @@ const getNearbyCategoryLabel = (
     park: { es: 'parques', en: 'parks' },
   };
   return labels[category][language];
-};
-
-const getAmenityExperience = (
-  amenity: string,
-  language: 'es' | 'en',
-): string => {
-  const normalized = normalizePrompt(amenity);
-  const copy = language === 'es'
-    ? [
-        { pattern: /\b(?:sala|living|estancia)\b/, text: `${amenity} favorece momentos cómodos de convivencia y descanso` },
-        { pattern: /\b(?:comedor|dining)\b/, text: `${amenity} crea un lugar natural para compartir comidas y conversaciones` },
-        { pattern: /\b(?:cocina|kitchen|isla)\b/, text: `${amenity} hace más práctica la rutina diaria y puede convertirse en un punto de reunión` },
-        { pattern: /\b(?:balcon|terraza|roof garden|azotea|patio)\b/, text: `${amenity} ofrece una pausa al aire libre y una sensación de mayor amplitud` },
-        { pattern: /\b(?:jardin|garden)\b/, text: `${amenity} aporta contacto con el exterior y un ambiente más sereno` },
-        { pattern: /\b(?:lavado|lavanderia|laundry)\b/, text: `${amenity} ayuda a mantener la rutina doméstica ordenada y fuera de las áreas sociales` },
-        { pattern: /\b(?:alberca|piscina|pool)\b/, text: `${amenity} invita a relajarse y disfrutar momentos de recreación sin salir del entorno residencial` },
-        { pattern: /\b(?:gimnasio|gym)\b/, text: `${amenity} facilita integrar bienestar y actividad física a la vida diaria` },
-        { pattern: /\b(?:seguridad|vigilancia|control de acceso|privada)\b/, text: `${amenity} aporta tranquilidad y mayor control en los accesos` },
-        { pattern: /\b(?:estacionamiento|cochera|garage|parking)\b/, text: `${amenity} hace más cómoda y ordenada la llegada a casa` },
-        { pattern: /\b(?:estudio|oficina|workspace)\b/, text: `${amenity} brinda un espacio separado para concentrarse, trabajar o estudiar` },
-        { pattern: /\b(?:aire acondicionado|minisplit|climatizacion)\b/, text: `${amenity} ayuda a conservar una temperatura agradable durante el día` },
-        { pattern: /\b(?:elevador|ascensor|elevator)\b/, text: `${amenity} mejora la accesibilidad y simplifica los desplazamientos cotidianos` },
-        { pattern: /\b(?:bodega|almacenamiento|closet|vestidor)\b/, text: `${amenity} facilita mantener los espacios despejados y bien organizados` },
-        { pattern: /\b(?:vista|ocean view|city view)\b/, text: `${amenity} suma luz, perspectiva y una experiencia visual más agradable` },
-        { pattern: /\b(?:amueblado|amueblada|muebles|furnished)\b/, text: `${amenity} permite imaginar una instalación más sencilla y con menos pendientes iniciales` },
-        { pattern: /\b(?:mascota|pet friendly|pets)\b/, text: `${amenity} hace más fácil integrar a las mascotas en la vida cotidiana` },
-      ]
-    : [
-        { pattern: /\b(?:sala|living|estancia)\b/, text: `${amenity} creates a comfortable setting for connection and rest` },
-        { pattern: /\b(?:comedor|dining)\b/, text: `${amenity} provides a natural place for shared meals and conversation` },
-        { pattern: /\b(?:cocina|kitchen|isla)\b/, text: `${amenity} makes everyday routines easier and can become a social hub` },
-        { pattern: /\b(?:balcon|terraza|roof garden|azotea|patio)\b/, text: `${amenity} offers an outdoor pause and a greater sense of openness` },
-        { pattern: /\b(?:jardin|garden)\b/, text: `${amenity} adds a calmer connection with the outdoors` },
-        { pattern: /\b(?:lavado|lavanderia|laundry)\b/, text: `${amenity} keeps household routines organized and away from social areas` },
-        { pattern: /\b(?:alberca|piscina|pool)\b/, text: `${amenity} encourages relaxation and recreation within the residential setting` },
-        { pattern: /\b(?:gimnasio|gym)\b/, text: `${amenity} makes daily wellness and exercise more convenient` },
-        { pattern: /\b(?:seguridad|vigilancia|control de acceso|privada)\b/, text: `${amenity} adds peace of mind and greater access control` },
-        { pattern: /\b(?:estacionamiento|cochera|garage|parking)\b/, text: `${amenity} makes arriving home easier and more orderly` },
-        { pattern: /\b(?:estudio|oficina|workspace)\b/, text: `${amenity} provides a dedicated place to focus, work, or study` },
-        { pattern: /\b(?:aire acondicionado|minisplit|climatizacion)\b/, text: `${amenity} helps maintain a comfortable indoor temperature` },
-        { pattern: /\b(?:elevador|ascensor|elevator)\b/, text: `${amenity} improves accessibility and everyday movement` },
-        { pattern: /\b(?:bodega|almacenamiento|closet|vestidor)\b/, text: `${amenity} helps keep living areas clear and organized` },
-        { pattern: /\b(?:vista|ocean view|city view)\b/, text: `${amenity} adds light, perspective, and a more enjoyable outlook` },
-        { pattern: /\b(?:amueblado|amueblada|muebles|furnished)\b/, text: `${amenity} can make moving in simpler with fewer initial decisions` },
-        { pattern: /\b(?:mascota|pet friendly|pets)\b/, text: `${amenity} makes it easier to include pets in everyday life` },
-      ];
-
-  return copy.find(({ pattern }) => pattern.test(normalized))?.text
-    || (language === 'es'
-      ? `${amenity} aporta funcionalidad y hace más cómoda la experiencia cotidiana`
-      : `${amenity} adds practical value and makes everyday living more comfortable`);
 };
 
 const answer = (
@@ -262,19 +212,14 @@ export function resolvePropertyVisualAnswer({
   }
 
   if (section === 'amenities') {
-    const amenityMap = new Map<string, string>();
-    [
+    const amenities = [
       ...(property.amenities || []),
       ...((property.metadata?.customAmenities as string[] | undefined) || []),
-    ].map((item) => item.trim()).filter(Boolean).forEach((amenity) => {
-      amenityMap.set(normalizePrompt(amenity), amenity);
-    });
-    const normalizedRequest = normalizePrompt(prompt);
-    const amenities = [...amenityMap.values()].sort((left, right) => {
-      const leftRequested = normalizedRequest.includes(normalizePrompt(left)) ? 1 : 0;
-      const rightRequested = normalizedRequest.includes(normalizePrompt(right)) ? 1 : 0;
-      return rightRequested - leftRequested;
-    });
+    ];
+    const narrative = buildAmenityNarrative({ amenities, language, prompt });
+    if (narrative) {
+      return answer(narrative.reply, narrative.suggestedReplies, narrative.speech);
+    }
     if (amenities.length === 0) {
       return answer(
         isSpanish
@@ -283,16 +228,6 @@ export function resolvePropertyVisualAnswer({
         isSpanish ? ['Ver descripción', 'Ver ficha técnica'] : ['View description', 'View technical profile'],
       );
     }
-    const experientialAmenities = amenities.slice(0, 3).map((amenity) => (
-      getAmenityExperience(amenity, language)
-    ));
-    const remaining = amenities.length - experientialAmenities.length;
-    return answer(
-      isSpanish
-        ? `Más que una lista de equipamiento: ${joinNaturally(experientialAmenities, language)}.${remaining > 0 ? ` La ficha muestra ${remaining} ${remaining === 1 ? 'amenidad adicional' : 'amenidades adicionales'} para completar la experiencia.` : ''} Todo lo mencionado está confirmado en el anuncio. ¿Cuál de estos espacios te gustaría imaginar en tu rutina diaria?`
-        : `More than a feature list: ${joinNaturally(experientialAmenities, language)}.${remaining > 0 ? ` The listing shows ${remaining} additional ${remaining === 1 ? 'amenity' : 'amenities'} to complete the experience.` : ''} Every feature mentioned is confirmed in the listing. Which of these spaces would you like to picture in your daily routine?`,
-      isSpanish ? ['Ver ficha técnica', 'Ver fotos'] : ['View technical profile', 'View photos'],
-    );
   }
 
   if (section === 'technical') {

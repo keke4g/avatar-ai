@@ -46,7 +46,7 @@ const VISUAL_RULES: VisualRule[] = [
   },
   {
     section: 'amenities',
-    pattern: /\b(?:amenidades|comodidades|que ofrece|que incluye|equipamiento|alberca|piscina|jardin|gimnasio|roof garden|terraza|balcon|cocina|sala|comedor|cuarto de lavado|lavanderia|estudio|oficina|cochera|patio|elevador|ascensor|vestidor|amueblada|amueblado|aire acondicionado|mascotas?)\b/,
+    pattern: /\b(?:amenidades?|comodidades|que ofrece|que incluye|equipamiento|interiores?|exteriores?|areas? interiores?|areas? exteriores?|areas? comunes?|zonas? comunes?|amenidades? privadas?|amenidades? compartidas?|alberca|piscina|jacuzzi|sauna|jardin|gimnasio|gym|roof garden|terraza|balcon|cocina|sala|comedor|cuarto de lavado|lavanderia|estudio|oficina|cochera|patio|elevador|ascensor|vestidor|amueblada|amueblado|aire acondicionado|mascotas?|pet center|zona de mascotas|area de mascotas|game room|cuarto de juegos|sala de juegos|salon de juegos|cinema room|sala de cine|ludoteca|coworking|business center|salon de usos multiples|fire pit|fogatero|asador|huerto|cancha|domotica|alexa|cerradura inteligente|paneles solares|fibra optica|lobby)\b/,
   },
   {
     section: 'contact',
