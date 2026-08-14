@@ -117,7 +117,7 @@ export default function HomeExperience() {
       }`}
       style={{
         "--navbar-height": `${navbarHeight}px`,
-        "--home-shell-height": `calc(100dvh - ${navbarHeight}px - 50px)`,
+        "--home-shell-height": `calc(100dvh - ${navbarHeight}px - 22px)`,
         "--useful-height": "calc(var(--home-shell-height) - 72px)",
       } as React.CSSProperties}
     >
@@ -204,7 +204,8 @@ export default function HomeExperience() {
           }
 
           .home-radar-image {
-            height: 62px !important;
+            height: auto !important;
+            min-height: 70px !important;
           }
 
           .home-radar-content {

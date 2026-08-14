@@ -23,7 +23,7 @@ function RadarImage({ entry }: { entry: HomeMarketRadarEntry }) {
   const source = entry.property.images?.[0];
 
   return (
-    <div className="home-radar-image relative h-28 overflow-hidden bg-[linear-gradient(145deg,#b8d6e2_0%,#7fa4b5_44%,#314650_100%)] lg:h-[clamp(70px,9.5vh,92px)]">
+    <div className="home-radar-image relative h-28 overflow-hidden bg-[linear-gradient(145deg,#b8d6e2_0%,#7fa4b5_44%,#314650_100%)] lg:h-auto lg:min-h-[70px] lg:flex-1">
       {source && !failed ? (
         <Image
           src={source}
@@ -105,7 +105,7 @@ export default function HomeMarketRadar({
                 aria-label={`${entry.tag}: ${entry.property.title}`}
               >
                 <RadarImage entry={entry} />
-                <div className="home-radar-content min-h-0 px-3 py-2.5 lg:px-3 lg:py-2">
+                <div className="home-radar-content min-h-0 shrink-0 px-3 py-2.5 lg:px-3 lg:py-2">
                   <strong className={`home-radar-title block truncate text-[12px] font-extrabold tracking-[-0.02em] ${isDark ? "text-white/90" : "text-zinc-900"}`}>
                     {entry.property.title}
                   </strong>
