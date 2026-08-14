@@ -112,7 +112,7 @@ export default function HomeExperience() {
 
   return (
     <div 
-      className={`relative w-full min-h-dvh lg:h-dvh flex flex-col justify-start overflow-x-hidden lg:overflow-y-hidden pb-6 lg:pb-0 transition-colors duration-300 ${
+      className={`home-experience-shell relative w-full min-h-dvh lg:fixed lg:inset-0 lg:h-dvh flex flex-col justify-start overflow-x-hidden lg:overflow-hidden pb-6 lg:pb-0 transition-colors duration-300 ${
         isDark ? "bg-[#030303] text-white" : "bg-[#fafafa] text-[#18181b]"
       }`}
       style={{
@@ -152,7 +152,7 @@ export default function HomeExperience() {
       </div>
 
       <main
-        className="relative z-10 mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-4 sm:px-6 lg:h-[var(--home-shell-height)] lg:min-h-0 lg:flex-none lg:overflow-hidden lg:px-10 xl:px-12"
+        className="home-experience-main relative z-10 mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-4 sm:px-6 lg:h-[var(--home-shell-height)] lg:min-h-0 lg:flex-none lg:overflow-hidden lg:px-10 xl:px-12"
         style={{
           marginTop: "calc(var(--navbar-height) + 22px)",
         }}
@@ -161,7 +161,7 @@ export default function HomeExperience() {
         <div className="flex w-full flex-1 flex-col select-none lg:min-h-0 lg:grid lg:grid-cols-[minmax(225px,270px)_minmax(300px,1fr)_minmax(330px,390px)] lg:items-stretch lg:gap-7 xl:grid-cols-[280px_minmax(320px,1fr)_400px] xl:gap-10">
         
         {/* Left Column: live market radar */}
-        <div className="order-2 mx-auto mt-10 flex w-full max-w-[340px] flex-col items-center self-start lg:order-1 lg:mt-0 lg:h-full lg:max-w-none lg:min-h-0 lg:items-start lg:pt-[88px]">
+        <div className="home-side-column order-2 mx-auto mt-10 flex w-full max-w-[340px] flex-col items-center self-start lg:order-1 lg:mt-0 lg:h-full lg:max-w-none lg:min-h-0 lg:items-start lg:pt-[88px]">
           <HomeMarketRadar
             isDark={isDark}
             language={language}
@@ -176,7 +176,7 @@ export default function HomeExperience() {
         </div>
 
         {/* Right Column: live search brief, with conversation as a secondary layer */}
-        <div className="order-3 mx-auto mt-10 w-full max-w-[340px] self-start lg:order-3 lg:mx-0 lg:mt-0 lg:h-full lg:max-w-none lg:min-h-0 lg:pt-[88px]">
+        <div className="home-side-column order-3 mx-auto mt-10 w-full max-w-[340px] self-start lg:order-3 lg:mx-0 lg:mt-0 lg:h-full lg:max-w-none lg:min-h-0 lg:pt-[88px]">
           <HomeSearchBrief
             searchInput={searchInput}
             setSearchInput={setSearchInput}
@@ -187,6 +187,104 @@ export default function HomeExperience() {
 
         </div>
       </main>
+
+      <style jsx global>{`
+        @media (min-width: 1024px) and (max-height: 820px) {
+          .home-side-column {
+            padding-top: 76px !important;
+          }
+
+          .home-market-radar-heading,
+          .home-search-brief-heading {
+            margin-bottom: 8px !important;
+          }
+
+          .home-market-radar-list {
+            gap: 6px !important;
+          }
+
+          .home-radar-image {
+            height: 62px !important;
+          }
+
+          .home-radar-content {
+            padding: 6px 10px !important;
+          }
+
+          .home-radar-title {
+            font-size: 10px !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .home-radar-caption {
+            margin-top: 2px !important;
+            font-size: 7.5px !important;
+          }
+
+          .home-radar-price-row {
+            margin-top: 4px !important;
+          }
+
+          .home-radar-insight {
+            display: none !important;
+          }
+
+          .home-search-brief-box {
+            padding: 14px !important;
+          }
+
+          .home-search-brief-title {
+            font-size: 17px !important;
+          }
+
+          .home-brief-status {
+            margin-top: 9px !important;
+            padding-top: 6px !important;
+            padding-bottom: 6px !important;
+          }
+
+          .home-brief-criteria {
+            margin-top: 9px !important;
+            gap: 5px !important;
+          }
+
+          .home-brief-criterion,
+          .home-brief-budget {
+            padding: 7px 10px !important;
+          }
+
+          .home-brief-budget {
+            margin-top: 5px !important;
+          }
+
+          .home-brief-matches {
+            margin-top: 9px !important;
+          }
+
+          .home-brief-match-list {
+            margin-top: 5px !important;
+          }
+
+          .home-brief-secondary-match {
+            display: none !important;
+          }
+
+          .home-brief-actions {
+            margin-top: 8px !important;
+            gap: 6px !important;
+          }
+
+          .home-brief-explore {
+            height: 36px !important;
+          }
+
+          .home-brief-composer input {
+            height: 38px !important;
+          }
+        }
+      `}</style>
 
     </div>
   );

@@ -58,7 +58,7 @@ function CompactComposer({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="relative w-full">
+    <form onSubmit={handleSubmit} className="home-brief-composer relative w-full">
       <Search
         className={`pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 ${isDark ? "text-white/28" : "text-zinc-400"}`}
         aria-hidden="true"
@@ -231,8 +231,8 @@ export default function HomeSearchBrief({
   ];
 
   return (
-    <section className="flex w-full flex-col" aria-labelledby="home-search-brief-title">
-      <div className="mb-3 flex h-4 items-center justify-between gap-3 px-1">
+    <section className="home-search-brief flex w-full flex-col lg:h-full lg:min-h-0" aria-labelledby="home-search-brief-title">
+      <div className="home-search-brief-heading mb-3 flex h-4 shrink-0 items-center justify-between gap-3 px-1">
         <h2
           id="home-search-brief-title"
           className={`text-[10px] font-bold uppercase tracking-[0.2em] ${isDark ? "text-white/42" : "text-zinc-500/85"}`}
@@ -255,7 +255,7 @@ export default function HomeSearchBrief({
       </div>
 
       <div
-        className={`relative flex min-h-[470px] w-full flex-col overflow-hidden rounded-[28px] border p-5 shadow-sm backdrop-blur-xl lg:h-[calc(var(--useful-height)-70px)] lg:max-h-[620px] lg:min-h-[470px] ${
+        className={`home-search-brief-box relative flex min-h-[470px] w-full flex-col overflow-hidden rounded-[28px] border p-5 shadow-sm backdrop-blur-xl lg:min-h-0 lg:flex-1 ${
           isDark
             ? "border-white/[0.07] bg-[#0b0e13]/86 shadow-2xl"
             : "border-zinc-200/85 bg-white/88 shadow-[0_22px_60px_rgba(24,24,27,0.07)]"
@@ -266,22 +266,22 @@ export default function HomeSearchBrief({
             <span className={`text-[8px] font-extrabold uppercase tracking-[0.16em] ${isDark ? "text-sky-300/60" : "text-sky-700/65"}`}>
               {language === "es" ? "Brief en vivo" : "Live brief"}
             </span>
-            <h3 className={`mt-1 text-[19px] font-black tracking-[-0.035em] ${isDark ? "text-white" : "text-zinc-950"}`}>
+            <h3 className={`home-search-brief-title mt-1 text-[19px] font-black tracking-[-0.035em] ${isDark ? "text-white" : "text-zinc-950"}`}>
               {language === "es" ? "Lo que Eterna entendió" : "What Eterna understood"}
             </h3>
           </div>
         </div>
 
-        <div className={`mt-4 flex items-center gap-2 rounded-full border px-3 py-2 ${isDark ? "border-white/[0.06] bg-white/[0.025]" : "border-zinc-200/80 bg-zinc-50/80"}`}>
+        <div className={`home-brief-status mt-4 flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 ${isDark ? "border-white/[0.06] bg-white/[0.025]" : "border-zinc-200/80 bg-zinc-50/80"}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${searchBrief.status === "error" ? "bg-amber-400" : "bg-emerald-400"}`} aria-hidden="true" />
           <span className={`text-[9px] font-bold uppercase tracking-[0.11em] ${isDark ? "text-white/55" : "text-zinc-600"}`}>
             {statusCopy}
           </span>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="home-brief-criteria mt-4 grid shrink-0 grid-cols-2 gap-2">
           {criteria.map(({ icon: Icon, label, value }) => (
-            <div key={label} className={`min-w-0 rounded-[16px] border px-3 py-2.5 ${isDark ? "border-white/[0.055] bg-white/[0.022]" : "border-zinc-200/75 bg-white"}`}>
+            <div key={label} className={`home-brief-criterion min-w-0 rounded-[16px] border px-3 py-2.5 ${isDark ? "border-white/[0.055] bg-white/[0.022]" : "border-zinc-200/75 bg-white"}`}>
               <div className={`flex items-center gap-1.5 text-[7px] font-extrabold uppercase tracking-[0.12em] ${isDark ? "text-white/30" : "text-zinc-400"}`}>
                 <Icon className="h-3 w-3" aria-hidden="true" />
                 {label}
@@ -291,7 +291,7 @@ export default function HomeSearchBrief({
           ))}
         </div>
 
-        <div className={`mt-2 rounded-[16px] border px-3 py-2.5 ${isDark ? "border-white/[0.055] bg-white/[0.022]" : "border-zinc-200/75 bg-white"}`}>
+        <div className={`home-brief-budget mt-2 shrink-0 rounded-[16px] border px-3 py-2.5 ${isDark ? "border-white/[0.055] bg-white/[0.022]" : "border-zinc-200/75 bg-white"}`}>
           <div className={`flex items-center gap-1.5 text-[7px] font-extrabold uppercase tracking-[0.12em] ${isDark ? "text-white/30" : "text-zinc-400"}`}>
             <WalletCards className="h-3 w-3" aria-hidden="true" />
             {language === "es" ? "Presupuesto" : "Budget"}
@@ -310,7 +310,7 @@ export default function HomeSearchBrief({
           ) : null}
         </div>
 
-        <div className="mt-4 flex min-h-0 flex-1 flex-col">
+        <div className="home-brief-matches mt-4 flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="flex items-center justify-between gap-3">
             <span className={`text-[8px] font-extrabold uppercase tracking-[0.14em] ${isDark ? "text-white/35" : "text-zinc-500"}`}>
               {language === "es" ? "Coincidencias" : "Matches"}
@@ -319,13 +319,13 @@ export default function HomeSearchBrief({
               {resultCount} {language === "es" ? "disponibles" : "available"}
             </b>
           </div>
-          <div className="mt-2 space-y-1.5">
-            {matches.map(({ property, price }) => (
+          <div className="home-brief-match-list mt-2 space-y-1.5 overflow-hidden">
+            {matches.map(({ property, price }, matchIndex) => (
               <Link
                 key={property.id}
                 href={`/property/${property.id}`}
                 prefetch={false}
-                className={`group flex items-center gap-2.5 rounded-[15px] border p-1.5 pr-2 transition-colors ${isDark ? "border-white/[0.05] bg-white/[0.018] hover:border-sky-300/25" : "border-zinc-200/75 bg-white hover:border-sky-300"}`}
+                className={`group flex items-center gap-2.5 rounded-[15px] border p-1.5 pr-2 transition-colors ${matchIndex > 0 ? "home-brief-secondary-match" : ""} ${isDark ? "border-white/[0.05] bg-white/[0.018] hover:border-sky-300/25" : "border-zinc-200/75 bg-white hover:border-sky-300"}`}
               >
                 <MatchImage source={property.images?.[0]} title={property.title} />
                 <span className="min-w-0 flex-1">
@@ -340,11 +340,11 @@ export default function HomeSearchBrief({
           </div>
         </div>
 
-        <div className="mt-4 space-y-2.5">
+        <div className="home-brief-actions mt-4 flex shrink-0 flex-col gap-2.5">
           <button
             type="button"
             onClick={handleExplore}
-            className={`flex h-10 w-full items-center justify-between rounded-full px-4 text-[9px] font-black uppercase tracking-[0.12em] transition-all hover:-translate-y-0.5 ${isDark ? "bg-white text-zinc-950 hover:bg-sky-50" : "bg-zinc-950 text-white hover:bg-zinc-800"}`}
+            className={`home-brief-explore flex h-10 w-full items-center justify-between rounded-full px-4 text-[9px] font-black uppercase tracking-[0.12em] transition-all hover:-translate-y-0.5 ${isDark ? "bg-white text-zinc-950 hover:bg-sky-50" : "bg-zinc-950 text-white hover:bg-zinc-800"}`}
           >
             <span>{activeSearch ? (language === "es" ? "Ver búsqueda completa" : "View full search") : (language === "es" ? "Explorar catálogo" : "Explore listings")}</span>
             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />

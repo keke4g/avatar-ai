@@ -23,7 +23,7 @@ function RadarImage({ entry }: { entry: HomeMarketRadarEntry }) {
   const source = entry.property.images?.[0];
 
   return (
-    <div className="relative h-28 overflow-hidden bg-[linear-gradient(145deg,#b8d6e2_0%,#7fa4b5_44%,#314650_100%)] lg:h-[82px] xl:h-[92px]">
+    <div className="home-radar-image relative h-28 overflow-hidden bg-[linear-gradient(145deg,#b8d6e2_0%,#7fa4b5_44%,#314650_100%)] lg:h-[clamp(70px,9.5vh,92px)]">
       {source && !failed ? (
         <Image
           src={source}
@@ -59,8 +59,8 @@ export default function HomeMarketRadar({
   );
 
   return (
-    <section className="flex w-full flex-col" aria-labelledby="home-market-radar-title">
-      <div className="mb-3 flex h-4 items-center justify-between gap-3 px-1">
+    <section className="home-market-radar flex w-full flex-col lg:h-full lg:min-h-0" aria-labelledby="home-market-radar-title">
+      <div className="home-market-radar-heading mb-3 flex h-4 shrink-0 items-center justify-between gap-3 px-1">
         <h2
           id="home-market-radar-title"
           className={`text-[10px] font-bold uppercase tracking-[0.2em] transition-colors ${
@@ -75,19 +75,19 @@ export default function HomeMarketRadar({
       </div>
 
       <div
-        className={`rounded-[23px] p-[2px] transition-all duration-500 ${
+        className={`home-market-radar-frame rounded-[23px] p-[2px] transition-all duration-500 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col ${
           highlighted
             ? "scale-[1.012] bg-gradient-to-br from-sky-400 via-cyan-300 to-blue-600 shadow-[0_0_32px_rgba(14,165,233,0.22)]"
             : "bg-transparent"
         }`}
       >
         <div
-          className={`grid snap-x snap-mandatory grid-flow-col auto-cols-[82%] gap-3 overflow-x-auto rounded-[21px] p-1 pb-2 scrollbar-none sm:auto-cols-[54%] lg:grid-flow-row lg:auto-cols-auto lg:gap-2.5 lg:overflow-visible lg:p-1 ${
+          className={`home-market-radar-list grid snap-x snap-mandatory grid-flow-col auto-cols-[82%] gap-3 overflow-x-auto rounded-[21px] p-1 pb-2 scrollbar-none sm:auto-cols-[54%] lg:h-full lg:min-h-0 lg:grid-flow-row lg:auto-cols-auto lg:grid-rows-[repeat(3,minmax(0,1fr))] lg:gap-2.5 lg:overflow-hidden lg:p-1 ${
             highlighted ? (isDark ? "bg-[#080b10]/96" : "bg-white/96") : "bg-transparent"
           }`}
         >
           {loading && entries.length === 0 ? (
-            <div className={`col-span-full flex min-h-40 items-center justify-center rounded-[20px] border ${isDark ? "border-white/8 bg-white/[0.025] text-white/40" : "border-zinc-200 bg-white text-zinc-400"}`}>
+            <div className={`col-span-full flex min-h-40 items-center justify-center rounded-[20px] border lg:row-span-3 lg:min-h-0 ${isDark ? "border-white/8 bg-white/[0.025] text-white/40" : "border-zinc-200 bg-white text-zinc-400"}`}>
               <LoaderCircle className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
               <span className="text-xs">{language === "es" ? "Leyendo el mercado…" : "Reading the market…"}</span>
             </div>
@@ -97,7 +97,7 @@ export default function HomeMarketRadar({
                 key={entry.property.id}
                 href={`/property/${entry.property.id}`}
                 prefetch={false}
-                className={`group snap-start overflow-hidden rounded-[20px] border text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${
+                className={`home-radar-card group snap-start overflow-hidden rounded-[20px] border text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 lg:flex lg:min-h-0 lg:flex-col ${
                   isDark
                     ? "border-white/[0.07] bg-[#0d1117]/92 hover:border-sky-400/30"
                     : "border-zinc-200/90 bg-white hover:border-sky-400/45"
@@ -105,14 +105,14 @@ export default function HomeMarketRadar({
                 aria-label={`${entry.tag}: ${entry.property.title}`}
               >
                 <RadarImage entry={entry} />
-                <div className="px-3 py-2.5 lg:px-3 lg:py-2">
-                  <strong className={`line-clamp-1 block text-[12px] font-extrabold tracking-[-0.02em] ${isDark ? "text-white/90" : "text-zinc-900"}`}>
+                <div className="home-radar-content min-h-0 px-3 py-2.5 lg:px-3 lg:py-2">
+                  <strong className={`home-radar-title block truncate text-[12px] font-extrabold tracking-[-0.02em] ${isDark ? "text-white/90" : "text-zinc-900"}`}>
                     {entry.property.title}
                   </strong>
-                  <span className={`mt-1 line-clamp-1 block text-[9px] ${isDark ? "text-white/38" : "text-zinc-500"}`}>
+                  <span className={`home-radar-caption mt-1 block truncate text-[9px] ${isDark ? "text-white/38" : "text-zinc-500"}`}>
                     {getHomePropertyCaption(entry.property, entry.price, language)}
                   </span>
-                  <div className="mt-2 flex items-center justify-between gap-2">
+                  <div className="home-radar-price-row mt-2 flex items-center justify-between gap-2">
                     <b className={`text-[12px] font-black tracking-[-0.02em] ${isDark ? "text-white" : "text-zinc-950"}`}>
                       {formatHomePrice(entry.price, language, true)}
                     </b>
@@ -125,7 +125,7 @@ export default function HomeMarketRadar({
               </Link>
             ))
           ) : (
-            <div className={`col-span-full rounded-[20px] border px-5 py-7 text-center ${isDark ? "border-white/8 bg-white/[0.025]" : "border-zinc-200 bg-white"}`}>
+            <div className={`col-span-full rounded-[20px] border px-5 py-7 text-center lg:row-span-3 ${isDark ? "border-white/8 bg-white/[0.025]" : "border-zinc-200 bg-white"}`}>
               <Building2 className={`mx-auto h-6 w-6 ${isDark ? "text-white/25" : "text-zinc-300"}`} aria-hidden="true" />
               <p className={`mt-3 text-xs font-semibold ${isDark ? "text-white/65" : "text-zinc-700"}`}>
                 {language === "es" ? "El radar se está actualizando" : "The radar is updating"}
@@ -136,7 +136,7 @@ export default function HomeMarketRadar({
       </div>
 
       {entries[0] ? (
-        <p className={`mt-3 hidden px-1 text-[9px] leading-relaxed lg:block ${isDark ? "text-white/28" : "text-zinc-400"}`}>
+        <p className={`home-radar-insight mt-3 hidden shrink-0 px-1 text-[9px] leading-relaxed lg:block ${isDark ? "text-white/28" : "text-zinc-400"}`}>
           {entries[0].insight}
         </p>
       ) : null}
