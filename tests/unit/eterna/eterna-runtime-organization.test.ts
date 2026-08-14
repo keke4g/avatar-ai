@@ -49,6 +49,11 @@ import {
   getHomePropertyTypeLabel,
 } from '../../../components/home/homeExperienceData';
 import {
+  buildHomeMiniSearchFilters,
+  buildHomeMiniSearchUrl,
+  searchHomeMiniInventory,
+} from '../../../components/home/homeMiniSearch';
+import {
   consumeInstantTopNavigation,
   requestInstantTopNavigation,
 } from '../../../lib/navigation/instantTopNavigation';
@@ -484,6 +489,33 @@ test('el Home construye un radar real y conserva los filtros al abrir Explorer',
       sort: 'price_asc',
     }),
     '/explore?search=Lomas+de+Angel%C3%B3polis&offering=SALE&budget=5000000&rooms=3&sort=price_asc',
+  );
+
+  const miniSearch = {
+    operation: 'SALE' as const,
+    zone: 'Culiacán',
+    propertyType: 'Casas',
+    budget: '3000000',
+  };
+  assert.deepEqual(buildHomeMiniSearchFilters(miniSearch), {
+    city: 'Culiacán',
+    type: 'Casas',
+    operation: 'sale',
+    budget: 3_000_000,
+    minBudget: 2_000_000,
+    sort: 'best_match',
+  });
+  assert.equal(
+    buildHomeMiniSearchUrl(miniSearch),
+    '/explore?search=Culiac%C3%A1n&offering=SALE&category=casas&budget=3000000&minBudget=2000000',
+  );
+  assert.deepEqual(
+    searchHomeMiniInventory([
+      makeProperty('below-range', 1_500_000, '2026-07-01T00:00:00.000Z'),
+      makeProperty('in-range', 2_500_000, '2026-08-01T00:00:00.000Z'),
+      makeProperty('above-range', 3_500_000, '2026-08-12T00:00:00.000Z'),
+    ], miniSearch).map((property) => property.id),
+    ['in-range'],
   );
 });
 

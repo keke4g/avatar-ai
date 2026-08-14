@@ -6,26 +6,39 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
-  BedDouble,
   Building2,
+  ChevronDown,
   House,
   MapPin,
   MessageCircle,
   Search,
   Send,
+  SlidersHorizontal,
   WalletCards,
   X,
 } from "lucide-react";
 import { useLiveContext } from "../../lib/context/LiveContext";
 import { useSwap } from "../../lib/context/SwapContext";
+import { parseBudgetToNumber } from "../../lib/search/SearchEngine";
 import { getPropertyPriceSnapshot } from "../../lib/search/propertyPrice";
+import {
+  PROPERTY_TYPE_OPTIONS,
+  type OperationMode,
+} from "../../lib/search/searchConfig";
 import { requestInstantTopNavigation } from "../../lib/navigation/instantTopNavigation";
 import {
-  buildHomeExploreUrl,
-  buildHomeMarketRadar,
   formatHomePrice,
   getHomePropertyCaption,
 } from "./homeExperienceData";
+import {
+  buildHomeMiniSearchUrl,
+  findHomeMiniBudgetSelection,
+  getHomeMiniBudgetOptions,
+  normalizeHomeMiniOperation,
+  normalizeHomeMiniPropertyType,
+  searchHomeMiniInventory,
+  type HomeMiniSearchSelection,
+} from "./homeMiniSearch";
 
 interface HomeSearchBriefProps {
   searchInput: string;
@@ -41,6 +54,13 @@ interface CompactComposerProps {
   language: "es" | "en";
   onSubmit: (prompt: string) => void;
 }
+
+const OPERATIONS: Array<{ id: OperationMode; es: string; en: string }> = [
+  { id: "ALL", es: "Todo", en: "All" },
+  { id: "SALE", es: "Venta", en: "Sale" },
+  { id: "RENT", es: "Renta", en: "Rent" },
+  { id: "SWAP", es: "Intercambio", en: "Swap" },
+];
 
 function CompactComposer({
   value,
@@ -92,48 +112,6 @@ function CompactComposer({
   );
 }
 
-const operationLabel = (
-  operation: "sale" | "rent" | "swap" | undefined,
-  language: "es" | "en",
-): string => {
-  if (operation === "sale") return language === "es" ? "Comprar" : "Buy";
-  if (operation === "rent") return language === "es" ? "Rentar" : "Rent";
-  if (operation === "swap") return language === "es" ? "Intercambiar" : "Exchange";
-  return language === "es" ? "Por definir" : "To be defined";
-};
-
-const typeLabel = (type: string | undefined, language: "es" | "en"): string => {
-  if (!type) return language === "es" ? "Cualquier tipo" : "Any type";
-  const normalized = type.toLocaleLowerCase("es-MX");
-  if (["villa", "house", "casa", "casas"].includes(normalized)) {
-    return language === "es" ? "Casa" : "House";
-  }
-  if (["apartment", "apartamento", "departamento"].includes(normalized)) {
-    return language === "es" ? "Departamento" : "Apartment";
-  }
-  return type;
-};
-
-const budgetLabel = (
-  budget: string | number | undefined,
-  minBudget: number | undefined,
-  language: "es" | "en",
-): string => {
-  const locale = language === "es" ? "es-MX" : "en-US";
-  const money = (value: number) => new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency: "MXN",
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(value);
-
-  if (typeof budget === "number" && minBudget) return `${money(minBudget)} – ${money(budget)}`;
-  if (typeof budget === "number") return `${language === "es" ? "Hasta" : "Up to"} ${money(budget)}`;
-  if (typeof budget === "string" && budget.trim()) return budget.trim();
-  if (minBudget) return `${language === "es" ? "Desde" : "From"} ${money(minBudget)}`;
-  return language === "es" ? "Presupuesto abierto" : "Open budget";
-};
-
 function MatchImage({ source, title }: { source?: string; title: string }) {
   const [failed, setFailed] = useState(false);
   return (
@@ -157,6 +135,25 @@ function MatchImage({ source, title }: { source?: string; title: string }) {
   );
 }
 
+const getEnglishBudgetLabel = (
+  value: string,
+  previousValue: string | undefined,
+  isLast: boolean,
+): string => {
+  if (!value) return "Any budget";
+  const money = (amount: number) => new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "MXN",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(amount);
+  const maximum = Number(value);
+  const minimum = Number(previousValue);
+  if (isLast && minimum > 0) return `Over ${money(minimum)}`;
+  if (!minimum) return `Up to ${money(maximum)}`;
+  return `${money(minimum)} – ${money(maximum)}`;
+};
+
 export default function HomeSearchBrief({
   searchInput,
   setSearchInput,
@@ -165,21 +162,43 @@ export default function HomeSearchBrief({
 }: HomeSearchBriefProps) {
   const router = useRouter();
   const { eternaChatState, sendPrompt } = useLiveContext();
-  const { activeSearch, properties } = useSwap();
+  const { activeSearch, properties, setActiveSearch } = useSwap();
   const { chatHistory, searchBrief } = eternaChatState;
   const [conversationOpen, setConversationOpen] = useState(false);
+  const [draftSelection, setDraftSelection] = useState<{
+    baseline: string;
+    value: HomeMiniSearchSelection;
+  } | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
 
-  const matches = useMemo(() => {
-    const liveMatches = (activeSearch?.results || []).flatMap((property) => {
-      const price = getPropertyPriceSnapshot(property, activeSearch?.filters.operation);
-      return price ? [{ property, price }] : [];
+  const externalOperation = activeSearch?.filters.operation || searchBrief.operation;
+  const externalZone = activeSearch?.filters.city || searchBrief.city || "";
+  const externalPropertyType = activeSearch?.filters.type || searchBrief.propertyType;
+  const externalBudget = activeSearch?.filters.budget
+    ?? (typeof searchBrief.budget === "number"
+      ? searchBrief.budget
+      : parseBudgetToNumber(searchBrief.budget || "", searchBrief.operation === "rent" ? "rent" : "sale"));
+  const externalSelection = useMemo<HomeMiniSearchSelection>(() => {
+    const nextOperation = normalizeHomeMiniOperation(externalOperation);
+    return {
+      operation: nextOperation,
+      zone: externalZone,
+      propertyType: normalizeHomeMiniPropertyType(externalPropertyType),
+      budget: findHomeMiniBudgetSelection(nextOperation, externalBudget || undefined),
+    };
+  }, [externalBudget, externalOperation, externalPropertyType, externalZone]);
+  const externalSelectionKey = `${externalSelection.operation}|${externalSelection.zone}|${externalSelection.propertyType}|${externalSelection.budget}`;
+  const selection = draftSelection?.baseline === externalSelectionKey
+    ? draftSelection.value
+    : externalSelection;
+  const { operation, zone, propertyType, budget } = selection;
+
+  const updateSelection = (patch: Partial<HomeMiniSearchSelection>) => {
+    setDraftSelection({
+      baseline: externalSelectionKey,
+      value: { ...selection, ...patch },
     });
-    if (liveMatches.length > 0) return liveMatches.slice(0, 2);
-    return buildHomeMarketRadar(properties, language)
-      .slice(0, 2)
-      .map(({ property, price }) => ({ property, price }));
-  }, [activeSearch, language, properties]);
+  };
 
   useEffect(() => {
     if (!conversationOpen || !transcriptRef.current) return;
@@ -189,46 +208,31 @@ export default function HomeSearchBrief({
     });
   }, [chatHistory, conversationOpen]);
 
-  const statusCopy = {
-    idle: language === "es" ? "Lista para descubrir" : "Ready to discover",
-    collecting: language === "es" ? "Afinando tu búsqueda" : "Refining your search",
-    searching: language === "es" ? "Buscando en tiempo real" : "Searching live inventory",
-    ready: language === "es" ? "Búsqueda actualizada" : "Search updated",
-    error: language === "es" ? "Revisa los criterios" : "Review your criteria",
-  }[searchBrief.status];
-  const resultCount = searchBrief.status === "ready"
-    ? searchBrief.resultCount
-    : properties.filter((property) => property.isPublished !== false && property.isDemo !== true && property.is_demo !== true).length;
-  const exploreUrl = buildHomeExploreUrl(activeSearch?.filters);
-  const handleExplore = () => {
-    requestInstantTopNavigation(window.sessionStorage);
-    router.push(exploreUrl, { scroll: false });
-  };
+  const filteredProperties = useMemo(() => (
+    searchHomeMiniInventory(properties, selection)
+  ), [properties, selection]);
 
-  const criteria = [
-    {
-      icon: WalletCards,
-      label: language === "es" ? "Operación" : "Operation",
-      value: operationLabel(searchBrief.operation, language),
-    },
-    {
-      icon: MapPin,
-      label: language === "es" ? "Zona" : "Area",
-      value: searchBrief.city || (language === "es" ? "Cualquier ubicación" : "Any location"),
-    },
-    {
-      icon: House,
-      label: language === "es" ? "Propiedad" : "Property",
-      value: typeLabel(searchBrief.propertyType, language),
-    },
-    {
-      icon: BedDouble,
-      label: language === "es" ? "Recámaras" : "Bedrooms",
-      value: searchBrief.rooms
-        ? `${searchBrief.rooms}+`
-        : (language === "es" ? "Sin límite" : "No limit"),
-    },
-  ];
+  const matches = useMemo(() => filteredProperties.slice(0, 2).map((property) => ({
+    property,
+    price: getPropertyPriceSnapshot(
+      property,
+      operation === "SALE" ? "sale" : operation === "RENT" ? "rent" : undefined,
+    ),
+  })), [filteredProperties, operation]);
+
+  const budgetOptions = getHomeMiniBudgetOptions(operation);
+  const exploreUrl = buildHomeMiniSearchUrl(selection);
+  const fieldClass = isDark
+    ? "border-white/[0.07] bg-white/[0.025] focus-within:border-sky-300/35"
+    : "border-zinc-200/80 bg-white focus-within:border-sky-400";
+  const labelClass = isDark ? "text-white/34" : "text-zinc-400";
+  const controlClass = isDark ? "text-white/82" : "text-zinc-800";
+
+  const navigateToExplore = (url: string) => {
+    setActiveSearch(null);
+    requestInstantTopNavigation(window.sessionStorage);
+    router.push(url, { scroll: false });
+  };
 
   return (
     <section className="home-search-brief flex w-full flex-col lg:h-full lg:min-h-0" aria-labelledby="home-search-brief-title">
@@ -261,53 +265,114 @@ export default function HomeSearchBrief({
             : "border-zinc-200/85 bg-white/88 shadow-[0_22px_60px_rgba(24,24,27,0.07)]"
         }`}
       >
-        <div className="flex items-start gap-4">
-          <div>
-            <span className={`text-[8px] font-extrabold uppercase tracking-[0.16em] ${isDark ? "text-sky-300/60" : "text-sky-700/65"}`}>
-              {language === "es" ? "Brief en vivo" : "Live brief"}
+        <div className="flex shrink-0 items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className={`grid h-8 w-8 place-items-center rounded-full ${isDark ? "bg-sky-300/10 text-sky-200" : "bg-sky-50 text-sky-700"}`}>
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
             </span>
-            <h3 className={`home-search-brief-title mt-1 text-[19px] font-black tracking-[-0.035em] ${isDark ? "text-white" : "text-zinc-950"}`}>
-              {language === "es" ? "Lo que Eterna entendió" : "What Eterna understood"}
+            <h3 className={`home-search-brief-title text-[18px] font-black tracking-[-0.035em] ${isDark ? "text-white" : "text-zinc-950"}`}>
+              {language === "es" ? "Buscar propiedades" : "Search listings"}
             </h3>
           </div>
-        </div>
-
-        <div className={`home-brief-status mt-4 flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 ${isDark ? "border-white/[0.06] bg-white/[0.025]" : "border-zinc-200/80 bg-zinc-50/80"}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${searchBrief.status === "error" ? "bg-amber-400" : "bg-emerald-400"}`} aria-hidden="true" />
-          <span className={`text-[9px] font-bold uppercase tracking-[0.11em] ${isDark ? "text-white/55" : "text-zinc-600"}`}>
-            {statusCopy}
+          <span className={`rounded-full px-2.5 py-1 text-[8px] font-extrabold tabular-nums ${isDark ? "bg-white/[0.05] text-white/55" : "bg-zinc-100 text-zinc-600"}`}>
+            {filteredProperties.length}
           </span>
         </div>
 
         <div className="home-brief-criteria mt-4 grid shrink-0 grid-cols-2 gap-2">
-          {criteria.map(({ icon: Icon, label, value }) => (
-            <div key={label} className={`home-brief-criterion min-w-0 rounded-[16px] border px-3 py-2.5 ${isDark ? "border-white/[0.055] bg-white/[0.022]" : "border-zinc-200/75 bg-white"}`}>
-              <div className={`flex items-center gap-1.5 text-[7px] font-extrabold uppercase tracking-[0.12em] ${isDark ? "text-white/30" : "text-zinc-400"}`}>
-                <Icon className="h-3 w-3" aria-hidden="true" />
-                {label}
-              </div>
-              <p className={`mt-1 truncate text-[11px] font-bold ${isDark ? "text-white/78" : "text-zinc-800"}`}>{value}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className={`home-brief-budget mt-2 shrink-0 rounded-[16px] border px-3 py-2.5 ${isDark ? "border-white/[0.055] bg-white/[0.022]" : "border-zinc-200/75 bg-white"}`}>
-          <div className={`flex items-center gap-1.5 text-[7px] font-extrabold uppercase tracking-[0.12em] ${isDark ? "text-white/30" : "text-zinc-400"}`}>
-            <WalletCards className="h-3 w-3" aria-hidden="true" />
-            {language === "es" ? "Presupuesto" : "Budget"}
-          </div>
-          <p className={`mt-1 truncate text-[11px] font-bold ${isDark ? "text-white/78" : "text-zinc-800"}`}>
-            {budgetLabel(searchBrief.budget, searchBrief.minBudget, language)}
-          </p>
-          {searchBrief.preferences.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {searchBrief.preferences.slice(0, 3).map((preference) => (
-                <span key={preference} className={`rounded-full px-2 py-1 text-[7px] font-bold ${isDark ? "bg-sky-300/10 text-sky-200/65" : "bg-sky-50 text-sky-700"}`}>
-                  {preference}
-                </span>
+          <label className={`home-brief-criterion group relative min-w-0 rounded-[16px] border px-3 py-2.5 transition-colors ${fieldClass}`}>
+            <span className={`flex items-center gap-1.5 text-[7px] font-extrabold uppercase tracking-[0.12em] ${labelClass}`}>
+              <WalletCards className="h-3 w-3" aria-hidden="true" />
+              {language === "es" ? "Operación" : "Operation"}
+            </span>
+            <select
+              value={operation}
+              onChange={(event) => {
+                updateSelection({
+                  operation: event.target.value as OperationMode,
+                  budget: "",
+                });
+              }}
+              className={`mt-1 w-full appearance-none bg-transparent pr-4 text-[11px] font-bold outline-none ${controlClass}`}
+              aria-label={language === "es" ? "Operación" : "Operation"}
+            >
+              {OPERATIONS.map((option) => (
+                <option key={option.id} value={option.id} className="text-zinc-900">
+                  {language === "es" ? option.es : option.en}
+                </option>
               ))}
-            </div>
-          ) : null}
+            </select>
+            <ChevronDown className={`pointer-events-none absolute bottom-3 right-3 h-3 w-3 ${labelClass}`} aria-hidden="true" />
+          </label>
+
+          <label className={`home-brief-criterion group min-w-0 rounded-[16px] border px-3 py-2.5 transition-colors ${fieldClass}`}>
+            <span className={`flex items-center gap-1.5 text-[7px] font-extrabold uppercase tracking-[0.12em] ${labelClass}`}>
+              <MapPin className="h-3 w-3" aria-hidden="true" />
+              {language === "es" ? "Zona" : "Area"}
+            </span>
+            <input
+              value={zone}
+              onChange={(event) => updateSelection({ zone: event.target.value })}
+              className={`mt-1 w-full bg-transparent text-[11px] font-bold outline-none placeholder:font-medium ${controlClass} ${isDark ? "placeholder:text-white/24" : "placeholder:text-zinc-400"}`}
+              placeholder={language === "es" ? "Ciudad o zona" : "City or area"}
+              aria-label={language === "es" ? "Ciudad o zona" : "City or area"}
+            />
+          </label>
+
+          <label className={`home-brief-criterion group relative min-w-0 rounded-[16px] border px-3 py-2.5 transition-colors ${fieldClass}`}>
+            <span className={`flex items-center gap-1.5 text-[7px] font-extrabold uppercase tracking-[0.12em] ${labelClass}`}>
+              <House className="h-3 w-3" aria-hidden="true" />
+              {language === "es" ? "Propiedad" : "Property"}
+            </span>
+            <select
+              value={propertyType}
+              onChange={(event) => updateSelection({ propertyType: event.target.value })}
+              className={`mt-1 w-full appearance-none bg-transparent pr-4 text-[11px] font-bold outline-none ${controlClass}`}
+              aria-label={language === "es" ? "Tipo de propiedad" : "Property type"}
+            >
+              {PROPERTY_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value} className="text-zinc-900">
+                  {language === "es"
+                    ? option.label
+                    : option.value === "All"
+                      ? "Any type"
+                      : option.value}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className={`pointer-events-none absolute bottom-3 right-3 h-3 w-3 ${labelClass}`} aria-hidden="true" />
+          </label>
+
+          <label className={`home-brief-criterion group relative min-w-0 rounded-[16px] border px-3 py-2.5 transition-colors ${fieldClass} ${budgetOptions.length === 0 ? "opacity-55" : ""}`}>
+            <span className={`flex items-center gap-1.5 text-[7px] font-extrabold uppercase tracking-[0.12em] ${labelClass}`}>
+              <WalletCards className="h-3 w-3" aria-hidden="true" />
+              {language === "es" ? "Presupuesto" : "Budget"}
+            </span>
+            <select
+              value={budget}
+              onChange={(event) => updateSelection({ budget: event.target.value })}
+              disabled={budgetOptions.length === 0}
+              className={`mt-1 w-full appearance-none bg-transparent pr-4 text-[11px] font-bold outline-none disabled:cursor-not-allowed ${controlClass}`}
+              aria-label={language === "es" ? "Rango de precio" : "Price range"}
+            >
+              {budgetOptions.length > 0 ? budgetOptions.map((option, index) => (
+                <option key={option.value || "any"} value={option.value} className="text-zinc-900">
+                  {language === "es"
+                    ? option.label
+                    : getEnglishBudgetLabel(
+                        option.value,
+                        budgetOptions[index - 1]?.value,
+                        index === budgetOptions.length - 1,
+                      )}
+                </option>
+              )) : (
+                <option value="" className="text-zinc-900">
+                  {language === "es" ? "Sin límite" : "No limit"}
+                </option>
+              )}
+            </select>
+            <ChevronDown className={`pointer-events-none absolute bottom-3 right-3 h-3 w-3 ${labelClass}`} aria-hidden="true" />
+          </label>
         </div>
 
         <div className="home-brief-matches mt-4 flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -315,12 +380,12 @@ export default function HomeSearchBrief({
             <span className={`text-[8px] font-extrabold uppercase tracking-[0.14em] ${isDark ? "text-white/35" : "text-zinc-500"}`}>
               {language === "es" ? "Coincidencias" : "Matches"}
             </span>
-            <b className={`text-[9px] ${isDark ? "text-white/65" : "text-zinc-700"}`}>
-              {resultCount} {language === "es" ? "disponibles" : "available"}
+            <b className={`text-[9px] tabular-nums ${isDark ? "text-white/65" : "text-zinc-700"}`}>
+              {filteredProperties.length} {language === "es" ? "disponibles" : "available"}
             </b>
           </div>
-          <div className="home-brief-match-list mt-2 space-y-1.5 overflow-hidden">
-            {matches.map(({ property, price }, matchIndex) => (
+          <div className="home-brief-match-list mt-2 space-y-1.5 overflow-hidden" aria-live="polite">
+            {matches.length > 0 ? matches.map(({ property, price }, matchIndex) => (
               <Link
                 key={property.id}
                 href={`/property/${property.id}`}
@@ -331,31 +396,40 @@ export default function HomeSearchBrief({
                 <span className="min-w-0 flex-1">
                   <strong className={`block truncate text-[9px] font-extrabold ${isDark ? "text-white/78" : "text-zinc-800"}`}>{property.title}</strong>
                   <small className={`mt-0.5 block truncate text-[7px] ${isDark ? "text-white/30" : "text-zinc-400"}`}>
-                    {getHomePropertyCaption(property, price, language)}
+                    {price
+                      ? getHomePropertyCaption(property, price, language)
+                      : `${property.location} · ${language === "es" ? "Intercambio" : "Swap"}`}
                   </small>
                 </span>
-                <b className={`shrink-0 text-[9px] ${isDark ? "text-white/70" : "text-zinc-800"}`}>{formatHomePrice(price, language, true)}</b>
+                <b className={`shrink-0 text-[9px] ${isDark ? "text-white/70" : "text-zinc-800"}`}>
+                  {price ? formatHomePrice(price, language, true) : "Swap"}
+                </b>
               </Link>
-            ))}
+            )) : (
+              <div className={`rounded-[15px] border border-dashed px-3 py-4 text-center text-[10px] font-semibold ${isDark ? "border-white/10 text-white/38" : "border-zinc-200 text-zinc-500"}`}>
+                {language === "es" ? "Sin coincidencias. Ajusta un filtro." : "No matches. Adjust a filter."}
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="home-brief-actions mt-4 flex shrink-0 flex-col gap-2.5">
+        <div className="home-brief-actions mt-4 flex shrink-0 flex-col gap-2">
           <button
             type="button"
-            onClick={handleExplore}
-            className={`home-brief-explore flex h-10 w-full items-center justify-between rounded-full px-4 text-[9px] font-black uppercase tracking-[0.12em] transition-all hover:-translate-y-0.5 ${isDark ? "bg-white text-zinc-950 hover:bg-sky-50" : "bg-zinc-950 text-white hover:bg-zinc-800"}`}
+            onClick={() => navigateToExplore(exploreUrl)}
+            className="home-mini-search-submit flex h-10 w-full items-center justify-center gap-2 rounded-full bg-sky-500 px-4 text-[9px] font-black uppercase tracking-[0.14em] text-white shadow-[0_12px_28px_rgba(14,165,233,0.22)] transition-all hover:-translate-y-0.5 hover:bg-sky-600"
           >
-            <span>{activeSearch ? (language === "es" ? "Ver búsqueda completa" : "View full search") : (language === "es" ? "Explorar catálogo" : "Explore listings")}</span>
+            <Search className="h-3.5 w-3.5" aria-hidden="true" />
+            {language === "es" ? "Buscar" : "Search"}
+          </button>
+          <button
+            type="button"
+            onClick={() => navigateToExplore("/explore")}
+            className={`home-brief-explore flex h-9 w-full items-center justify-between rounded-full border px-4 text-[8px] font-black uppercase tracking-[0.1em] transition-colors ${isDark ? "border-white/10 text-white/68 hover:bg-white/5 hover:text-white" : "border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"}`}
+          >
+            <span>{language === "es" ? "Explora todo el catálogo" : "Explore the full catalog"}</span>
             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
-          <CompactComposer
-            value={searchInput}
-            setValue={setSearchInput}
-            isDark={isDark}
-            language={language}
-            onSubmit={sendPrompt}
-          />
         </div>
 
         {conversationOpen ? (
