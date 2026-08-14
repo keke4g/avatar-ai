@@ -117,7 +117,7 @@ export default function HomeExperience() {
       }`}
       style={{
         "--navbar-height": `${navbarHeight}px`,
-        "--home-shell-height": `calc(100dvh - ${navbarHeight}px - 22px)`,
+        "--home-shell-height": `calc(100dvh - ${navbarHeight}px - 36px)`,
         "--useful-height": "calc(var(--home-shell-height) - 72px)",
       } as React.CSSProperties}
     >
@@ -170,7 +170,7 @@ export default function HomeExperience() {
         </div>
 
         {/* Center Column: Eterna prompt guide + avatar */}
-        <div className="order-1 flex w-full flex-shrink-0 flex-col items-center justify-start gap-5 lg:order-2 lg:h-full lg:min-h-0 lg:gap-6">
+        <div className="home-center-column order-1 flex w-full flex-shrink-0 flex-col items-center justify-start gap-5 lg:order-2 lg:h-full lg:min-h-0 lg:gap-6">
           <EternaPromptRail isDark={isDark} language={language} />
           <HomeHero />
         </div>
@@ -192,6 +192,14 @@ export default function HomeExperience() {
         @media (min-width: 1024px) and (max-height: 820px) {
           .home-side-column {
             padding-top: 76px !important;
+          }
+
+          .home-center-column {
+            gap: 16px !important;
+          }
+
+          .home-hero-video {
+            --home-hero-height-offset: 12px;
           }
 
           .home-market-radar-heading,

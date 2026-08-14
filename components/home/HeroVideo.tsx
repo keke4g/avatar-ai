@@ -131,9 +131,9 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={(e) => handleTouchEnd(e, "Outer")}
-      className="relative flex items-center justify-center select-none w-full max-w-[340px] sm:max-w-[360px] mx-auto rounded-[32px] p-[3px] transition-all duration-300 ease-in-out mt-2 lg:mt-1 cursor-pointer"
+      className="home-hero-video relative flex items-center justify-center select-none w-full max-w-[340px] sm:max-w-[360px] mx-auto rounded-[32px] p-[3px] transition-all duration-300 ease-in-out mt-2 lg:mt-1 cursor-pointer"
       style={{
-        height: "min(calc(var(--useful-height, 760px) - 20px), 760px)",
+        height: "min(calc(var(--useful-height, 760px) - var(--home-hero-height-offset, 20px)), 760px)",
         aspectRatio: "9/16",
         background: frameBg
       }}

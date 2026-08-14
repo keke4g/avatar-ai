@@ -151,12 +151,6 @@ export default function EternaPromptRail({ isDark, language }: EternaPromptRailP
             isDark ? "border-white/10 bg-[#101017]" : "border-zinc-200/70 bg-white"
           }`}
         />
-        <motion.span
-          aria-hidden="true"
-          className="absolute -bottom-[17px] left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-[#6C63FF] shadow-[0_0_12px_3px_rgba(108,99,255,0.38)]"
-          animate={reduceMotion ? undefined : { opacity: [0.35, 1, 0.35], scale: [0.8, 1.25, 0.8] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-        />
       </div>
     </div>
   );

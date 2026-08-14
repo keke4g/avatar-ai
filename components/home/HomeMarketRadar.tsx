@@ -77,7 +77,7 @@ export default function HomeMarketRadar({
       <div
         className={`home-market-radar-frame rounded-[23px] p-[2px] transition-all duration-500 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col ${
           highlighted
-            ? "scale-[1.012] bg-gradient-to-br from-sky-400 via-cyan-300 to-blue-600 shadow-[0_0_32px_rgba(14,165,233,0.22)]"
+            ? "bg-gradient-to-br from-sky-400 via-cyan-300 to-blue-600 shadow-[0_0_32px_rgba(14,165,233,0.22)]"
             : "bg-transparent"
         }`}
       >
