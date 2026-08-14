@@ -33,6 +33,11 @@ import { PropertyValidator } from '@/lib/services/PropertyValidator';
 import { AMENITY_OPTIONS, PROPERTY_FEATURE_GROUPS } from '@/lib/propertyFeatures';
 import { getPropertyFeatureIcon } from '@/lib/propertyFeatureIcons';
 import { shouldSyncSuggestedRentalDeposit } from '@/lib/rentalTerms';
+import {
+  getPropertyAvailability,
+  persistPropertyAvailability,
+  type PropertyAvailabilityStatus,
+} from '@/lib/propertyAvailability';
 
 interface PropertyEditorModalProps {
   isOpen: boolean;
@@ -67,6 +72,7 @@ type EditorForm = {
   maintenanceFeeAmount: string;
   internalCode: string;
   primaryOperation: Property['primaryOperation'];
+  commercialStatus: PropertyAvailabilityStatus;
   city: string;
   state: string;
   country: string;
@@ -134,12 +140,49 @@ type EditorForm = {
 };
 
 const TYPE_OPTIONS: Array<{ value: Property['type']; label: string }> = [
-  { value: 'Villa', label: 'Casa / Villa' },
+  { value: 'Villa', label: 'Casa' },
   { value: 'Apartment', label: 'Departamento' },
   { value: 'Penthouse', label: 'Penthouse' },
   { value: 'Beach House', label: 'Casa de playa' },
   { value: 'Cabin', label: 'Cabaña / Terreno' },
   { value: 'Loft', label: 'Loft' },
+];
+
+const AVAILABILITY_OPTIONS: Array<{
+  value: PropertyAvailabilityStatus;
+  label: string;
+  description: string;
+  dotClassName: string;
+  selectedClassName: string;
+}> = [
+  {
+    value: 'Disponible',
+    label: 'Disponible',
+    description: 'Lista para recibir interesados',
+    dotClassName: 'bg-emerald-500',
+    selectedClassName: 'border-emerald-400 bg-emerald-50/80 shadow-[0_10px_28px_rgba(16,185,129,0.12)]',
+  },
+  {
+    value: 'Apartada',
+    label: 'Apartada',
+    description: 'Reservada temporalmente',
+    dotClassName: 'bg-amber-500',
+    selectedClassName: 'border-amber-400 bg-amber-50/80 shadow-[0_10px_28px_rgba(245,158,11,0.12)]',
+  },
+  {
+    value: 'Rentada',
+    label: 'Rentada',
+    description: 'Con contrato de renta vigente',
+    dotClassName: 'bg-sky-500',
+    selectedClassName: 'border-sky-400 bg-sky-50/80 shadow-[0_10px_28px_rgba(14,165,233,0.12)]',
+  },
+  {
+    value: 'No disponible',
+    label: 'No disponible',
+    description: 'Fuera del mercado por ahora',
+    dotClassName: 'bg-slate-500',
+    selectedClassName: 'border-slate-400 bg-slate-100/90 shadow-[0_10px_28px_rgba(71,85,105,0.10)]',
+  },
 ];
 
 const NAV_ITEMS: Array<{
@@ -198,6 +241,7 @@ function formFromProperty(property: Property): EditorForm {
     maintenanceFeeAmount: stringValue(property.maintenanceFeeAmount),
     internalCode: property.internalCode || '',
     primaryOperation: property.primaryOperation || 'SWAP',
+    commercialStatus: getPropertyAvailability(property),
     city: inferredCity,
     state: inferredState,
     country: property.country || '',
@@ -582,13 +626,13 @@ export default function PropertyEditorModal({ isOpen, property, onClose, onSubmi
     // prevents views from rendering values such as "México, México".
     const location = [form.city.trim(), form.state.trim()].filter(Boolean).join(', ');
     const address = [form.streetName.trim(), form.streetNumber.trim()].filter(Boolean).join(' ');
-    const offerings = form.offerings.map((offering) => ({
+    const offerings = persistPropertyAvailability(form.offerings.map((offering) => ({
       ...offering,
       propertyId: property.id,
       title: form.title.trim(),
       description: form.description.trim(),
       status: offering.status,
-    }));
+    })), form.commercialStatus);
 
     const nextMediaSignature = JSON.stringify({ images: form.images, videoUrls: form.videoUrls, youtubeUrl: form.youtubeUrl, virtualTourUrl: form.virtualTourUrl });
     const initialMediaSignature = JSON.stringify({ images: initialForm.images, videoUrls: initialForm.videoUrls, youtubeUrl: initialForm.youtubeUrl, virtualTourUrl: initialForm.virtualTourUrl });
@@ -597,6 +641,7 @@ export default function PropertyEditorModal({ isOpen, property, onClose, onSubmi
       title: value.title,
       description: value.description,
       type: value.type,
+      commercialStatus: value.commercialStatus,
       location: [value.city, value.state, value.country, value.streetName, value.streetNumber],
       coordinates: [value.latitude, value.longitude],
       spaces: [value.bedrooms, value.bathrooms, value.parkingSpaces, value.surfaceTotal, value.surfaceBuilt],
@@ -627,6 +672,7 @@ export default function PropertyEditorModal({ isOpen, property, onClose, onSubmi
       title: form.title.trim(),
       description: form.description.trim(),
       type: form.type,
+      commercialStatus: form.commercialStatus,
       valueRating: form.valueRating,
       developmentName: form.developmentName.trim() || null,
       subdivisionName: form.subdivisionName.trim() || null,
@@ -842,6 +888,41 @@ export default function PropertyEditorModal({ isOpen, property, onClose, onSubmi
             <div className="mx-auto flex max-w-[1040px] flex-col gap-5 pb-28">
               <Section id="general" eyebrow="01 · Identidad" title="Información principal" description="Estos datos construyen la portada pública del anuncio y la presentación que utiliza Eterna.">
                 <div className="grid gap-4 md:grid-cols-2">
+                  <div className="md:col-span-2">
+                    <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">Disponibilidad</p>
+                        <p className="mt-1 text-sm text-slate-500">Actualiza rápidamente el estado comercial de esta propiedad.</p>
+                      </div>
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+                        Estado actual
+                      </span>
+                    </div>
+                    <div role="radiogroup" aria-label="Disponibilidad de la propiedad" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      {AVAILABILITY_OPTIONS.map((option) => {
+                        const isSelected = form.commercialStatus === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            onClick={() => update('commercialStatus', option.value)}
+                            className={`group flex min-h-20 items-center gap-3 rounded-2xl border p-3.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 ${isSelected ? option.selectedClassName : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md'}`}
+                          >
+                            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${option.dotClassName}`} aria-hidden="true" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-black text-slate-900">{option.label}</span>
+                              <span className="mt-0.5 block text-[11px] leading-4 text-slate-500">{option.description}</span>
+                            </span>
+                            <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full transition ${isSelected ? 'bg-slate-950 text-white' : 'bg-slate-100 text-transparent group-hover:text-slate-300'}`} aria-hidden="true">
+                              <Check className="h-3.5 w-3.5" />
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                   <Field label="Título del anuncio" required className="md:col-span-2"><input value={form.title} onChange={(event) => update('title', event.target.value)} className={inputClass} placeholder="Ej. Departamento con terraza privada" /></Field>
                   <Field label="Descripción" required hint={`${form.description.length} caracteres · Explica distribución, estado, entorno y ventajas.`} className="md:col-span-2"><textarea value={form.description} onChange={(event) => update('description', event.target.value)} rows={6} className={`${inputClass} resize-y py-3.5 leading-relaxed`} placeholder="Describe la propiedad con información útil y verificable…" /></Field>
                   <Field label="Tipo de propiedad"><select value={form.type} onChange={(event) => update('type', event.target.value as Property['type'])} className={inputClass}>{TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>

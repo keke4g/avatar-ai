@@ -386,7 +386,7 @@ export interface Property {
   appraisalValidity?: string;
   
   appreciationLevel?: 'Alta' | 'Media' | 'Baja' | 'En desarrollo';
-  commercialStatus?: 'Disponible' | 'Apartada' | 'Promesa de Compra' | 'En Escrituración' | 'Vendida' | 'Rentada' | 'Suspendida' | 'Bajo Oferta' | 'En negociación';
+  commercialStatus?: 'Disponible' | 'Apartada' | 'Promesa de Compra' | 'En Escrituración' | 'Vendida' | 'Rentada' | 'Suspendida' | 'Bajo Oferta' | 'En negociación' | 'No disponible';
   
   priceHistory?: {
     initialPrice: number;

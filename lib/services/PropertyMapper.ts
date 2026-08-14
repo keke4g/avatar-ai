@@ -1,6 +1,7 @@
 import { Property, PropertyOffering } from '../types';
 import { PropertyMediaMapper } from './PropertyMediaMapper';
 import { PROPERTY_COLUMNS } from '../db/propertySchema';
+import { getPropertyAvailability } from '../propertyAvailability';
 
 // Excepciones específicas de conversión camelCase <-> snake_case
 const camelToSnakeMap: Record<string, string> = {
@@ -191,6 +192,12 @@ export class PropertyMapper {
     const publisherContact = Array.isArray(row.publisher_contact)
       ? row.publisher_contact[0]
       : row.publisher_contact;
+    const offerings = row.property_offerings ? row.property_offerings.map(mapPostgresOffering) : [];
+    const commercialStatus = getPropertyAvailability({
+      commercialStatus: property.commercialStatus,
+      offerings,
+      primaryOperation: property.primaryOperation,
+    });
 
     return {
       ...property,
@@ -214,7 +221,8 @@ export class PropertyMapper {
       hostReviewsCount: row.host_reviews_count == null ? 0 : Number(row.host_reviews_count),
       availableStart: row.available_start || '',
       availableEnd: row.available_end || '',
-      offerings: row.property_offerings ? row.property_offerings.map(mapPostgresOffering) : [],
+      commercialStatus,
+      offerings,
     } as unknown as Property;
   }
 }

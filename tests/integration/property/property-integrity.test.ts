@@ -37,6 +37,10 @@ import {
 } from '../../../lib/valuation/ValuationEngine';
 import { mapMarketObservationToCatalogProperty } from '../../../lib/valuation/MarketObservationMapper';
 import { buildPresentationValuation } from '../../../features/properties/property-details/propertyValuation';
+import {
+  getPropertyAvailability,
+  persistPropertyAvailability,
+} from '../../../lib/propertyAvailability';
 
 const offering: PropertyOffering = {
   id: 'offering-1',
@@ -1286,4 +1290,29 @@ test('production valuation gate exposes three-comparable guidance without openin
     /grant execute on function public\.save_market_valuation_run\(jsonb\) to service_role;/,
   );
   assert.match(migration, /property_valuation_runs_property_created_idx/);
+});
+
+test('property availability persists in offering metadata and survives a reload', () => {
+  const updatedOfferings = persistPropertyAvailability([offering], 'Apartada');
+
+  assert.equal(updatedOfferings[0]?.metadata.commercialStatus, 'Apartada');
+  assert.equal(offering.metadata.commercialStatus, undefined);
+  assert.equal(getPropertyAvailability({
+    commercialStatus: undefined,
+    offerings: updatedOfferings,
+    primaryOperation: 'SALE',
+  }), 'Apartada');
+});
+
+test('legacy commercial states are simplified for property management', () => {
+  assert.equal(getPropertyAvailability({
+    commercialStatus: 'Bajo Oferta',
+    offerings: [],
+    primaryOperation: 'SALE',
+  }), 'Apartada');
+  assert.equal(getPropertyAvailability({
+    commercialStatus: 'Suspendida',
+    offerings: [],
+    primaryOperation: 'SALE',
+  }), 'No disponible');
 });
