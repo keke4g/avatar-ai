@@ -248,24 +248,36 @@ export default function HomeExperience() {
             font-size: 17px !important;
           }
 
-          .home-brief-status {
-            margin-top: 9px !important;
+          .home-mini-operation-tabs {
+            margin-top: 8px !important;
+          }
+
+          .home-mini-operation-tabs button {
             padding-top: 6px !important;
             padding-bottom: 6px !important;
           }
 
-          .home-brief-criteria {
-            margin-top: 9px !important;
-            gap: 5px !important;
+          .home-mini-search-field,
+          .home-mini-property-types,
+          .home-mini-budget {
+            margin-top: 7px !important;
           }
 
-          .home-brief-criterion,
-          .home-brief-budget {
-            padding: 7px 10px !important;
+          .home-mini-search-field {
+            height: 38px !important;
           }
 
-          .home-brief-budget {
-            margin-top: 5px !important;
+          .home-mini-type-card {
+            padding-top: 5px !important;
+            padding-bottom: 5px !important;
+          }
+
+          .home-mini-extra-types {
+            margin-top: 4px !important;
+          }
+
+          .home-mini-budget {
+            height: 32px !important;
           }
 
           .home-brief-matches {
@@ -274,10 +286,6 @@ export default function HomeExperience() {
 
           .home-brief-match-list {
             margin-top: 5px !important;
-          }
-
-          .home-brief-secondary-match {
-            display: none !important;
           }
 
           .home-brief-actions {
