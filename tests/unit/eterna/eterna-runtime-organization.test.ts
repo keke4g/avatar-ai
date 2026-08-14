@@ -51,6 +51,7 @@ import {
 import {
   buildHomeMiniSearchFilters,
   buildHomeMiniSearchUrl,
+  normalizeHomeMiniOperation,
   searchHomeMiniInventory,
 } from '../../../components/home/homeMiniSearch';
 import {
@@ -420,6 +421,8 @@ test('Eterna waits for the confirmed Towers profile before using a name', () => 
 });
 
 test('el Home construye un radar real y conserva los filtros al abrir Explorer', () => {
+  assert.equal(normalizeHomeMiniOperation(undefined), 'SALE');
+
   const makeProperty = (id: string, price: number, createdAt: string): Property => ({
     id,
     title: `Casa ${id}`,

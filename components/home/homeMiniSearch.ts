@@ -131,5 +131,5 @@ export const normalizeHomeMiniOperation = (
   if (value === 'sale') return 'SALE';
   if (value === 'rent') return 'RENT';
   if (value === 'swap') return 'SWAP';
-  return 'ALL';
+  return 'SALE';
 };

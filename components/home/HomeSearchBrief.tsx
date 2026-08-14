@@ -8,7 +8,9 @@ import {
   ArrowRight,
   Briefcase,
   Building2,
+  Check,
   ChevronDown,
+  Ellipsis,
   House,
   MessageCircle,
   Search,
@@ -55,20 +57,20 @@ interface CompactComposerProps {
 }
 
 const OPERATIONS: Array<{ id: OperationMode; es: string; en: string }> = [
-  { id: "ALL", es: "Todo", en: "All" },
   { id: "SALE", es: "Venta", en: "Sale" },
   { id: "RENT", es: "Renta", en: "Rent" },
   { id: "SWAP", es: "Intercambio", en: "Swap" },
+  { id: "ALL", es: "Todo", en: "All" },
 ];
 
 const PRIMARY_PROPERTY_TYPES = [
   { id: "Casas", es: "Casas", en: "Houses", icon: House },
   { id: "Departamentos", es: "Departamentos", en: "Apartments", icon: Building2 },
   { id: "Terrenos", es: "Terrenos", en: "Land", icon: Trees },
-  { id: "Lofts", es: "Lofts", en: "Lofts", icon: Warehouse },
 ] as const;
 
 const EXTRA_PROPERTY_TYPES = [
+  { id: "Lofts", es: "Lofts", en: "Lofts", icon: Warehouse },
   { id: "Locales", es: "Locales", en: "Retail", icon: Store },
   { id: "Oficinas", es: "Oficinas", en: "Offices", icon: Briefcase },
 ] as const;
@@ -177,11 +179,13 @@ export default function HomeSearchBrief({
   const { chatHistory, searchBrief } = eternaChatState;
   const [conversationOpen, setConversationOpen] = useState(false);
   const [showMoreTypes, setShowMoreTypes] = useState(false);
+  const [budgetOpen, setBudgetOpen] = useState(false);
   const [draftSelection, setDraftSelection] = useState<{
     baseline: string;
     value: HomeMiniSearchSelection;
   } | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const budgetRef = useRef<HTMLDivElement | null>(null);
 
   const externalOperation = activeSearch?.filters.operation || searchBrief.operation;
   const externalZone = activeSearch?.filters.city || searchBrief.city || "";
@@ -220,6 +224,22 @@ export default function HomeSearchBrief({
     });
   }, [chatHistory, conversationOpen]);
 
+  useEffect(() => {
+    if (!budgetOpen) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!budgetRef.current?.contains(event.target as Node)) setBudgetOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setBudgetOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [budgetOpen]);
+
   const filteredProperties = useMemo(() => (
     searchHomeMiniInventory(properties, selection)
   ), [properties, selection]);
@@ -233,6 +253,19 @@ export default function HomeSearchBrief({
   })), [filteredProperties, operation]);
 
   const budgetOptions = getHomeMiniBudgetOptions(operation);
+  const selectedBudgetIndex = budgetOptions.findIndex((option) => option.value === budget);
+  const selectedBudgetOption = selectedBudgetIndex >= 0
+    ? budgetOptions[selectedBudgetIndex]
+    : budgetOptions[0];
+  const selectedBudgetLabel = selectedBudgetOption
+    ? language === "es"
+      ? selectedBudgetOption.label
+      : getEnglishBudgetLabel(
+          selectedBudgetOption.value,
+          budgetOptions[selectedBudgetIndex - 1]?.value,
+          selectedBudgetIndex === budgetOptions.length - 1,
+        )
+    : language === "es" ? "Elige venta o renta" : "Choose sale or rent";
   const exploreUrl = buildHomeMiniSearchUrl(selection);
   const fieldClass = isDark
     ? "border-white/[0.07] bg-white/[0.025] focus-within:border-sky-300/35"
@@ -304,7 +337,10 @@ export default function HomeSearchBrief({
                 type="button"
                 role="tab"
                 aria-selected={isActive}
-                onClick={() => updateSelection({ operation: option.id, budget: "" })}
+                onClick={() => {
+                  updateSelection({ operation: option.id, budget: "" });
+                  setBudgetOpen(false);
+                }}
                 className={`min-w-0 rounded-full px-1 py-2 text-[7px] font-black uppercase tracking-[0.08em] transition-all ${
                   isActive
                     ? isDark
@@ -333,34 +369,10 @@ export default function HomeSearchBrief({
         </label>
 
         <div className="home-mini-property-types mt-2.5 shrink-0">
-          <div className="flex items-center justify-between gap-3 px-0.5">
+          <div className="flex items-center px-0.5">
             <span className={`text-[7px] font-extrabold uppercase tracking-[0.14em] ${labelClass}`}>
               {language === "es" ? "Tipo de propiedad" : "Property type"}
             </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => updateSelection({ propertyType: "All" })}
-                aria-pressed={propertyType === "All"}
-                className={`rounded-full px-2.5 py-1 text-[7px] font-black uppercase tracking-[0.08em] transition-colors ${
-                  propertyType === "All"
-                    ? isDark ? "bg-white text-zinc-950" : "bg-zinc-950 text-white"
-                    : isDark ? "bg-white/[0.04] text-white/45 hover:text-white" : "bg-zinc-100 text-zinc-500 hover:text-zinc-900"
-                }`}
-              >
-                {language === "es" ? "Todas" : "All"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowMoreTypes((value) => !value)}
-                aria-expanded={showMoreTypes}
-                className={`rounded-full px-2 py-1 text-[7px] font-black uppercase tracking-[0.08em] transition-colors ${isDark ? "text-sky-300/70 hover:bg-white/5 hover:text-sky-200" : "text-sky-700 hover:bg-sky-50"}`}
-              >
-                {showMoreTypes
-                  ? language === "es" ? "Ver menos" : "Less"
-                  : language === "es" ? "Ver más" : "More"}
-              </button>
-            </div>
           </div>
 
           <div className="mt-1.5 grid grid-cols-4 gap-1.5" role="group" aria-label={language === "es" ? "Tipos principales" : "Main property types"}>
@@ -370,7 +382,7 @@ export default function HomeSearchBrief({
                 <button
                   key={type.id}
                   type="button"
-                  onClick={() => updateSelection({ propertyType: type.id })}
+                  onClick={() => updateSelection({ propertyType: isActive ? "All" : type.id })}
                   aria-pressed={isActive}
                   className={`home-mini-type-card flex min-w-0 flex-col items-center justify-center gap-1 rounded-[13px] border px-1 py-2 transition-all ${
                     isActive
@@ -385,17 +397,32 @@ export default function HomeSearchBrief({
                 </button>
               );
             })}
+            <button
+              type="button"
+              onClick={() => setShowMoreTypes((value) => !value)}
+              aria-expanded={showMoreTypes}
+              className={`home-mini-type-card flex min-w-0 flex-col items-center justify-center gap-1 rounded-[13px] border px-1 py-2 transition-all ${
+                showMoreTypes
+                  ? isDark ? "border-white bg-white text-zinc-950" : "border-zinc-950 bg-zinc-950 text-white shadow-sm"
+                  : isDark ? "border-white/[0.07] bg-white/[0.025] text-sky-200/70 hover:border-white/20 hover:text-white" : "border-zinc-200 bg-white text-sky-700 hover:border-sky-300 hover:bg-sky-50"
+              }`}
+            >
+              <Ellipsis className="h-3.5 w-3.5" strokeWidth={2.1} aria-hidden="true" />
+              <span className="w-full truncate text-center text-[7px] font-extrabold tracking-[-0.01em]">
+                {language === "es" ? "Ver más" : "More"}
+              </span>
+            </button>
           </div>
 
           {showMoreTypes ? (
-            <div className="home-mini-extra-types mt-1.5 grid grid-cols-2 gap-1.5" role="group" aria-label={language === "es" ? "Más tipos" : "More property types"}>
+            <div className="home-mini-extra-types mt-1.5 grid grid-cols-3 gap-1.5" role="group" aria-label={language === "es" ? "Más tipos" : "More property types"}>
               {EXTRA_PROPERTY_TYPES.map((type) => {
                 const isActive = propertyType === type.id;
                 return (
                   <button
                     key={type.id}
                     type="button"
-                    onClick={() => updateSelection({ propertyType: type.id })}
+                    onClick={() => updateSelection({ propertyType: isActive ? "All" : type.id })}
                     aria-pressed={isActive}
                     className={`flex items-center justify-center gap-1.5 rounded-[12px] border px-2 py-1.5 text-[7px] font-extrabold transition-all ${
                       isActive
@@ -412,35 +439,63 @@ export default function HomeSearchBrief({
           ) : null}
         </div>
 
-        <label className={`home-mini-budget relative mt-2.5 flex h-9 shrink-0 items-center rounded-[14px] border px-3 transition-colors ${fieldClass} ${budgetOptions.length === 0 ? "opacity-60" : ""}`}>
-          <span className={`mr-2 shrink-0 text-[7px] font-extrabold uppercase tracking-[0.12em] ${labelClass}`}>
-            {language === "es" ? "Precio" : "Price"}
-          </span>
-          <select
-            value={budget}
-            onChange={(event) => updateSelection({ budget: event.target.value })}
+        <div ref={budgetRef} className="home-mini-budget relative z-20 mt-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => budgetOptions.length > 0 && setBudgetOpen((value) => !value)}
             disabled={budgetOptions.length === 0}
-            className={`min-w-0 flex-1 appearance-none bg-transparent pr-5 text-[9px] font-bold outline-none disabled:cursor-not-allowed ${controlClass}`}
-            aria-label={language === "es" ? "Rango de precio" : "Price range"}
+            aria-haspopup="listbox"
+            aria-expanded={budgetOpen}
+            className={`flex h-9 w-full items-center rounded-[14px] border px-3 text-left transition-all disabled:cursor-not-allowed ${fieldClass} ${budgetOptions.length === 0 ? "opacity-60" : budgetOpen ? isDark ? "border-sky-300/40" : "border-sky-500 shadow-[0_0_0_3px_rgba(14,165,233,0.08)]" : ""}`}
           >
-            {budgetOptions.length > 0 ? budgetOptions.map((option, index) => (
-              <option key={option.value || "any"} value={option.value} className="text-zinc-900">
-                {language === "es"
+            <span className={`mr-2 shrink-0 text-[7px] font-extrabold uppercase tracking-[0.12em] ${labelClass}`}>
+              {language === "es" ? "Precio" : "Price"}
+            </span>
+            <span className={`min-w-0 flex-1 truncate text-[9px] font-bold ${controlClass}`}>
+              {selectedBudgetLabel}
+            </span>
+            <ChevronDown className={`ml-2 h-3 w-3 shrink-0 transition-transform ${budgetOpen ? "rotate-180" : ""} ${labelClass}`} aria-hidden="true" />
+          </button>
+
+          {budgetOpen && budgetOptions.length > 0 ? (
+            <div
+              role="listbox"
+              aria-label={language === "es" ? "Rango de precio" : "Price range"}
+              className={`absolute inset-x-0 top-full z-30 mt-1.5 max-h-[190px] overflow-y-auto rounded-[16px] border p-1.5 shadow-[0_18px_45px_rgba(9,9,11,0.18)] backdrop-blur-xl scrollbar-thin ${isDark ? "border-white/10 bg-[#12161d]/[0.98]" : "border-zinc-200 bg-white/[0.98]"}`}
+            >
+              {budgetOptions.map((option, index) => {
+                const isSelected = option.value === budget;
+                const optionLabel = language === "es"
                   ? option.label
                   : getEnglishBudgetLabel(
                       option.value,
                       budgetOptions[index - 1]?.value,
                       index === budgetOptions.length - 1,
-                    )}
-              </option>
-            )) : (
-              <option value="" className="text-zinc-900">
-                {language === "es" ? "Elige venta o renta" : "Choose sale or rent"}
-              </option>
-            )}
-          </select>
-          <ChevronDown className={`pointer-events-none absolute right-3 h-3 w-3 ${labelClass}`} aria-hidden="true" />
-        </label>
+                    );
+                return (
+                  <button
+                    key={option.value || "any"}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => {
+                      updateSelection({ budget: option.value });
+                      setBudgetOpen(false);
+                    }}
+                    className={`flex w-full items-center justify-between gap-3 rounded-[11px] px-3 py-2 text-left text-[9px] font-bold transition-colors ${
+                      isSelected
+                        ? isDark ? "bg-white text-zinc-950" : "bg-zinc-950 text-white"
+                        : isDark ? "text-white/62 hover:bg-white/[0.06] hover:text-white" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950"
+                    }`}
+                  >
+                    <span>{optionLabel}</span>
+                    {isSelected ? <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.4} aria-hidden="true" /> : null}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
 
         <div className="home-brief-matches mt-4 flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="flex items-center justify-between gap-3">
