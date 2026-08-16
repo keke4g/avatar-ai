@@ -1331,6 +1331,7 @@ test('public property routes expose indexable server content and real not-found 
     'utf8',
   );
   const rootLayoutSource = readFileSync(resolve(process.cwd(), 'app/layout.tsx'), 'utf8');
+  const layoutContentSource = readFileSync(resolve(process.cwd(), 'app/_components/LayoutContent.tsx'), 'utf8');
   const liveContextSource = readFileSync(resolve(process.cwd(), 'lib/context/LiveContext.tsx'), 'utf8');
 
   assert.match(pageSource, /if \(!property \|\| property\.isDemo\) notFound\(\)/);
@@ -1339,6 +1340,7 @@ test('public property routes expose indexable server content and real not-found 
   assert.match(initialSummarySource, /<h1[^>]*>[\s\S]*\{property\.title\}/);
   assert.match(initialSummarySource, /\{property\.description\}/);
   assert.doesNotMatch(rootLayoutSource, /<Suspense fallback=\{null\}>/);
+  assert.match(layoutContentSource, /<Suspense fallback=\{null\}>\s*<DebugOverlay \/>\s*<\/Suspense>/);
   assert.match(liveContextSource, /<LiveContextSearchParamsSync onChange=\{setSearchParamsValue\} \/>/);
 });
 

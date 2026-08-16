@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import AuthRecoveryRedirect from "@/components/AuthRecoveryRedirect";
 import DebugOverlay from "@/components/DebugOverlay";
@@ -25,7 +25,9 @@ export default function LayoutContent({ children }: { children: ReactNode }) {
       <AuthRecoveryRedirect />
       {!hideHeader && <Navbar />}
       {!hideEterna && <EternaConcierge />}
-      <DebugOverlay />
+      <Suspense fallback={null}>
+        <DebugOverlay />
+      </Suspense>
       <main className={`flex-grow ${hideHeader ? "" : "pb-16 pt-24"}`}>
         {children}
       </main>
