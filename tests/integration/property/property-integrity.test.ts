@@ -1346,8 +1346,11 @@ test('public property routes expose indexable server content and real not-found 
 
 test('sitemap includes public information pages and property images', () => {
   const sitemapSource = readFileSync(resolve(process.cwd(), 'app/sitemap.ts'), 'utf8');
+  const publicPropertiesSource = readFileSync(resolve(process.cwd(), 'lib/seo/publicProperties.ts'), 'utf8');
 
   assert.match(sitemapSource, /'como-funciona'/);
   assert.match(sitemapSource, /'privacidad'/);
   assert.match(sitemapSource, /images: property\.images/);
+  assert.match(publicPropertiesSource, /\.in\('property_id', propertyIds\)/);
+  assert.match(publicPropertiesSource, /mediaByProperty\.get\(row\.id\)/);
 });

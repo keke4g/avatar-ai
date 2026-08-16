@@ -165,7 +165,29 @@ export const listPublicPropertiesForSitemap = async (): Promise<PublicPropertySe
     return [];
   }
 
-  return (data as unknown as PublicPropertyRow[]).map((row) => mapRecord(row));
+  const rows = data as unknown as PublicPropertyRow[];
+  const propertyIds = rows.map((row) => row.id);
+  if (propertyIds.length === 0) return [];
+
+  const { data: media, error: mediaError } = await client
+    .from('public_property_media_view')
+    .select('property_id,url,display_order,is_primary')
+    .in('property_id', propertyIds)
+    .eq('media_type', 'IMAGE')
+    .order('display_order', { ascending: true });
+
+  if (mediaError) {
+    console.warn('[seo] Unable to add property images to sitemap:', mediaError.message);
+  }
+
+  const mediaByProperty = new Map<string, PublicMediaRow[]>();
+  for (const item of (media || []) as PublicMediaRow[]) {
+    const propertyMedia = mediaByProperty.get(item.property_id) || [];
+    propertyMedia.push(item);
+    mediaByProperty.set(item.property_id, propertyMedia);
+  }
+
+  return rows.map((row) => mapRecord(row, mediaByProperty.get(row.id) || []));
 };
 
 export const getCanonicalPropertyUrl = (id: string): string =>
