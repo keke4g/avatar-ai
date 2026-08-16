@@ -1316,3 +1316,36 @@ test('legacy commercial states are simplified for property management', () => {
     primaryOperation: 'SALE',
   }), 'No disponible');
 });
+
+test('public property routes expose indexable server content and real not-found responses', () => {
+  const pageSource = readFileSync(
+    resolve(process.cwd(), 'app/property/[id]/page.tsx'),
+    'utf8',
+  );
+  const clientSource = readFileSync(
+    resolve(process.cwd(), 'app/property/[id]/_components/PropertyDetailsClient.tsx'),
+    'utf8',
+  );
+  const initialSummarySource = readFileSync(
+    resolve(process.cwd(), 'app/property/[id]/_components/PropertyIndexableSummary.tsx'),
+    'utf8',
+  );
+  const rootLayoutSource = readFileSync(resolve(process.cwd(), 'app/layout.tsx'), 'utf8');
+  const liveContextSource = readFileSync(resolve(process.cwd(), 'lib/context/LiveContext.tsx'), 'utf8');
+
+  assert.match(pageSource, /if \(!property \|\| property\.isDemo\) notFound\(\)/);
+  assert.match(pageSource, /initialContent=\{<PropertyIndexableSummary property=\{property\} \/>\}/);
+  assert.match(clientSource, /if \(initialContent\) return <>\{initialContent\}<\/>/);
+  assert.match(initialSummarySource, /<h1[^>]*>[\s\S]*\{property\.title\}/);
+  assert.match(initialSummarySource, /\{property\.description\}/);
+  assert.doesNotMatch(rootLayoutSource, /<Suspense fallback=\{null\}>/);
+  assert.match(liveContextSource, /<LiveContextSearchParamsSync onChange=\{setSearchParamsValue\} \/>/);
+});
+
+test('sitemap includes public information pages and property images', () => {
+  const sitemapSource = readFileSync(resolve(process.cwd(), 'app/sitemap.ts'), 'utf8');
+
+  assert.match(sitemapSource, /'como-funciona'/);
+  assert.match(sitemapSource, /'privacidad'/);
+  assert.match(sitemapSource, /images: property\.images/);
+});

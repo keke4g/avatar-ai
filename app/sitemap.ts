@@ -20,6 +20,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 0.9,
     },
+    ...[
+      'como-funciona',
+      'estandares',
+      'seguridad',
+      'tarifas',
+      'privacidad',
+      'terminos',
+      'cookies',
+      'eliminar-cuenta',
+    ].map((slug) => ({
+      url: `${origin}/info/${slug}`,
+      changeFrequency: 'monthly' as const,
+      priority: 0.5,
+    })),
   ];
 
   return [
@@ -29,6 +43,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: property.updatedAt || property.publishedAt || undefined,
       changeFrequency: 'weekly' as const,
       priority: 0.8,
+      images: property.images,
     })),
   ];
 }

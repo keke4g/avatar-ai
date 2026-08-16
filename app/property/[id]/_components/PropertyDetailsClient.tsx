@@ -70,9 +70,10 @@ import {
 
 interface PropertyDetailsClientProps {
   id: string;
+  initialContent?: React.ReactNode;
 }
 
-export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps) {
+export default function PropertyDetailsClient({ id, initialContent }: PropertyDetailsClientProps) {
   const router = useRouter();
   const { properties, myProperties, requestSwap, favorites, toggleFavorite, currentUser, swaps, createLead, loading } = useSwap();
   const { t, language } = useTranslation();
@@ -268,6 +269,8 @@ export default function PropertyDetailsClient({ id }: PropertyDetailsClientProps
 
   // If properties are still empty (initializing), render a loading skeleton
   if (!hasMounted || loading) {
+    if (initialContent) return <>{initialContent}</>;
+
     return (
       <div className="max-w-7xl mx-auto px-6 py-20 flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">

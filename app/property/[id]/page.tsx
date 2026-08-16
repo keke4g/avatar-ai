@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { getPublicAppOrigin } from '../../../lib/authUrls';
 import {
   getCanonicalPropertyUrl,
   getPublicPropertyForSeo,
 } from '../../../lib/seo/publicProperties';
 import PropertyDetailsClient from './_components/PropertyDetailsClient';
+import PropertyIndexableSummary from './_components/PropertyIndexableSummary';
 
 interface PropertyDetailsPageProps {
   params: Promise<{ id: string }>;
@@ -70,8 +72,9 @@ export default async function PropertyDetailsPage({ params }: PropertyDetailsPag
   const { id } = await params;
   const property = await getPublicPropertyForSeo(id);
 
-  const jsonLd = property && !property.isDemo
-    ? {
+  if (!property || property.isDemo) notFound();
+
+  const jsonLd = {
         '@context': 'https://schema.org',
         '@type': 'Residence',
         name: property.title,
@@ -100,20 +103,20 @@ export default async function PropertyDetailsPage({ params }: PropertyDetailsPag
               maxValue: property.maxGuests,
             }
           : undefined,
-      }
-    : null;
+      };
 
   return (
     <>
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c'),
-          }}
-        />
-      )}
-      <PropertyDetailsClient id={id} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c'),
+        }}
+      />
+      <PropertyDetailsClient
+        id={id}
+        initialContent={<PropertyIndexableSummary property={property} />}
+      />
     </>
   );
 }

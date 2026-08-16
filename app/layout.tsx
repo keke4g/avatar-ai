@@ -4,7 +4,6 @@ import "./globals.css";
 import { SwapProvider } from "../lib/context/SwapContext";
 import { LanguageProvider } from "../lib/context/LanguageContext";
 import { LiveContextProvider } from "../lib/context/LiveContext";
-import { Suspense } from "react";
 import { LayoutProvider } from "../lib/context/LayoutContext";
 import LayoutContent from "./_components/LayoutContent";
 
@@ -46,15 +45,13 @@ export default function RootLayout({
       <body className="font-sans antialiased bg-brand-gray-50 text-brand-black min-h-screen flex flex-col justify-between selection:bg-brand-accent/20 selection:text-brand-accent">
         <LanguageProvider>
           <SwapProvider>
-            <Suspense fallback={null}>
-              <LiveContextProvider>
-                <LayoutProvider>
-                  <LayoutContent>
-                    {children}
-                  </LayoutContent>
-                </LayoutProvider>
-              </LiveContextProvider>
-            </Suspense>
+            <LiveContextProvider>
+              <LayoutProvider>
+                <LayoutContent>
+                  {children}
+                </LayoutContent>
+              </LayoutProvider>
+            </LiveContextProvider>
           </SwapProvider>
         </LanguageProvider>
       </body>

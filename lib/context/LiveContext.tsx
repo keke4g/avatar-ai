@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, Suspense, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useSwap } from './SwapContext';
 import { Property } from '../types';
@@ -135,10 +135,24 @@ const defaultWizardState: LiveContextPayload['wizard'] = {
 
 const LiveContext = createContext<LiveContextType | undefined>(undefined);
 
+function LiveContextSearchParamsSync({
+  onChange,
+}: {
+  onChange: (value: string) => void;
+}) {
+  const searchParams = useSearchParams();
+  const serializedSearchParams = searchParams.toString();
+
+  useEffect(() => {
+    onChange(serializedSearchParams);
+  }, [onChange, serializedSearchParams]);
+
+  return null;
+}
+
 export function LiveContextProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { currentUser, properties } = useSwap();
 
   // 1. Local states for interactive visual components (excluding URL-derived states)
@@ -147,6 +161,7 @@ export function LiveContextProvider({ children }: { children: React.ReactNode })
   const [pendingIntent, setPendingIntentState] = useState<PendingIntent | null>(null);
   const [activeGuidedFlow, setActiveGuidedFlowState] = useState<string | null>(null);
   const [activeProperty, setActivePropertyState] = useState<Property | null>(null);
+  const [searchParamsValue, setSearchParamsValue] = useState('');
 
   // Eterna chat context states for homepage integration
   const [eternaChatState, setEternaChatStateInternal] = useState<EternaChatState>({
@@ -206,16 +221,15 @@ export function LiveContextProvider({ children }: { children: React.ReactNode })
   // 2. Derive dashboard activeTab directly from searchParams (URL is the single source of truth)
   const dashboardTab = useMemo(() => {
     if (pathname === '/dashboard') {
-      return searchParams.get('tab') || 'swaps';
+      return new URLSearchParams(searchParamsValue).get('tab') || 'swaps';
     }
     return null;
-  }, [pathname, searchParams]);
+  }, [pathname, searchParamsValue]);
 
   // 3. Synchronize url parameter directly from Next.js router
   const currentUrl = useMemo(() => {
-    const params = searchParams.toString();
-    return pathname + (params ? `?${params}` : '');
-  }, [pathname, searchParams]);
+    return pathname + (searchParamsValue ? `?${searchParamsValue}` : '');
+  }, [pathname, searchParamsValue]);
 
   // 4. Symmetrical listeners to restore states on mount
   useEffect(() => {
@@ -388,6 +402,9 @@ export function LiveContextProvider({ children }: { children: React.ReactNode })
         clearEternaCommand,
       }}
     >
+      <Suspense fallback={null}>
+        <LiveContextSearchParamsSync onChange={setSearchParamsValue} />
+      </Suspense>
       {children}
     </LiveContext.Provider>
   );
