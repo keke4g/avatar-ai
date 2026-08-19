@@ -75,11 +75,11 @@ export default function HomeMarketRadar({
       </div>
 
       <div
-        className={`home-market-radar-frame rounded-[23px] p-[2px] transition-all duration-500 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col ${
-          highlighted
-            ? "bg-gradient-to-br from-sky-400 via-cyan-300 to-blue-600 shadow-[0_0_32px_rgba(14,165,233,0.22)]"
+          className={`home-market-radar-frame rounded-[23px] p-[2px] transition-all duration-500 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col ${
+            highlighted
+            ? "home-radar-highlighted bg-gradient-to-br from-sky-400 via-cyan-300 to-blue-600 shadow-[0_0_32px_rgba(14,165,233,0.22)]"
             : "bg-transparent"
-        }`}
+          }`}
       >
         <div
           className={`home-market-radar-list grid snap-x snap-mandatory grid-flow-col auto-cols-[82%] gap-3 overflow-x-auto rounded-[21px] p-1 pb-2 scrollbar-none sm:auto-cols-[54%] lg:h-full lg:min-h-0 lg:grid-flow-row lg:auto-cols-auto lg:grid-rows-[repeat(3,minmax(0,1fr))] lg:gap-2.5 lg:overflow-hidden lg:p-1 ${

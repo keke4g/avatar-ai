@@ -6,9 +6,10 @@ import { DoubleBufferVideoPlayer } from "../DoubleBufferVideoPlayer";
 
 interface HeroVideoProps {
   avatarState: AvatarState;
+  isDark?: boolean;
 }
 
-export default function HeroVideo({ avatarState }: HeroVideoProps) {
+export default function HeroVideo({ avatarState, isDark = false }: HeroVideoProps) {
   const { startVoice } = useLiveContext();
   const [isInitialFrameReady, setIsInitialFrameReady] = useState(false);
 
@@ -100,20 +101,20 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
 
 
   // Border & Glow configuration based on avatarState
-  let frameBg = "rgba(120, 170, 255, 0.25)";
-  let glowShadow = "0 0 25px rgba(120, 170, 255, 0.12)";
+  let frameBg = isDark ? "rgba(216, 183, 119, 0.42)" : "rgba(120, 170, 255, 0.25)";
+  let glowShadow = isDark ? "0 0 32px rgba(216, 183, 119, 0.18)" : "0 0 25px rgba(120, 170, 255, 0.12)";
   let innerAnimationClass = "";
 
   if (avatarState === "LISTENING") {
-    frameBg = "#3B82F6";
-    glowShadow = "0 0 55px rgba(59, 130, 246, 0.35)";
+    frameBg = isDark ? "#2d9ac6" : "#3B82F6";
+    glowShadow = isDark ? "0 0 55px rgba(45, 154, 198, 0.32)" : "0 0 55px rgba(59, 130, 246, 0.35)";
   } else if (avatarState === "THINKING") {
-    frameBg = "#8B5CF6";
-    glowShadow = "0 0 55px rgba(139, 92, 246, 0.35)";
+    frameBg = isDark ? "#caa96b" : "#8B5CF6";
+    glowShadow = isDark ? "0 0 55px rgba(202, 169, 107, 0.3)" : "0 0 55px rgba(139, 92, 246, 0.35)";
     innerAnimationClass = "animate-border-glow-pulse";
   } else if (avatarState === "TALKING") {
-    frameBg = "#22C55E";
-    glowShadow = "0 0 65px rgba(34, 197, 94, 0.45)";
+    frameBg = isDark ? "#53a477" : "#22C55E";
+    glowShadow = isDark ? "0 0 65px rgba(83, 164, 119, 0.4)" : "0 0 65px rgba(34, 197, 94, 0.45)";
     innerAnimationClass = "animate-border-glow-breath";
   }
 
@@ -131,7 +132,7 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={(e) => handleTouchEnd(e, "Outer")}
-      className="home-hero-video relative flex items-center justify-center select-none w-full max-w-[340px] sm:max-w-[360px] mx-auto rounded-[32px] p-[3px] transition-all duration-300 ease-in-out mt-2 lg:mt-1 cursor-pointer"
+      className={`home-hero-video ${isDark ? "home-hero-video-dark" : ""} relative flex items-center justify-center select-none w-full max-w-[340px] sm:max-w-[360px] mx-auto rounded-[32px] p-[3px] transition-all duration-300 ease-in-out mt-2 lg:mt-1 cursor-pointer`}
       style={{
         height: "min(calc(var(--useful-height, 760px) - var(--home-hero-height-offset, 20px)), 760px)",
         aspectRatio: "9/16",
@@ -140,7 +141,7 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
     >
       {/* Glow Layer & Inner video wrapper */}
       <div
-        className={`relative w-full h-full rounded-[29px] overflow-hidden bg-slate-950 flex items-center justify-center transition-all duration-300 ease-in-out ${innerAnimationClass}`}
+        className={`home-hero-video-inner relative w-full h-full rounded-[29px] overflow-hidden bg-slate-950 flex items-center justify-center transition-all duration-300 ease-in-out ${innerAnimationClass}`}
         style={{
           boxShadow: glowShadow
         }}
@@ -209,11 +210,11 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
         */}
         <div
           aria-hidden="true"
-          className={`absolute inset-0 z-[15] overflow-hidden rounded-[28px] bg-[#080b10] transition-[opacity,visibility] duration-500 ease-out ${
+          className={`absolute inset-0 z-[15] overflow-hidden rounded-[28px] ${isDark ? "bg-[#080706]" : "bg-[#080b10]"} transition-[opacity,visibility] duration-500 ease-out ${
             isInitialFrameReady ? "invisible opacity-0" : "visible opacity-100"
           }`}
         >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_34%,rgba(30,154,207,0.20),transparent_24%),radial-gradient(circle_at_74%_78%,rgba(99,102,241,0.12),transparent_34%),linear-gradient(155deg,#111721_0%,#080b10_52%,#050608_100%)]" />
+          <div className={`absolute inset-0 ${isDark ? "bg-[radial-gradient(circle_at_50%_34%,rgba(216,183,119,0.18),transparent_24%),radial-gradient(circle_at_74%_78%,rgba(45,154,198,0.09),transparent_34%),linear-gradient(155deg,#18140e_0%,#080706_52%,#050504_100%)]" : "bg-[radial-gradient(circle_at_50%_34%,rgba(30,154,207,0.20),transparent_24%),radial-gradient(circle_at_74%_78%,rgba(99,102,241,0.12),transparent_34%),linear-gradient(155deg,#111721_0%,#080b10_52%,#050608_100%)]"}`} />
           <div className="absolute inset-0 opacity-[0.12] [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:42px_42px] [mask-image:linear-gradient(to_bottom,black,transparent_82%)]" />
           <div className="absolute -left-20 top-[22%] h-56 w-56 rounded-full border border-sky-300/10" />
           <div className="absolute -right-24 top-[8%] h-72 w-72 rounded-full border border-white/[0.06]" />
@@ -221,7 +222,7 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
           <div className="relative flex h-full flex-col px-7 pb-24 pt-8 sm:px-9 sm:pt-10">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.28em] text-sky-300/70">Towers México</p>
+                <p className={`text-[9px] font-black uppercase tracking-[0.28em] ${isDark ? "text-[#ecd29a]/80" : "text-sky-300/70"}`}>Towers México</p>
                 <p className="mt-1 text-[8px] font-bold uppercase tracking-[0.22em] text-white/30">Concierge inmobiliaria</p>
               </div>
               <span className="relative flex h-2 w-2">
@@ -235,12 +236,12 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
                 <div className="absolute inset-0 animate-[eterna-orbit_8s_linear_infinite] rounded-full border border-white/[0.08] motion-reduce:animate-none">
                   <span className="absolute left-1/2 top-[-3px] h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(103,232,249,0.95)]" />
                 </div>
-                <div className="absolute inset-4 animate-[eterna-orbit_12s_linear_infinite_reverse] rounded-full border border-sky-300/15 motion-reduce:animate-none">
-                  <span className="absolute bottom-[11px] right-[8px] h-1 w-1 rounded-full bg-indigo-300 shadow-[0_0_14px_rgba(165,180,252,0.9)]" />
+                <div className={`absolute inset-4 animate-[eterna-orbit_12s_linear_infinite_reverse] rounded-full border ${isDark ? "border-[#ecd29a]/15" : "border-sky-300/15"} motion-reduce:animate-none`}>
+                  <span className={`absolute bottom-[11px] right-[8px] h-1 w-1 rounded-full ${isDark ? "bg-[#ecd29a] shadow-[0_0_14px_rgba(236,210,154,0.72)]" : "bg-indigo-300 shadow-[0_0_14px_rgba(165,180,252,0.9)]"}`} />
                 </div>
                 <div className="absolute inset-9 rounded-full border border-white/10 bg-white/[0.035] shadow-[inset_0_0_36px_rgba(56,189,248,0.08),0_0_48px_rgba(14,165,233,0.08)] backdrop-blur-sm" />
                 <div className="relative flex h-12 w-12 items-center justify-center rounded-[17px] border border-white/10 bg-white/[0.07] shadow-[0_14px_40px_rgba(0,0,0,0.35)]">
-                  <span className="h-2.5 w-2.5 rotate-45 rounded-[3px] bg-gradient-to-br from-white via-cyan-200 to-sky-500 shadow-[0_0_20px_rgba(103,232,249,0.55)]" />
+                  <span className={`h-2.5 w-2.5 rotate-45 rounded-[3px] ${isDark ? "bg-gradient-to-br from-white via-[#ecd29a] to-[#a77d36] shadow-[0_0_20px_rgba(236,210,154,0.42)]" : "bg-gradient-to-br from-white via-cyan-200 to-sky-500 shadow-[0_0_20px_rgba(103,232,249,0.55)]"}`} />
                 </div>
               </div>
             </div>
@@ -249,7 +250,7 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
               <p className="text-[11px] font-black uppercase tracking-[0.32em] text-white">Eterna</p>
               <p className="mt-2 text-[9px] font-semibold tracking-[0.08em] text-white/42">Preparando tu experiencia</p>
               <div className="mt-4 h-px overflow-hidden bg-white/10">
-                <span className="block h-full w-1/2 animate-[eterna-line_1.35s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-cyan-300 to-transparent motion-reduce:animate-none" />
+                <span className={`block h-full w-1/2 animate-[eterna-line_1.35s_ease-in-out_infinite] bg-gradient-to-r from-transparent ${isDark ? "via-[#ecd29a]" : "via-cyan-300"} to-transparent motion-reduce:animate-none`} />
               </div>
             </div>
           </div>
@@ -290,6 +291,38 @@ export default function HeroVideo({ avatarState }: HeroVideoProps) {
         .animate-border-glow-breath {
           animation: border-glow-breath 4s infinite ease-in-out;
           transition: transform 0.3s ease-in-out;
+        }
+        .home-hero-video-dark .animate-border-glow-pulse {
+          animation-name: border-glow-pulse-dark;
+        }
+        .home-hero-video-dark .animate-border-glow-breath {
+          animation-name: border-glow-breath-dark;
+        }
+        @keyframes border-glow-pulse-dark {
+          0%, 100% {
+            box-shadow: 0 0 35px rgba(202, 169, 107, 0.3);
+          }
+          50% {
+            box-shadow: 0 0 55px rgba(202, 169, 107, 0.58);
+          }
+        }
+        @keyframes border-glow-breath-dark {
+          0%, 100% {
+            box-shadow: 0 0 45px rgba(83, 164, 119, 0.32);
+            transform: scale(1);
+          }
+          50% {
+            box-shadow: 0 0 65px rgba(83, 164, 119, 0.55);
+            transform: scale(1.006);
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-border-glow-pulse,
+          .animate-border-glow-breath,
+          .home-hero-video [class*="animate-[eterna-"] {
+            animation: none !important;
+            transition: none !important;
+          }
         }
       `}</style>
     </div>

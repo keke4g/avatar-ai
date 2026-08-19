@@ -1354,3 +1354,30 @@ test('sitemap includes public information pages and property images', () => {
   assert.match(publicPropertiesSource, /\.in\('property_id', propertyIds\)/);
   assert.match(publicPropertiesSource, /mediaByProperty\.get\(row\.id\)/);
 });
+
+test('the global theme defaults to dark while the marble artwork remains home-only', () => {
+  const themeSource = readFileSync(
+    resolve(process.cwd(), 'lib/context/ThemeContext.tsx'),
+    'utf8',
+  );
+  const rootLayoutSource = readFileSync(resolve(process.cwd(), 'app/layout.tsx'), 'utf8');
+  const navbarSource = readFileSync(resolve(process.cwd(), 'components/Navbar.tsx'), 'utf8');
+  const homeSource = readFileSync(
+    resolve(process.cwd(), 'components/home/HomeExperience.tsx'),
+    'utf8',
+  );
+  const globalStyles = readFileSync(resolve(process.cwd(), 'app/globals.css'), 'utf8');
+
+  assert.match(themeSource, /DEFAULT_THEME:\s*Theme\s*=\s*["']dark["']/);
+  assert.match(themeSource, /THEME_STORAGE_KEY\s*=\s*["']site_theme["']/);
+  assert.match(rootLayoutSource, /<ThemeProvider>/);
+  assert.match(rootLayoutSource, /data-theme="dark"/);
+  assert.match(rootLayoutSource, /id="theme-bootstrap"/);
+  assert.match(navbarSource, /useTheme\(\)/);
+  assert.match(homeSource, /towers-black-gold-marble\.webp/);
+  assert.match(homeSource, /towers-black-gold-marble-mobile\.webp/);
+  assert.match(globalStyles, /@custom-variant dark/);
+  assert.match(globalStyles, /BLACK MARBLE RESIDENCE/);
+  assert.doesNotMatch(rootLayoutSource, /towers-black-gold-marble/);
+  assert.doesNotMatch(globalStyles, /towers-black-gold-marble/);
+});

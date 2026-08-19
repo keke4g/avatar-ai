@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tailwind's dark utilities follow the explicit application theme class. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   
@@ -20,6 +23,18 @@
   --radius-md: 14px;
   --radius-lg: 18px;
   --radius-xl: 24px;
+
+  /* Black Marble Residence palette (used by the scoped dark system below). */
+  --color-residence-obsidian: #08090b;
+  --color-residence-carbon: #0d0f12;
+  --color-residence-graphite: #12161b;
+  --color-residence-slate: #181d24;
+  --color-residence-elevated: #20262e;
+  --color-residence-ink: #f3f0e9;
+  --color-residence-copy: #c7c9ce;
+  --color-residence-muted: #9ca3ad;
+  --color-residence-blue: #2f9bc4;
+  --color-residence-champagne: #d7b97e;
 }
 
 /* ========================================================
@@ -1099,5 +1114,427 @@ button:focus-visible > .liquid-glass-chevron {
     height: 76px;
     right: 38px;
     bottom: 36px;
+  }
+}
+
+/* ============================================================
+   BLACK MARBLE RESIDENCE · DARK SYSTEM
+   Explicitly scoped to `.dark` so the existing light theme remains
+   unchanged. The Home experience owns its own art direction and is
+   excluded whenever it is mounted in the document.
+   ============================================================ */
+
+.dark {
+  color-scheme: dark;
+  --residence-canvas: var(--color-residence-obsidian);
+  --residence-inset: var(--color-residence-carbon);
+  --residence-panel: var(--color-residence-graphite);
+  --residence-raised: var(--color-residence-slate);
+  --residence-floating: var(--color-residence-elevated);
+  --residence-ink: var(--color-residence-ink);
+  --residence-copy: var(--color-residence-copy);
+  --residence-muted: var(--color-residence-muted);
+  --residence-border: rgba(215, 185, 126, 0.17);
+  --residence-border-strong: rgba(215, 185, 126, 0.32);
+  --residence-border-subtle: rgba(226, 231, 238, 0.1);
+  --residence-blue: var(--color-residence-blue);
+  --residence-focus: #6ac7e8;
+  --shadow-premium: 0 12px 34px rgba(0, 0, 0, 0.32), 0 1px 0 rgba(255, 255, 255, 0.035);
+  --shadow-floating: 0 24px 64px rgba(0, 0, 0, 0.46), 0 2px 10px rgba(0, 0, 0, 0.24);
+  --shadow-glow: 0 0 24px rgba(47, 155, 196, 0.22);
+}
+
+/* Keep the page canvas dark even where the layout's light utility is present. */
+:where(.dark body, body.dark) {
+  background-color: var(--residence-canvas);
+  color: var(--residence-ink);
+}
+
+/* The Home shell and its descendants keep their existing visual language. */
+.dark:not(:has(.home-experience-shell)) :where(input, textarea, select) {
+  color: var(--residence-ink);
+  background-color: var(--residence-panel);
+  border-color: var(--residence-border);
+  accent-color: var(--residence-blue);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(input, textarea)::placeholder {
+  color: var(--residence-muted);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(option) {
+  color: var(--residence-ink);
+  background-color: var(--residence-panel);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(button, a, input, textarea, select, [role="button"]):focus-visible {
+  outline: 2px solid var(--residence-focus);
+  outline-offset: 2px;
+}
+
+.dark:not(:has(.home-experience-shell)) ::selection {
+  color: var(--residence-ink);
+  background-color: rgba(47, 155, 196, 0.34);
+}
+
+/* Light utility surfaces become charcoal layers. Media, maps, and existing
+   dark media surfaces are intentionally not selected here. */
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="bg-white"],
+  [class~="bg-white/40"], [class~="bg-white/50"], [class~="bg-white/70"],
+  [class~="bg-white/75"], [class~="bg-white/80"], [class~="bg-white/85"],
+  [class~="bg-white/88"], [class~="bg-white/90"], [class~="bg-white/95"],
+  [class~="bg-white/96"], [class~="bg-white/98"]
+) {
+  background-color: var(--residence-raised);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="bg-brand-gray-50"], [class~="bg-brand-gray-50/10"], [class~="bg-brand-gray-50/20"],
+  [class~="bg-brand-gray-50/40"], [class~="bg-brand-gray-50/50"], [class~="bg-brand-gray-50/55"],
+  [class~="bg-brand-gray-50/60"], [class~="bg-brand-gray-50/65"], [class~="bg-brand-gray-50/70"],
+  [class~="bg-brand-gray-50/80"], [class~="bg-brand-gray-50/90"],
+  [class~="bg-slate-50"], [class~="bg-slate-50/70"], [class~="bg-slate-50/80"], [class~="bg-slate-50/85"],
+  [class~="bg-zinc-50"], [class~="bg-neutral-50"], [class~="bg-neutral-50/35"],
+  [class~="bg-neutral-50/45"], [class~="bg-neutral-50/55"], [class~="bg-neutral-50/60"], [class~="bg-neutral-50/70"]
+) {
+  background-color: var(--residence-panel);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="bg-brand-gray-100"], [class~="bg-brand-gray-100/50"], [class~="bg-brand-gray-100/80"],
+  [class~="bg-slate-100"], [class~="bg-slate-100/80"], [class~="bg-slate-100/90"],
+  [class~="bg-zinc-100"], [class~="bg-zinc-100/90"], [class~="bg-neutral-100"]
+) {
+  background-color: var(--residence-raised);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="bg-brand-gray-200"], [class~="bg-brand-gray-200/40"], [class~="bg-brand-gray-300"],
+  [class~="bg-slate-200"], [class~="bg-zinc-200"], [class~="bg-zinc-200/80"], [class~="bg-neutral-200"]
+) {
+  background-color: var(--residence-floating);
+}
+
+/* Hover/focus states stay one layer above their resting surface. */
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="hover:bg-white"], [class~="hover:bg-white/90"],
+  [class~="hover:bg-brand-gray-50"], [class~="hover:bg-brand-gray-50/50"],
+  [class~="hover:bg-brand-gray-100"], [class~="hover:bg-brand-gray-100/50"],
+  [class~="hover:bg-brand-gray-200"], [class~="hover:bg-slate-50"], [class~="hover:bg-slate-100"],
+  [class~="hover:bg-zinc-50"], [class~="hover:bg-zinc-100"], [class~="hover:bg-zinc-200"],
+  [class~="hover:bg-neutral-50"], [class~="hover:bg-neutral-50/70"]
+):hover {
+  background-color: var(--residence-floating);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="focus:bg-white"], [class~="focus:bg-brand-gray-50"], [class~="focus:bg-brand-gray-50/50"],
+  [class~="focus:bg-slate-50"], [class~="focus:bg-zinc-50"], [class~="focus:bg-neutral-50"]
+):focus {
+  background-color: var(--residence-floating);
+}
+
+/* Champaña is reserved for quiet structure; status hues remain semantic. */
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="border-brand-gray-100"], [class~="border-brand-gray-100/50"],
+  [class~="border-brand-gray-150"], [class~="border-brand-gray-200"],
+  [class~="border-brand-gray-200/30"], [class~="border-brand-gray-200/35"],
+  [class~="border-brand-gray-200/40"], [class~="border-brand-gray-200/50"],
+  [class~="border-brand-gray-200/60"], [class~="border-brand-gray-200/70"],
+  [class~="border-brand-gray-200/80"], [class~="border-brand-gray-200/90"],
+  [class~="border-brand-gray-205"], [class~="border-brand-gray-300"], [class~="border-brand-gray-400"],
+  [class~="border-slate-100"], [class~="border-slate-200"], [class~="border-slate-200/20"],
+  [class~="border-slate-200/80"], [class~="border-slate-300"],
+  [class~="border-zinc-200"], [class~="border-zinc-200/50"], [class~="border-zinc-200/70"],
+  [class~="border-zinc-200/75"], [class~="border-zinc-200/80"], [class~="border-zinc-200/85"],
+  [class~="border-zinc-200/90"], [class~="border-zinc-300"],
+  [class~="border-neutral-100"], [class~="border-neutral-200"], [class~="border-neutral-200/70"],
+  [class~="border-neutral-200/75"], [class~="border-neutral-200/80"], [class~="border-neutral-200/90"],
+  [class~="border-neutral-300"], [class~="border-black/5"], [class~="border-black/10"]
+) {
+  border-color: var(--residence-border);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="focus:border-brand-gray-200"], [class~="focus:border-brand-gray-200/80"],
+  [class~="focus:border-slate-200"], [class~="focus:border-zinc-200"], [class~="focus:border-neutral-200"]
+):focus {
+  border-color: var(--residence-border-strong);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="divide-brand-gray-200"], [class~="divide-brand-gray-200/40"],
+  [class~="divide-slate-200"], [class~="divide-zinc-200"], [class~="divide-neutral-200"]
+) > :not(:last-child) {
+  border-color: var(--residence-border);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="ring-brand-gray-100"], [class~="ring-zinc-200/55"], [class~="ring-slate-200"]
+) {
+  --tw-ring-color: var(--residence-border-strong);
+}
+
+/* Readable ink hierarchy for utilities that were authored for white pages. */
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="text-brand-black"], [class~="text-brand-gray-700"], [class~="text-neutral-800"],
+  [class~="text-neutral-900"], [class~="text-neutral-950"], [class~="text-slate-800"],
+  [class~="text-slate-900"], [class~="text-slate-950"], [class~="text-zinc-800"],
+  [class~="text-zinc-900"], [class~="text-zinc-950"]
+) {
+  color: var(--residence-ink);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="text-brand-gray-500"], [class~="text-brand-gray-600"], [class~="text-brand-gray-650"],
+  [class~="text-neutral-500"], [class~="text-neutral-600"], [class~="text-neutral-700"],
+  [class~="text-slate-500"], [class~="text-slate-600"], [class~="text-slate-700"],
+  [class~="text-zinc-500"], [class~="text-zinc-500/80"], [class~="text-zinc-500/85"],
+  [class~="text-zinc-600"], [class~="text-zinc-700"]
+) {
+  color: var(--residence-copy);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="text-brand-gray-200"], [class~="text-brand-gray-300"], [class~="text-brand-gray-300/40"],
+  [class~="text-brand-gray-400"], [class~="text-brand-gray-550"], [class~="text-brand-gray-555"],
+  [class~="text-neutral-300"], [class~="text-neutral-400"], [class~="text-slate-100"],
+  [class~="text-slate-200"], [class~="text-slate-300"], [class~="text-slate-400"],
+  [class~="text-zinc-300"], [class~="text-zinc-400"], [class~="text-zinc-400/80"]
+) {
+  color: var(--residence-muted);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="hover:text-brand-black"], [class~="hover:text-neutral-950"], [class~="hover:text-slate-950"],
+  [class~="hover:text-zinc-700"], [class~="hover:text-zinc-900"], [class~="hover:text-zinc-950"]
+):hover {
+  color: var(--residence-ink);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="placeholder:text-brand-gray-400"]::placeholder,
+  [class~="placeholder:text-slate-300"]::placeholder,
+  [class~="placeholder:text-zinc-400"]::placeholder
+) {
+  color: var(--residence-muted);
+}
+
+/* State tints remain rose/emerald/amber, but their light-mode surfaces and
+   dark-mode text values are lifted enough to remain legible on charcoal. */
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="bg-rose-50"], [class~="bg-rose-50/5"], [class~="bg-rose-50/10"],
+  [class~="bg-rose-100"], [class~="bg-rose-500/10"]
+) {
+  background-color: color-mix(in srgb, #e11d48 18%, var(--residence-panel));
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="bg-emerald-50"], [class~="bg-emerald-50/50"], [class~="bg-emerald-50/80"],
+  [class~="bg-emerald-100"], [class~="bg-emerald-100/40"], [class~="bg-emerald-100/80"],
+  [class~="bg-emerald-500/10"]
+) {
+  background-color: color-mix(in srgb, #059669 18%, var(--residence-panel));
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="bg-amber-50"], [class~="bg-amber-50/60"], [class~="bg-amber-50/70"],
+  [class~="bg-amber-100"], [class~="bg-amber-100/80"], [class~="bg-amber-500/10"]
+) {
+  background-color: color-mix(in srgb, #d97706 20%, var(--residence-panel));
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="text-rose-700"], [class~="text-rose-600"], [class~="text-rose-500"],
+  [class~="text-emerald-700"], [class~="text-emerald-800"], [class~="text-emerald-600"],
+  [class~="text-amber-700"], [class~="text-amber-800"], [class~="text-amber-900/75"],
+  [class~="text-amber-950"]
+) {
+  color: #f5c76c;
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="text-rose-700"], [class~="text-rose-600"], [class~="text-rose-500"]
+) {
+  color: #fb7185;
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="text-emerald-700"], [class~="text-emerald-800"], [class~="text-emerald-600"]
+) {
+  color: #6ee7b7;
+}
+
+.dark:not(:has(.home-experience-shell)) :where(
+  [class~="border-rose-100"], [class~="border-rose-200"], [class~="border-rose-200/50"],
+  [class~="border-rose-300"], [class~="border-rose-300/35"],
+  [class~="border-emerald-100"], [class~="border-emerald-200"], [class~="border-emerald-200/20"],
+  [class~="border-emerald-200/30"], [class~="border-emerald-200/35"], [class~="border-emerald-200/40"],
+  [class~="border-emerald-200/50"], [class~="border-emerald-300"],
+  [class~="border-amber-100"], [class~="border-amber-200"], [class~="border-amber-200/20"],
+  [class~="border-amber-200/30"], [class~="border-amber-200/50"], [class~="border-amber-300"],
+  [class~="border-amber-300/35"]
+) {
+  border-color: color-mix(in srgb, var(--residence-border-strong) 76%, currentColor 24%);
+}
+
+/* Elevation, glass, loading, and table primitives. */
+.dark:not(:has(.home-experience-shell)) :where(.shadow-premium) {
+  box-shadow: var(--shadow-premium);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(.shadow-floating) {
+  box-shadow: var(--shadow-floating);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(.glass) {
+  background:
+    linear-gradient(145deg, rgba(34, 41, 50, 0.88), rgba(13, 16, 20, 0.82)),
+    radial-gradient(circle at 14% 0%, rgba(215, 185, 126, 0.1), transparent 44%);
+  border-color: var(--residence-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), var(--shadow-premium);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(.glass-dark) {
+  background: rgba(8, 9, 11, 0.9);
+  border-color: var(--residence-border-subtle);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(.skeleton-loading) {
+  background: linear-gradient(90deg, var(--residence-panel) 25%, var(--residence-floating) 50%, var(--residence-panel) 75%);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(table) {
+  color: var(--residence-copy);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(th) {
+  color: var(--residence-ink);
+  border-color: var(--residence-border);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(td) {
+  border-color: var(--residence-border-subtle);
+}
+
+/* Native and custom scrollbars share the same restrained graphite/champagne treatment. */
+.dark:not(:has(.home-experience-shell)) :where(*) {
+  scrollbar-color: var(--residence-border-strong) var(--residence-canvas);
+}
+
+.dark:not(:has(.home-experience-shell)) ::-webkit-scrollbar-track {
+  background: var(--residence-canvas);
+}
+
+.dark:not(:has(.home-experience-shell)) ::-webkit-scrollbar-thumb {
+  background: var(--residence-border-strong);
+}
+
+.dark:not(:has(.home-experience-shell)) ::-webkit-scrollbar-thumb:hover {
+  background: var(--residence-blue);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(.select-scrollbar) {
+  scrollbar-color: var(--residence-blue) var(--residence-panel);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(.select-scrollbar)::-webkit-scrollbar-track {
+  background: var(--residence-panel);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(.select-scrollbar)::-webkit-scrollbar-thumb {
+  background: var(--residence-blue);
+  border-color: var(--residence-panel);
+}
+
+/* The Explorer search is an older liquid-glass primitive with fixed light
+   colors. Refinish it as smoked glass instead of leaving a bright strip in
+   the middle of the dark catalog. */
+.dark:not(:has(.home-experience-shell)) :where(.liquid-glass-search) {
+  background:
+    linear-gradient(145deg, rgba(31, 37, 46, 0.96), rgba(14, 17, 22, 0.94) 52%, rgba(22, 29, 36, 0.96)),
+    radial-gradient(circle at 16% 0%, rgba(215, 185, 126, 0.1), transparent 42%);
+  border-color: var(--residence-border-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 -1px 0 rgba(215, 185, 126, 0.08),
+    0 20px 48px rgba(0, 0, 0, 0.3);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(.liquid-glass-search)::before {
+  background:
+    linear-gradient(105deg, transparent 0 24%, rgba(255, 255, 255, 0.035) 38%, transparent 54%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 24%);
+  opacity: 1;
+}
+
+.dark:not(:has(.home-experience-shell)) :where(.liquid-glass-search)::after {
+  border-color: rgba(215, 185, 126, 0.12);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(.hero-search-shell input) {
+  color: var(--residence-ink) !important;
+  background: transparent !important;
+}
+
+.dark:not(:has(.home-experience-shell)) :where(.hero-search-shell input)::placeholder {
+  color: var(--residence-muted) !important;
+}
+
+.dark:not(:has(.home-experience-shell)) :where(.hero-search-divider) {
+  background: linear-gradient(180deg, transparent, var(--residence-border-strong), transparent);
+}
+
+.dark:not(:has(.home-experience-shell)) :where(.hero-search-mobile-row) {
+  color: var(--residence-ink);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), inset 0 -1px 0 rgba(215, 185, 126, 0.08);
+}
+
+/* Consent is rendered outside the Home shell. It still needs to belong to the
+   active dark residence on a visitor's very first page view. */
+.dark :where([aria-labelledby="privacy-consent-title"]) {
+  color: var(--residence-copy);
+  background:
+    linear-gradient(145deg, rgba(28, 34, 42, 0.98), rgba(10, 12, 16, 0.985)),
+    radial-gradient(circle at 8% 0%, rgba(215, 185, 126, 0.12), transparent 46%);
+  border-color: var(--residence-border-strong);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.dark :where([aria-labelledby="privacy-consent-title"]) :where(
+  [class~="text-neutral-950"], [class~="text-neutral-900"]
+) {
+  color: var(--residence-ink);
+}
+
+.dark :where([aria-labelledby="privacy-consent-title"]) :where(
+  [class~="text-neutral-500"], [class~="text-neutral-600"]
+) {
+  color: var(--residence-copy);
+}
+
+.dark :where([aria-labelledby="privacy-consent-title"]) :where(
+  [class~="bg-white"], [class~="bg-neutral-50"]
+) {
+  color: var(--residence-ink);
+  background-color: var(--residence-raised);
+}
+
+.dark :where([aria-labelledby="privacy-consent-title"]) :where(
+  [class~="border-black/10"], [class~="border-neutral-200"], [class~="border-neutral-300"]
+) {
+  border-color: var(--residence-border);
+}
+
+/* Respect reduced motion for both utilities and the existing cinematic classes. */
+@media (prefers-reduced-motion: reduce) {
+  :where(*, *::before, *::after) {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    scroll-behavior: auto;
+    transition-duration: 0.01ms;
   }
 }

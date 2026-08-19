@@ -7,14 +7,16 @@ import HomeMarketRadar from "./HomeMarketRadar";
 import HomeSearchBrief from "./HomeSearchBrief";
 import { useLayoutContext } from "../../lib/context/LayoutContext";
 import { useTranslation } from "../../lib/context/LanguageContext";
+import { useTheme } from "@/lib/context/ThemeContext";
 import { Sun, Moon } from "lucide-react";
+import styles from "./homeExperience.module.css";
 
 export default function HomeExperience() {
   const { setHideHeader, setHideFooter } = useLayoutContext();
   const { language } = useTranslation();
+  const { theme, isDark, toggleTheme } = useTheme();
   const [searchInput, setSearchInput] = useState("");
   const [navbarHeight, setNavbarHeight] = useState(80);
-  const [isDark, setIsDark] = useState(false);
   const [highlightActions, setHighlightActions] = useState(false);
 
   useEffect(() => {
@@ -29,15 +31,6 @@ export default function HomeExperience() {
     };
   }, []);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("home_theme");
-      setTimeout(() => {
-        setIsDark(stored === "dark");
-      }, 0);
-    }
-  }, []);
-
   // Force scroll viewport to top on load and mount to prevent viewport jumps on home page loading
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -48,15 +41,6 @@ export default function HomeExperience() {
       return () => clearTimeout(timer);
     }
   }, []);
-
-  const toggleTheme = () => {
-    const nextDark = !isDark;
-    setIsDark(nextDark);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("home_theme", nextDark ? "dark" : "light");
-      window.dispatchEvent(new CustomEvent("home-theme-change", { detail: nextDark ? "dark" : "light" }));
-    }
-  };
 
   useEffect(() => {
     setHideHeader(true);
@@ -111,8 +95,9 @@ export default function HomeExperience() {
   }, []);
 
   return (
-    <div 
-      className={`home-experience-shell relative w-full min-h-dvh lg:fixed lg:inset-0 lg:h-dvh flex flex-col justify-start overflow-x-hidden lg:overflow-hidden pb-6 lg:pb-0 transition-colors duration-300 ${
+    <div
+      data-theme={theme}
+      className={`${styles.homeShell} ${isDark ? styles.darkTheme : styles.lightTheme} home-experience-shell relative w-full min-h-dvh lg:fixed lg:inset-0 lg:h-dvh flex flex-col justify-start overflow-x-hidden lg:overflow-hidden pb-6 lg:pb-0 transition-colors duration-300 ${
         isDark ? "bg-[#030303] text-white" : "bg-[#fafafa] text-[#18181b]"
       }`}
       style={{
@@ -121,12 +106,35 @@ export default function HomeExperience() {
         "--useful-height": "calc(var(--home-shell-height) - 72px)",
       } as React.CSSProperties}
     >
+      {/* The marble texture is intentionally mounted only for the dark residence. */}
+      <div
+        aria-hidden="true"
+        className={`${styles.darkTexture} ${styles.darkTextureDesktop} pointer-events-none z-0`}
+        style={{
+          backgroundImage: isDark
+            ? "url('/images/home/towers-black-gold-marble.webp')"
+            : "none",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className={`${styles.darkTexture} ${styles.darkTextureMobile} pointer-events-none z-0`}
+        style={{
+          backgroundImage: isDark
+            ? "url('/images/home/towers-black-gold-marble-mobile.webp')"
+            : "none",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className={`${styles.darkVignette} pointer-events-none z-0`}
+      />
       {/* Radial dark/light premium background */}
-      <div 
-        className="absolute inset-0 pointer-events-none z-0 transition-opacity duration-500" 
+      <div
+        className="absolute inset-0 pointer-events-none z-0 transition-opacity duration-500"
         style={{
           background: isDark
-            ? "radial-gradient(circle at center, #0f0f15 0%, #030303 100%)"
+            ? "radial-gradient(circle at 50% 30%, rgba(29, 26, 20, 0.24) 0%, rgba(7, 7, 6, 0.82) 48%, #060605 100%)"
             : "radial-gradient(circle at top, #ffffff 0%, #f4f4f7 100%)",
         }}
       />
@@ -172,7 +180,7 @@ export default function HomeExperience() {
         {/* Center Column: Eterna prompt guide + avatar */}
         <div className="home-center-column order-1 flex w-full flex-shrink-0 flex-col items-center justify-start gap-5 lg:order-2 lg:h-full lg:min-h-0 lg:gap-6">
           <EternaPromptRail isDark={isDark} language={language} />
-          <HomeHero />
+          <HomeHero isDark={isDark} />
         </div>
 
         {/* Right Column: live search brief, with conversation as a secondary layer */}

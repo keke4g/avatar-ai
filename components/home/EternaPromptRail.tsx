@@ -70,25 +70,25 @@ export default function EternaPromptRail({ isDark, language }: EternaPromptRailP
   }, [prompts.length]);
 
   return (
-    <div className="relative z-20 mx-auto w-full max-w-[340px] shrink-0 px-1 sm:max-w-[520px] lg:w-[500px] lg:max-w-none xl:w-[560px]">
+    <div className="home-eterna-prompt-rail relative z-20 mx-auto w-full max-w-[340px] shrink-0 px-1 sm:max-w-[520px] lg:w-[500px] lg:max-w-none xl:w-[560px]">
       <div
         role="note"
         aria-label={language === "es" ? "Ideas para hablar con Eterna" : "Ideas for talking to Eterna"}
         className={`relative flex h-[72px] w-full items-center overflow-visible rounded-[23px] border px-4 text-left backdrop-blur-2xl sm:h-16 sm:px-5 ${
-          isDark
-            ? "border-white/10 bg-[#101017]/88 text-white shadow-[0_16px_42px_rgba(0,0,0,0.38)]"
-            : "border-white/95 bg-white/88 text-zinc-950 shadow-[0_14px_38px_rgba(24,24,27,0.09)] ring-1 ring-zinc-200/55"
+            isDark
+              ? "border-[#e8cf9d]/20 bg-[#0a0908]/88 text-[#f5f1e8] shadow-[0_16px_42px_rgba(0,0,0,0.38)]"
+              : "border-white/95 bg-white/88 text-zinc-950 shadow-[0_14px_38px_rgba(24,24,27,0.09)] ring-1 ring-zinc-200/55"
         }`}
       >
         <span
           aria-hidden="true"
           className={`pointer-events-none absolute inset-y-0 left-0 w-28 rounded-l-[23px] opacity-70 blur-2xl ${
-            isDark ? "bg-blue-500/15" : "bg-violet-300/25"
+            isDark ? "bg-[#d8b777]/[0.12]" : "bg-violet-300/25"
           }`}
         />
 
         <span className={`relative mr-3.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] ${
-          isDark ? "bg-white/10 text-blue-300" : "bg-[#6C63FF]/9 text-[#6258F5]"
+          isDark ? "bg-[#d8b777]/[0.12] text-[#ecd29a]" : "bg-[#6C63FF]/9 text-[#6258F5]"
         }`}>
           <MessageCircle className="h-[18px] w-[18px]" />
         </span>
@@ -96,7 +96,7 @@ export default function EternaPromptRail({ isDark, language }: EternaPromptRailP
         <span className="relative min-w-0 flex-1">
           <span className={`mb-1 inline-flex rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.18em] ${
             isDark
-              ? "bg-white/[0.035] text-blue-200/45 ring-1 ring-white/[0.05]"
+              ? "bg-white/[0.035] text-[#ecd29a]/65 ring-1 ring-[#e8cf9d]/[0.12]"
               : "bg-[#655BFF]/[0.06] text-[#655BFF]/60 ring-1 ring-[#655BFF]/10"
           }`}>
             {language === "es" ? "Dile a Eterna" : "Say to Eterna"}
@@ -125,7 +125,7 @@ export default function EternaPromptRail({ isDark, language }: EternaPromptRailP
               <motion.span
                 key={`glint-${language}-${activeIndex}`}
                 aria-hidden="true"
-                className="pointer-events-none absolute -inset-y-1 left-0 w-14 bg-gradient-to-r from-transparent via-[#8A82FF]/35 to-transparent blur-[2px]"
+                className={`pointer-events-none absolute -inset-y-1 left-0 w-14 bg-gradient-to-r from-transparent ${isDark ? "via-[#ecd29a]/30" : "via-[#8A82FF]/35"} to-transparent blur-[2px]`}
                 initial={{ x: "-180%", opacity: 0 }}
                 animate={{ x: "720%", opacity: [0, 0.75, 0] }}
                 transition={{ duration: 0.9, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
@@ -138,7 +138,7 @@ export default function EternaPromptRail({ isDark, language }: EternaPromptRailP
           <motion.span
             key={`progress-${language}-${activeIndex}`}
             aria-hidden="true"
-            className="absolute inset-x-7 bottom-0 h-px origin-left bg-gradient-to-r from-transparent via-[#6C63FF] to-transparent"
+            className={`absolute inset-x-7 bottom-0 h-px origin-left bg-gradient-to-r from-transparent ${isDark ? "via-[#d8b777]" : "via-[#6C63FF]"} to-transparent`}
             initial={{ scaleX: 0, opacity: 0.15 }}
             animate={{ scaleX: 1, opacity: 0.75 }}
             transition={{ duration: 5.5, ease: "linear" }}
@@ -148,7 +148,7 @@ export default function EternaPromptRail({ isDark, language }: EternaPromptRailP
         <span
           aria-hidden="true"
           className={`absolute -bottom-[7px] left-1/2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-b border-r ${
-            isDark ? "border-white/10 bg-[#101017]" : "border-zinc-200/70 bg-white"
+            isDark ? "border-[#e8cf9d]/20 bg-[#0a0908]" : "border-zinc-200/70 bg-white"
           }`}
         />
       </div>

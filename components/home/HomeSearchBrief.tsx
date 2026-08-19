@@ -555,7 +555,7 @@ export default function HomeSearchBrief({
         </div>
 
         {conversationOpen ? (
-          <div className={`absolute inset-0 z-20 flex flex-col p-5 ${isDark ? "bg-[#0b0e13]/[0.985]" : "bg-white/[0.985]"}`}>
+          <div className={`home-brief-conversation absolute inset-0 z-20 flex flex-col p-5 ${isDark ? "bg-[#0b0e13]/[0.985]" : "bg-white/[0.985]"}`}>
             <div className="flex items-center justify-between gap-4">
               <div>
                 <span className={`text-[8px] font-extrabold uppercase tracking-[0.16em] ${isDark ? "text-sky-300/60" : "text-sky-700/65"}`}>Eterna</span>

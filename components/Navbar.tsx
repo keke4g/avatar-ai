@@ -6,10 +6,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSwap } from '../lib/context/SwapContext';
 import { useTranslation } from '../lib/context/LanguageContext';
-import { MessageSquare, Compass, Grid, Menu, X, Bell, Shield, User, LogOut, Check, Plus, CalendarCheck2, ChevronRight } from 'lucide-react';
+import { MessageSquare, Compass, Grid, Menu, X, Bell, Shield, User, LogOut, Check, Plus, CalendarCheck2, ChevronRight, Sun, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProfileAvatar from './ProfileAvatar';
 import BrandLogo from './BrandLogo';
+import { useTheme } from '../lib/context/ThemeContext';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -24,11 +25,11 @@ export default function Navbar() {
     setLogoutToast
   } = useSwap();
   const { t, language, setLanguage } = useTranslation();
+  const { isDark, toggleTheme } = useTheme();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notiDropdownOpen, setNotiDropdownOpen] = useState(false);
-  const [isHomeDark, setIsHomeDark] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const currentUser = isHydrated ? sessionUser : null;
   const publishHref = currentUser
@@ -39,21 +40,6 @@ export default function Navbar() {
 
   useEffect(() => {
     setIsHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedTheme = localStorage.getItem('home_theme');
-      setIsHomeDark(storedTheme === 'dark');
-    }
-
-    const handleThemeChange = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      setIsHomeDark(customEvent.detail === 'dark');
-    };
-
-    window.addEventListener('home-theme-change', handleThemeChange);
-    return () => window.removeEventListener('home-theme-change', handleThemeChange);
   }, []);
 
   const notiRef = useRef<HTMLDivElement>(null);
@@ -238,10 +224,10 @@ export default function Navbar() {
     <>
       <header
         className={`fixed top-4 left-1/2 z-[100] w-[calc(100%-2rem)] max-w-7xl -translate-x-1/2 overflow-visible rounded-full transition-all duration-300 ${
-          pathname === '/'
-            ? (isHomeDark
-                ? 'py-2 px-6 bg-transparent border-transparent opacity-40 hover:opacity-100 text-white'
-                : 'py-2.5 px-6 shadow-floating glass bg-white/85 border border-zinc-200/80 text-zinc-800')
+          isDark
+            ? 'py-2.5 px-6 border border-[#d6bb8a]/25 bg-[#080b12]/82 text-white shadow-[0_22px_70px_-28px_rgba(2,8,23,0.95)] backdrop-blur-2xl backdrop-saturate-150'
+            : pathname === '/'
+            ? 'py-2.5 px-6 shadow-floating glass bg-white/85 border border-zinc-200/80 text-zinc-800'
             : isScrolled
             ? 'py-2.5 px-6 shadow-floating glass bg-white/85 border border-white/35 text-zinc-800'
             : 'py-4 px-8 shadow-premium bg-white/70 border border-white/20 text-zinc-800'
@@ -251,7 +237,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" aria-label="Towers México — Inicio" className="group">
             <BrandLogo
-              inverted={pathname === '/' && isHomeDark}
+              inverted={isDark}
               priority
               markClassName="h-8 w-8 transition-transform duration-200 group-hover:scale-105"
             />
@@ -266,10 +252,10 @@ export default function Navbar() {
                   key={item.href}
                   href={item.href}
                   className={`relative px-4 py-2 rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-1.5 ${
-                    pathname === '/' && isHomeDark
+                    isDark
                       ? isActive
-                        ? 'text-white bg-white/10'
-                        : 'text-white/60 hover:text-white hover:bg-white/5'
+                        ? 'text-white bg-white/10 ring-1 ring-[#d6bb8a]/20'
+                        : 'text-white/62 hover:text-white hover:bg-white/[0.06]'
                       : isActive
                       ? 'text-brand-black bg-brand-gray-100'
                       : 'text-brand-gray-500 hover:text-brand-black hover:bg-brand-gray-50'
@@ -293,16 +279,16 @@ export default function Navbar() {
             
             {/* Elegant Glassmorphic Language Switcher Pill */}
             <div className={`flex items-center gap-0.5 border p-1 rounded-full text-[9px] font-black tracking-wide shadow-xs shrink-0 select-none ${
-              pathname === '/' && isHomeDark
-                ? 'bg-white/5 border-white/10 text-white'
+              isDark
+                ? 'bg-white/[0.045] border-[#d6bb8a]/20 text-white'
                 : 'bg-brand-gray-100/80 border border-brand-gray-200/50 text-brand-black'
             }`}>
               <button
                 onClick={() => setLanguage('es')}
                 className={`px-2.5 py-1 rounded-full cursor-pointer transition-all duration-200 ${
                   language === 'es'
-                    ? pathname === '/' && isHomeDark ? 'bg-white/10 text-white font-black' : 'bg-white text-brand-black shadow-sm font-black'
-                    : pathname === '/' && isHomeDark ? 'text-white/45 hover:text-white' : 'text-brand-gray-500 hover:text-brand-black'
+                    ? isDark ? 'bg-white/10 text-white font-black ring-1 ring-[#d6bb8a]/20' : 'bg-white text-brand-black shadow-sm font-black'
+                    : isDark ? 'text-white/45 hover:text-white' : 'text-brand-gray-500 hover:text-brand-black'
                 }`}
               >
                 ES
@@ -311,19 +297,40 @@ export default function Navbar() {
                 onClick={() => setLanguage('en')}
                 className={`px-2.5 py-1 rounded-full cursor-pointer transition-all duration-200 ${
                   language === 'en'
-                    ? pathname === '/' && isHomeDark ? 'bg-white/10 text-white font-black' : 'bg-white text-brand-black shadow-sm font-black'
-                    : pathname === '/' && isHomeDark ? 'text-white/45 hover:text-white' : 'text-brand-gray-500 hover:text-brand-black'
+                    ? isDark ? 'bg-white/10 text-white font-black ring-1 ring-[#d6bb8a]/20' : 'bg-white text-brand-black shadow-sm font-black'
+                    : isDark ? 'text-white/45 hover:text-white' : 'text-brand-gray-500 hover:text-brand-black'
                 }`}
               >
                 EN
               </button>
             </div>
 
+            {pathname !== '/' && (
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-pressed={isDark}
+                aria-label={isDark
+                  ? (language === 'es' ? 'Activar modo claro' : 'Enable light mode')
+                  : (language === 'es' ? 'Activar modo oscuro' : 'Enable dark mode')}
+                title={isDark
+                  ? (language === 'es' ? 'Modo claro' : 'Light mode')
+                  : (language === 'es' ? 'Modo oscuro' : 'Dark mode')}
+                className={`flex h-8 w-8 items-center justify-center rounded-full border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 ${
+                  isDark
+                    ? 'border-[#d6bb8a]/35 bg-white/[0.045] text-[#e6c994] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] hover:border-[#d6bb8a]/60 hover:bg-white/[0.08]'
+                    : 'border-brand-gray-200 bg-white text-brand-gray-500 hover:border-brand-gray-300 hover:bg-brand-gray-50 hover:text-brand-black'
+                }`}
+              >
+                {isDark ? <Sun className="h-3.5 w-3.5" aria-hidden="true" /> : <Moon className="h-3.5 w-3.5" aria-hidden="true" />}
+              </button>
+            )}
+
             <Link
               href={publishHref}
               className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-4 py-2 text-[9px] font-black uppercase tracking-wider shadow-sm transition hover:-translate-y-0.5 ${
-                pathname === '/' && isHomeDark
-                  ? 'border-white/25 bg-white/10 text-white hover:bg-white/15'
+                isDark
+                  ? 'border-[#d6bb8a]/30 bg-white/[0.06] text-white hover:border-[#d6bb8a]/55 hover:bg-white/[0.1]'
                   : 'border-brand-black bg-white text-brand-black hover:bg-brand-black hover:text-white'
               }`}
             >
@@ -341,8 +348,8 @@ export default function Navbar() {
                     setDropdownOpen(false);
                   }}
                   className={`p-2 rounded-full transition-colors relative cursor-pointer outline-none ${
-                    pathname === '/' && isHomeDark
-                      ? 'text-white/40 hover:text-white hover:bg-white/5'
+                    isDark
+                      ? 'text-white/45 hover:text-[#e6c994] hover:bg-white/[0.06]'
                       : 'text-brand-gray-500 hover:text-brand-black hover:bg-brand-gray-100'
                   }`}
                 >
@@ -360,12 +367,16 @@ export default function Navbar() {
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95, y: 5 }}
                       transition={{ duration: 0.18, ease: "easeOut" }}
-                      className="absolute right-0 mt-2.5 w-80 bg-white border border-brand-gray-200 rounded-3xl shadow-floating z-50 p-4 text-left overflow-hidden"
+                      className={`absolute right-0 mt-2.5 z-50 w-80 overflow-hidden rounded-3xl border p-4 text-left shadow-floating ${
+                        isDark
+                          ? 'border-[#d6bb8a]/20 bg-[#0c111b]/96 text-white shadow-[0_26px_80px_-30px_rgba(0,0,0,0.9)] backdrop-blur-2xl'
+                          : 'border-brand-gray-200 bg-white'
+                      }`}
                     >
                       <div className="absolute -top-10 -left-10 w-24 h-24 rounded-full bg-brand-accent/5 filter blur-lg pointer-events-none" />
                       
-                      <div className="flex items-center justify-between pb-3 border-b border-brand-gray-100 mb-3 select-none">
-                        <span className="text-[10px] uppercase font-black tracking-widest text-brand-black flex items-center gap-1.5">
+                      <div className={`mb-3 flex items-center justify-between border-b pb-3 select-none ${isDark ? 'border-white/10' : 'border-brand-gray-100'}`}>
+                        <span className={`flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest ${isDark ? 'text-white' : 'text-brand-black'}`}>
                           <Bell className="w-4 h-4 text-brand-accent" />
                           <span>{language === 'es' ? 'Notificaciones' : 'Notifications'}</span>
                         </span>
@@ -388,21 +399,21 @@ export default function Navbar() {
                             key={noti.id}
                             href={noti.link}
                             onClick={() => setNotiDropdownOpen(false)}
-                            className="flex gap-2.5 p-2 rounded-2xl hover:bg-brand-gray-50 transition-colors text-left"
+                            className={`flex gap-2.5 rounded-2xl p-2 text-left transition-colors ${isDark ? 'hover:bg-white/[0.06]' : 'hover:bg-brand-gray-50'}`}
                           >
                             <ProfileAvatar
                               name="Towers México"
-                              className="h-8 w-8 border border-brand-gray-200"
+                              className={`h-8 w-8 ${isDark ? 'border-white/15' : 'border-brand-gray-200'}`}
                               textClassName="text-[10px]"
                               alt={language === 'es' ? 'Notificación de Towers México' : 'Towers México notification'}
                             />
                             
                             <div className="overflow-hidden flex-grow select-none">
                               <div className="flex items-center justify-between gap-1 mb-0.5">
-                                <p className="text-[10px] font-black text-brand-black truncate">{noti.title}</p>
-                                <span className="text-[8px] font-bold text-brand-gray-400 shrink-0">{noti.time}</span>
+                                <p className={`truncate text-[10px] font-black ${isDark ? 'text-white/90' : 'text-brand-black'}`}>{noti.title}</p>
+                                <span className={`shrink-0 text-[8px] font-bold ${isDark ? 'text-white/35' : 'text-brand-gray-400'}`}>{noti.time}</span>
                               </div>
-                              <p className="text-[10px] font-semibold text-brand-gray-500 leading-normal line-clamp-2">{noti.body}</p>
+                              <p className={`line-clamp-2 text-[10px] font-semibold leading-normal ${isDark ? 'text-white/55' : 'text-brand-gray-500'}`}>{noti.body}</p>
                             </div>
                           </Link>
                         ))}
@@ -418,7 +429,7 @@ export default function Navbar() {
               <Link 
                 href="/login"
                 className={`py-2 px-4 rounded-full font-bold text-[10px] uppercase tracking-wider transition-colors shadow-premium cursor-pointer select-none ${
-                  pathname === '/' && isHomeDark
+                  isDark
                     ? 'bg-white text-brand-black hover:bg-white/90'
                     : 'bg-brand-black text-white hover:bg-brand-black/90'
                 }`}
@@ -430,7 +441,7 @@ export default function Navbar() {
                 <button
                   ref={profileBtnRef}
                   onClick={() => setDropdownOpen(!dropdownOpen)}
-                  className={`flex items-center gap-2 pl-2 border-l hover:opacity-90 transition-opacity cursor-pointer select-none ${pathname === '/' && isHomeDark ? 'border-white/10' : 'border-brand-gray-200'}`}
+                  className={`flex items-center gap-2 border-l pl-2 transition-opacity hover:opacity-90 cursor-pointer select-none ${isDark ? 'border-white/10' : 'border-brand-gray-200'}`}
                 >
                   <ProfileAvatar
                     src={currentUser.avatar}
@@ -438,7 +449,7 @@ export default function Navbar() {
                     className="h-7 w-7 border border-brand-gray-200"
                     textClassName="text-[10px]"
                   />
-                  <span className={`text-[10px] uppercase font-black tracking-wider hidden lg:inline ${pathname === '/' && isHomeDark ? 'text-white' : 'text-brand-black'}`}>
+                  <span className={`hidden text-[10px] uppercase font-black tracking-wider lg:inline ${isDark ? 'text-white' : 'text-brand-black'}`}>
                     {currentUser.name.split(' ')[0]}
                   </span>
                 </button>
@@ -451,32 +462,32 @@ export default function Navbar() {
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95, y: 5 }}
                       transition={{ duration: 0.18, ease: "easeOut" }}
-                      className="absolute right-0 mt-2.5 w-52 bg-white border border-brand-gray-200 rounded-2xl shadow-floating z-50 p-2 text-left"
+                      className={`absolute right-0 z-50 mt-2.5 w-52 rounded-2xl border p-2 text-left shadow-floating ${isDark ? 'border-[#d6bb8a]/20 bg-[#0c111b]/96 backdrop-blur-2xl' : 'border-brand-gray-200 bg-white'}`}
                     >
                       <Link
                         href="/profile"
                         onClick={() => setDropdownOpen(false)}
-                        className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-brand-gray-50 text-[11px] font-bold text-brand-black transition-colors"
+                        className={`flex items-center gap-2.5 rounded-xl p-2.5 text-[11px] font-bold transition-colors ${isDark ? 'text-white/85 hover:bg-white/[0.06]' : 'text-brand-black hover:bg-brand-gray-50'}`}
                       >
-                        <User className="w-4 h-4 text-brand-gray-400" />
+                        <User className={`h-4 w-4 ${isDark ? 'text-[#e6c994]/75' : 'text-brand-gray-400'}`} />
                         <span>{language === 'es' ? 'Mi Perfil' : 'My Profile'}</span>
                       </Link>
                       
                       <Link
                         href="/dashboard"
                         onClick={() => setDropdownOpen(false)}
-                        className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-brand-gray-50 text-[11px] font-bold text-brand-black transition-colors"
+                        className={`flex items-center gap-2.5 rounded-xl p-2.5 text-[11px] font-bold transition-colors ${isDark ? 'text-white/85 hover:bg-white/[0.06]' : 'text-brand-black hover:bg-brand-gray-50'}`}
                       >
-                        <Grid className="w-4 h-4 text-brand-gray-400" />
+                        <Grid className={`h-4 w-4 ${isDark ? 'text-[#e6c994]/75' : 'text-brand-gray-400'}`} />
                         <span>Dashboard</span>
                       </Link>
                       
                       <Link
                         href="/messages"
                         onClick={() => setDropdownOpen(false)}
-                        className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-brand-gray-50 text-[11px] font-bold text-brand-black transition-colors"
+                        className={`flex items-center gap-2.5 rounded-xl p-2.5 text-[11px] font-bold transition-colors ${isDark ? 'text-white/85 hover:bg-white/[0.06]' : 'text-brand-black hover:bg-brand-gray-50'}`}
                       >
-                        <MessageSquare className="w-4 h-4 text-brand-gray-400" />
+                        <MessageSquare className={`h-4 w-4 ${isDark ? 'text-[#e6c994]/75' : 'text-brand-gray-400'}`} />
                         <span>{language === 'es' ? 'Mensajes' : 'Messages'}</span>
                       </Link>
 
@@ -484,14 +495,14 @@ export default function Navbar() {
                         <Link
                           href="/admin"
                           onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-brand-gray-50 text-[11px] font-bold text-brand-black transition-colors"
+                          className={`flex items-center gap-2.5 rounded-xl p-2.5 text-[11px] font-bold transition-colors ${isDark ? 'text-white/85 hover:bg-white/[0.06]' : 'text-brand-black hover:bg-brand-gray-50'}`}
                         >
-                          <Shield className="w-4 h-4 text-brand-gray-400" />
+                          <Shield className={`h-4 w-4 ${isDark ? 'text-[#e6c994]/75' : 'text-brand-gray-400'}`} />
                           <span>{language === 'es' ? 'Consola Admin' : 'Admin Console'}</span>
                         </Link>
                       )}
                       
-                      <div className="h-px bg-brand-gray-100 my-1" />
+                      <div className={`my-1 h-px ${isDark ? 'bg-white/10' : 'bg-brand-gray-100'}`} />
                       
                       <button
                         type="button"
@@ -523,9 +534,9 @@ export default function Navbar() {
               aria-label={mobileMenuOpen
                 ? (language === 'es' ? 'Cerrar menú' : 'Close menu')
                 : (language === 'es' ? 'Abrir menú' : 'Open menu')}
-              className={`p-2 rounded-full transition-colors cursor-pointer ${
-                pathname === '/' && isHomeDark
-                  ? 'text-white/40 hover:text-white hover:bg-white/5'
+              className={`cursor-pointer rounded-full p-2 transition-colors ${
+                isDark
+                  ? 'text-white/45 hover:text-[#e6c994] hover:bg-white/[0.06]'
                   : 'text-brand-gray-500 hover:text-brand-black hover:bg-brand-gray-100'
               }`}
             >
@@ -558,7 +569,7 @@ export default function Navbar() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -12, scale: 0.98 }}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="fixed left-3 right-3 top-4 z-[5000] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[30px] border border-white/75 bg-white/98 p-4 shadow-[0_28px_90px_-28px_rgba(2,8,23,0.72)] md:hidden"
+              className={`fixed left-3 right-3 top-4 z-[5000] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[30px] border p-4 shadow-[0_28px_90px_-28px_rgba(2,8,23,0.72)] md:hidden ${isDark ? 'border-[#d6bb8a]/25 bg-[#090e17]/[0.98] text-white backdrop-blur-2xl' : 'border-white/75 bg-white/[0.98]'}`}
             >
               <div className="flex flex-col">
                 <div className="flex items-start justify-between gap-4 px-1 pb-4">
@@ -566,10 +577,10 @@ export default function Navbar() {
                     <span className="text-[9px] font-black uppercase tracking-[0.18em] text-brand-accent">
                       Towers México
                     </span>
-                    <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-slate-950">
+                    <h2 className={`mt-1 text-xl font-black tracking-[-0.04em] ${isDark ? 'text-white' : 'text-slate-950'}`}>
                       {language === 'es' ? '¿A dónde quieres ir?' : 'Where would you like to go?'}
                     </h2>
-                    <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                    <p className={`mt-1 text-[10px] font-semibold ${isDark ? 'text-white/50' : 'text-slate-500'}`}>
                       {language === 'es' ? 'Explora, publica y administra desde un solo lugar.' : 'Explore, publish, and manage from one place.'}
                     </p>
                   </div>
@@ -577,13 +588,13 @@ export default function Navbar() {
                     type="button"
                     onClick={() => setMobileMenuOpen(false)}
                     aria-label={language === 'es' ? 'Cerrar menú' : 'Close menu'}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition active:scale-95"
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border shadow-sm transition active:scale-95 ${isDark ? 'border-white/15 bg-white/[0.06] text-white/70 hover:bg-white/[0.1]' : 'border-slate-200 bg-white text-slate-600'}`}
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
 
-                <nav className="rounded-[24px] border border-slate-200/80 bg-slate-50/85 p-1.5">
+                <nav className={`rounded-[24px] border p-1.5 ${isDark ? 'border-white/10 bg-white/[0.035]' : 'border-slate-200/80 bg-slate-50/85'}`}>
                   {navItems.map((item) => {
                     const isActive = pathname === item.href || (item.href !== '/explore' && pathname?.startsWith(item.href));
                     return (
@@ -594,12 +605,12 @@ export default function Navbar() {
                         className={`flex min-h-13 items-center justify-between rounded-[18px] px-3.5 py-3 text-xs font-extrabold transition ${
                           isActive
                             ? 'bg-brand-accent text-white shadow-[0_14px_28px_-18px_rgba(10,119,168,0.9)]'
-                            : 'text-slate-600 hover:bg-white hover:text-slate-950'
+                            : isDark ? 'text-white/62 hover:bg-white/[0.06] hover:text-white' : 'text-slate-600 hover:bg-white hover:text-slate-950'
                         }`}
                       >
                         <div className="flex items-center gap-3">
                           <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${
-                            isActive ? 'bg-white/14 text-white' : 'bg-white text-slate-500 shadow-sm'
+                            isActive ? 'bg-white/14 text-white' : isDark ? 'bg-white/[0.06] text-white/45' : 'bg-white text-slate-500 shadow-sm'
                           }`}>
                             <item.icon className="h-4 w-4" />
                           </span>
@@ -613,7 +624,7 @@ export default function Navbar() {
                               {item.badge}
                             </span>
                           )}
-                          <ChevronRight className={`h-3.5 w-3.5 ${isActive ? 'text-white/70' : 'text-slate-300'}`} />
+                          <ChevronRight className={`h-3.5 w-3.5 ${isActive ? 'text-white/70' : isDark ? 'text-white/25' : 'text-slate-300'}`} />
                         </div>
                       </Link>
                     );
@@ -663,8 +674,30 @@ export default function Navbar() {
                     </div>
                   </div>
 
+                  <div className={`mt-4 flex items-center justify-between border-t pt-4 ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+                    <span className={`text-[9px] font-black uppercase tracking-[0.15em] ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                      {language === 'es' ? 'Apariencia' : 'Appearance'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={toggleTheme}
+                      aria-pressed={isDark}
+                      aria-label={isDark
+                        ? (language === 'es' ? 'Activar modo claro' : 'Enable light mode')
+                        : (language === 'es' ? 'Activar modo oscuro' : 'Enable dark mode')}
+                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[9px] font-black transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 ${
+                        isDark
+                          ? 'border-[#d6bb8a]/30 bg-white/[0.05] text-[#e6c994] hover:bg-white/[0.1]'
+                          : 'border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50'
+                      }`}
+                    >
+                      {isDark ? <Sun className="h-3.5 w-3.5" aria-hidden="true" /> : <Moon className="h-3.5 w-3.5" aria-hidden="true" />}
+                      <span>{isDark ? (language === 'es' ? 'Claro' : 'Light') : (language === 'es' ? 'Oscuro' : 'Dark')}</span>
+                    </button>
+                  </div>
+
                   {currentUser ? (
-                    <div className="mt-3 rounded-[22px] border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className={`mt-3 rounded-[22px] border p-3 shadow-sm ${isDark ? 'border-white/10 bg-white/[0.035]' : 'border-slate-200 bg-white'}`}>
                       <div className="flex items-center justify-between gap-3">
                         <Link
                           href="/profile"
@@ -678,8 +711,8 @@ export default function Navbar() {
                             textClassName="text-xs"
                           />
                           <div className="min-w-0">
-                            <p className="truncate text-xs font-extrabold text-slate-950">{currentUser.name}</p>
-                            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-400">{t('nav.profile')}</p>
+                            <p className={`truncate text-xs font-extrabold ${isDark ? 'text-white' : 'text-slate-950'}`}>{currentUser.name}</p>
+                            <p className={`mt-0.5 text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-white/35' : 'text-slate-400'}`}>{t('nav.profile')}</p>
                           </div>
                         </Link>
                         <button
@@ -695,13 +728,13 @@ export default function Navbar() {
                         <Link
                           href="/admin"
                           onClick={() => setMobileMenuOpen(false)}
-                          className="mt-3 flex items-center justify-between rounded-2xl bg-slate-50 p-3 text-xs font-bold text-slate-800"
+                          className={`mt-3 flex items-center justify-between rounded-2xl p-3 text-xs font-bold ${isDark ? 'bg-white/[0.045] text-white/80' : 'bg-slate-50 text-slate-800'}`}
                         >
                           <span className="flex items-center gap-3">
-                            <Shield className="h-4 w-4 text-slate-500" />
+                            <Shield className={`h-4 w-4 ${isDark ? 'text-[#e6c994]/70' : 'text-slate-500'}`} />
                             {language === 'es' ? 'Consola Admin' : 'Admin Console'}
                           </span>
-                          <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
+                          <ChevronRight className={`h-3.5 w-3.5 ${isDark ? 'text-white/25' : 'text-slate-300'}`} />
                         </Link>
                       )}
                     </div>
@@ -709,7 +742,7 @@ export default function Navbar() {
                     <Link
                       href="/login"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="mt-3 flex min-h-12 w-full items-center justify-center rounded-[18px] border border-slate-300 bg-white px-4 text-[10px] font-black uppercase tracking-[0.1em] text-slate-950 shadow-sm transition active:bg-slate-50"
+                      className={`mt-3 flex min-h-12 w-full items-center justify-center rounded-[18px] border px-4 text-[10px] font-black uppercase tracking-[0.1em] shadow-sm transition active:bg-slate-50 ${isDark ? 'border-[#d6bb8a]/30 bg-white/[0.05] text-white hover:bg-white/[0.1]' : 'border-slate-300 bg-white text-slate-950'}`}
                     >
                       {language === 'es' ? 'Iniciar sesión' : 'Log in'}
                     </Link>
