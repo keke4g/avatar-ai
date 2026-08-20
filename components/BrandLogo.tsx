@@ -18,7 +18,7 @@ export default function BrandLogo({
   priority = false,
 }: BrandLogoProps) {
   return (
-    <span className={`inline-flex items-center gap-2.5 ${className}`}>
+    <span className={`inline-flex items-center gap-2.5 leading-none ${className}`}>
       <span className={`relative block h-9 w-9 shrink-0 ${markClassName}`}>
         <Image
           src={inverted ? '/towers-mexico-logo-white.png' : '/towers-mexico-logo-blue.png'}
@@ -31,7 +31,7 @@ export default function BrandLogo({
       </span>
       {!compact && (
         <span
-          className={`whitespace-nowrap text-[17px] font-extrabold tracking-[-0.035em] ${
+          className={`whitespace-nowrap text-[17px] font-extrabold leading-none tracking-[-0.035em] ${
             inverted ? 'text-white' : 'text-slate-950'
           } ${textClassName}`}
         >

@@ -85,20 +85,20 @@ type SectionMeta = {
 };
 
 const SECTION_META: Record<EternaPropertyVisualSection, SectionMeta> = {
-  summary: { eyebrowEs: 'Resumen guiado', eyebrowEn: 'Guided brief', titleEs: 'Lo esencial de esta propiedad', titleEn: 'The property at a glance', icon: Sparkles, accent: 'text-violet-700' },
-  gallery: { eyebrowEs: 'Galería visual', eyebrowEn: 'Visual gallery', titleEs: 'Fotos de la propiedad', titleEn: 'Property photos', icon: Images, accent: 'text-rose-700' },
-  description: { eyebrowEs: 'Descripción', eyebrowEn: 'Description', titleEs: 'Así es la propiedad', titleEn: 'About this property', icon: FileText, accent: 'text-sky-700' },
-  amenities: { eyebrowEs: 'Comodidades', eyebrowEn: 'Amenities', titleEs: 'Amenidades y equipamiento', titleEn: 'Amenities & features', icon: Compass, accent: 'text-emerald-700' },
-  technical: { eyebrowEs: 'Ficha técnica', eyebrowEn: 'Technical profile', titleEs: 'Espacios, superficies y servicios', titleEn: 'Spaces, surfaces & services', icon: Ruler, accent: 'text-amber-700' },
-  media: { eyebrowEs: 'Multimedia', eyebrowEn: 'Media', titleEs: 'Videos, recorridos y planos', titleEn: 'Videos, tours & floor plans', icon: Play, accent: 'text-fuchsia-700' },
-  location: { eyebrowEs: 'Ubicación interactiva', eyebrowEn: 'Interactive location', titleEs: 'Mapa y lugares cercanos', titleEn: 'Map & nearby places', icon: MapPin, accent: 'text-sky-700' },
-  valuation: { eyebrowEs: 'Inteligencia de mercado', eyebrowEn: 'Market intelligence', titleEs: 'Estimación automatizada Towers', titleEn: 'Towers automated estimate', icon: Scale, accent: 'text-indigo-700' },
-  mortgage: { eyebrowEs: 'Escenario editable', eyebrowEn: 'Editable scenario', titleEs: 'Mensualidad y simulador hipotecario', titleEn: 'Monthly payment & mortgage simulator', icon: Calculator, accent: 'text-sky-700' },
-  financing: { eyebrowEs: 'Adquisición', eyebrowEn: 'Acquisition', titleEs: 'Financiamiento y métodos de pago', titleEn: 'Financing & payment methods', icon: WalletCards, accent: 'text-emerald-700' },
-  legal: { eyebrowEs: 'Debida diligencia', eyebrowEn: 'Due diligence', titleEs: 'Situación documental', titleEn: 'Document status', icon: FileCheck2, accent: 'text-amber-700' },
-  contact: { eyebrowEs: 'Contacto verificado', eyebrowEn: 'Verified contact', titleEs: 'Responsable de la publicación', titleEn: 'Listing representative', icon: UserRound, accent: 'text-cyan-700' },
-  commercial: { eyebrowEs: 'Condiciones comerciales', eyebrowEn: 'Commercial terms', titleEs: 'Precio y modalidades disponibles', titleEn: 'Price & available modes', icon: BadgeDollarSign, accent: 'text-emerald-700' },
-  market: { eyebrowEs: 'Evidencia comercial', eyebrowEn: 'Commercial evidence', titleEs: 'Datos de mercado documentados', titleEn: 'Documented market data', icon: BarChart3, accent: 'text-violet-700' },
+  summary: { eyebrowEs: 'Resumen guiado', eyebrowEn: 'Guided brief', titleEs: 'Lo esencial de esta propiedad', titleEn: 'The property at a glance', icon: Sparkles, accent: 'text-violet-700 dark:text-violet-300' },
+  gallery: { eyebrowEs: 'Galería visual', eyebrowEn: 'Visual gallery', titleEs: 'Fotos de la propiedad', titleEn: 'Property photos', icon: Images, accent: 'text-rose-700 dark:text-rose-300' },
+  description: { eyebrowEs: 'Descripción', eyebrowEn: 'Description', titleEs: 'Así es la propiedad', titleEn: 'About this property', icon: FileText, accent: 'text-sky-700 dark:text-sky-300' },
+  amenities: { eyebrowEs: 'Comodidades', eyebrowEn: 'Amenities', titleEs: 'Amenidades y equipamiento', titleEn: 'Amenities & features', icon: Compass, accent: 'text-emerald-700 dark:text-emerald-300' },
+  technical: { eyebrowEs: 'Ficha técnica', eyebrowEn: 'Technical profile', titleEs: 'Espacios, superficies y servicios', titleEn: 'Spaces, surfaces & services', icon: Ruler, accent: 'text-amber-700 dark:text-amber-300' },
+  media: { eyebrowEs: 'Multimedia', eyebrowEn: 'Media', titleEs: 'Videos, recorridos y planos', titleEn: 'Videos, tours & floor plans', icon: Play, accent: 'text-fuchsia-700 dark:text-fuchsia-300' },
+  location: { eyebrowEs: 'Ubicación interactiva', eyebrowEn: 'Interactive location', titleEs: 'Mapa y lugares cercanos', titleEn: 'Map & nearby places', icon: MapPin, accent: 'text-sky-700 dark:text-sky-300' },
+  valuation: { eyebrowEs: 'Inteligencia de mercado', eyebrowEn: 'Market intelligence', titleEs: 'Estimación automatizada Towers', titleEn: 'Towers automated estimate', icon: Scale, accent: 'text-indigo-700 dark:text-indigo-300' },
+  mortgage: { eyebrowEs: 'Escenario editable', eyebrowEn: 'Editable scenario', titleEs: 'Mensualidad y simulador hipotecario', titleEn: 'Monthly payment & mortgage simulator', icon: Calculator, accent: 'text-sky-700 dark:text-sky-300' },
+  financing: { eyebrowEs: 'Adquisición', eyebrowEn: 'Acquisition', titleEs: 'Financiamiento y métodos de pago', titleEn: 'Financing & payment methods', icon: WalletCards, accent: 'text-emerald-700 dark:text-emerald-300' },
+  legal: { eyebrowEs: 'Debida diligencia', eyebrowEn: 'Due diligence', titleEs: 'Situación documental', titleEn: 'Document status', icon: FileCheck2, accent: 'text-amber-700 dark:text-amber-300' },
+  contact: { eyebrowEs: 'Contacto verificado', eyebrowEn: 'Verified contact', titleEs: 'Responsable de la publicación', titleEn: 'Listing representative', icon: UserRound, accent: 'text-cyan-700 dark:text-cyan-300' },
+  commercial: { eyebrowEs: 'Condiciones comerciales', eyebrowEn: 'Commercial terms', titleEs: 'Precio y modalidades disponibles', titleEn: 'Price & available modes', icon: BadgeDollarSign, accent: 'text-emerald-700 dark:text-emerald-300' },
+  market: { eyebrowEs: 'Evidencia comercial', eyebrowEn: 'Commercial evidence', titleEs: 'Datos de mercado documentados', titleEn: 'Documented market data', icon: BarChart3, accent: 'text-violet-700 dark:text-violet-300' },
 };
 
 const formatPrice = (offering: PropertyOffering, language: LanguageType) => {
@@ -508,7 +508,7 @@ export const PropertyEternaVisualPanel = memo(function PropertyEternaVisualPanel
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[5100] flex items-end bg-[#555862] lg:items-center lg:pr-[430px]"
+          className="fixed inset-0 z-[5100] flex items-end bg-[#555862] dark:bg-[rgba(3,5,8,0.82)] dark:backdrop-blur-md lg:items-center lg:pr-[430px]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="eterna-property-visual-title"
@@ -521,11 +521,11 @@ export const PropertyEternaVisualPanel = memo(function PropertyEternaVisualPanel
             animate={{ y: 0, scale: 1 }}
             exit={{ y: 42, scale: 0.985 }}
             transition={{ type: 'spring', damping: 29, stiffness: 290 }}
-            className="flex h-[93dvh] w-full flex-col overflow-hidden rounded-t-[30px] border border-white/70 bg-[#f6f6f3] shadow-[0_35px_110px_rgba(2,6,23,0.5)] lg:mx-auto lg:h-[88dvh] lg:max-w-6xl lg:rounded-[34px]"
+            className="property-eterna-visual-shell flex h-[93dvh] w-full flex-col overflow-hidden rounded-t-[30px] border border-white/70 bg-[#f6f6f3] shadow-[0_35px_110px_rgba(2,6,23,0.5)] dark:border-[#d6bb8a]/25 dark:bg-[#0b0f14] dark:shadow-[0_36px_120px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.04)] lg:mx-auto lg:h-[88dvh] lg:max-w-6xl lg:rounded-[34px]"
           >
-            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-neutral-200/80 bg-white px-4 py-3.5 sm:px-6 sm:py-5">
+            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-neutral-200/80 bg-white px-4 py-3.5 dark:border-white/10 dark:bg-[#121820] sm:px-6 sm:py-5">
               <div className="flex min-w-0 items-start gap-3.5">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-neutral-950 text-white shadow-lg shadow-neutral-950/15 sm:h-11 sm:w-11">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-neutral-950 text-white shadow-lg shadow-neutral-950/15 dark:border dark:border-[#d6bb8a]/28 dark:bg-[#080b10] dark:text-[#efd69b] sm:h-11 sm:w-11">
                   <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" aria-hidden="true" />
                 </span>
                 <div className="min-w-0">
@@ -534,12 +534,12 @@ export const PropertyEternaVisualPanel = memo(function PropertyEternaVisualPanel
                   <p className="mt-0.5 line-clamp-1 text-[10px] font-semibold text-neutral-500 sm:text-xs">{property.title}</p>
                 </div>
               </div>
-              <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-500 transition hover:border-neutral-300 hover:text-neutral-950" aria-label={language === 'es' ? 'Cerrar apartado' : 'Close section'}>
+              <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-500 transition hover:border-neutral-300 hover:text-neutral-950 dark:border-white/12 dark:bg-white/[0.04] dark:text-white/60 dark:hover:border-[#d6bb8a]/45 dark:hover:bg-white/[0.08] dark:hover:text-white" aria-label={language === 'es' ? 'Cerrar apartado' : 'Close section'}>
                 <X className="h-4 w-4" />
               </button>
             </header>
 
-            <div className={`min-h-0 flex-1 ${activeSection === 'summary' ? 'overflow-hidden p-3 sm:p-5' : 'overflow-y-auto p-4 sm:p-6'}`}>
+            <div className={`property-eterna-visual-content min-h-0 flex-1 dark:bg-[radial-gradient(circle_at_86%_8%,rgba(214,187,138,0.07),transparent_28%),#0b0f14] ${activeSection === 'summary' ? 'overflow-hidden p-3 sm:p-5' : 'overflow-y-auto p-4 sm:p-6'}`}>
               {content}
             </div>
           </motion.section>

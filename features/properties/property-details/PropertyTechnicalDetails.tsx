@@ -121,7 +121,7 @@ export const PropertyTechnicalDetails = memo(function PropertyTechnicalDetails({
     <details open={expanded || undefined} className="group overflow-hidden rounded-[28px] border border-neutral-200/80 bg-white shadow-[0_22px_55px_-42px_rgba(15,23,42,0.55)]">
       <summary className="flex min-h-[88px] cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:content-none sm:px-6 [&::-webkit-details-marker]:hidden">
         <span className="flex min-w-0 items-center gap-3.5">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-neutral-950 text-white shadow-[0_12px_24px_-16px_rgba(0,0,0,0.95)]">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-neutral-950 text-white shadow-[0_12px_24px_-16px_rgba(0,0,0,0.95)] dark:border dark:border-[#d6bb8a]/25 dark:bg-[#0a0d12] dark:text-[#efd69b]">
             <Building className="h-[18px] w-[18px]" aria-hidden="true" />
           </span>
           <span className="min-w-0">

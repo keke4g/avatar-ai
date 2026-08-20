@@ -235,7 +235,7 @@ export default function Navbar() {
       >
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" aria-label="Towers México — Inicio" className="group">
+          <Link href="/" aria-label="Towers México — Inicio" className="group flex items-center self-center">
             <BrandLogo
               inverted={isDark}
               priority

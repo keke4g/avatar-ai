@@ -54,7 +54,7 @@
 }
 
 .darkTheme .darkTexture {
-  opacity: 0.2;
+  opacity: 0.28;
 }
 
 .darkTheme .darkVignette {
@@ -300,7 +300,7 @@
   }
 
   .darkTheme .darkTexture {
-    opacity: 0.16;
+    opacity: 0.22;
   }
 
   .darkTheme :global(.home-search-brief-box) {

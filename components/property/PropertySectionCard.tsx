@@ -29,9 +29,9 @@ export function PropertySubIcon({
   return (
     <span
       style={style}
-      className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-neutral-200/90 bg-[linear-gradient(145deg,#ffffff_0%,#f2f2ef_100%)] text-neutral-800 shadow-[0_12px_26px_-20px_rgba(15,23,42,0.8),inset_0_1px_0_rgba(255,255,255,0.95)] ${className}`}
+      className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-neutral-200/90 bg-[linear-gradient(145deg,#ffffff_0%,#f2f2ef_100%)] text-[#252a31] shadow-[0_12px_26px_-20px_rgba(15,23,42,0.8),inset_0_1px_0_rgba(255,255,255,0.95)] dark:border-[#d6bb8a]/30 dark:bg-[linear-gradient(145deg,#252c34_0%,#11161c_100%)] dark:text-[#efd69b] dark:shadow-[0_14px_28px_-18px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.08)] ${className}`}
     >
-      <span aria-hidden="true" className="absolute inset-x-1 top-0 h-px bg-white" />
+      <span aria-hidden="true" className="absolute inset-x-1 top-0 h-px bg-[#ffffff] dark:bg-white/15" />
       <Icon aria-hidden="true" className={iconClassName} />
     </span>
   );
@@ -55,7 +55,7 @@ export function PropertySectionCard({
     >
       <header className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex min-w-0 items-start gap-3.5">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-neutral-950 text-white shadow-[0_12px_24px_-16px_rgba(0,0,0,0.95)]">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-neutral-950 text-white shadow-[0_12px_24px_-16px_rgba(0,0,0,0.95)] dark:border dark:border-[#d6bb8a]/25 dark:bg-[#0a0d12] dark:text-[#efd69b]">
             <Icon aria-hidden="true" className="h-[18px] w-[18px]" />
           </span>
           <div className="min-w-0 pt-0.5">
