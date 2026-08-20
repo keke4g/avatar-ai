@@ -225,7 +225,7 @@ export default function Navbar() {
       <header
         className={`fixed top-4 left-1/2 z-[100] w-[calc(100%-2rem)] max-w-7xl -translate-x-1/2 overflow-visible rounded-full transition-all duration-300 ${
           isDark
-            ? 'py-2.5 px-6 border border-[#d6bb8a]/25 bg-[#080b12]/82 text-white shadow-[0_22px_70px_-28px_rgba(2,8,23,0.95)] backdrop-blur-2xl backdrop-saturate-150'
+            ? 'py-2.5 px-6 border border-[#d8b777]/30 bg-[#0a0907]/90 text-white shadow-[0_22px_70px_-28px_rgba(0,0,0,0.96),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-2xl backdrop-saturate-150'
             : pathname === '/'
             ? 'py-2.5 px-6 shadow-floating glass bg-white/85 border border-zinc-200/80 text-zinc-800'
             : isScrolled

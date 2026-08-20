@@ -690,8 +690,8 @@ export const translations = {
       actionReport: 'Reportar'
     },
     auth: {
-      loginTitle: 'Acceso de Propietarios',
-      loginSubtitle: 'Inicia sesión para gestionar tus trueques y conectar con la red global.',
+      loginTitle: 'Acceso a Towers México',
+      loginSubtitle: 'Inicia sesión para explorar, publicar y gestionar tus propiedades en un solo lugar.',
       emailLabel: 'Correo Electrónico',
       emailPlaceholder: 'correo@ejemplo.com',
       passwordLabel: 'Contraseña',
@@ -1470,8 +1470,8 @@ export const translations = {
       actionReport: 'Report'
     },
     auth: {
-      loginTitle: 'Homeowner Log In',
-      loginSubtitle: 'Log in to manage your swaps and connect with the global network.',
+      loginTitle: 'Access Towers México',
+      loginSubtitle: 'Sign in to explore, publish, and manage your properties in one place.',
       emailLabel: 'Email Address',
       emailPlaceholder: 'email@example.com',
       passwordLabel: 'Password',

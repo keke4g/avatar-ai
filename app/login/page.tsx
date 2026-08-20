@@ -800,12 +800,13 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="relative mx-auto flex min-h-[calc(100dvh-112px)] max-w-7xl items-center justify-center overflow-hidden px-4 py-8 pb-28 sm:px-8 sm:py-12 sm:pb-24 lg:px-12">
+    <main className="relative isolate mx-auto flex min-h-[calc(100svh-112px)] max-w-7xl items-center justify-center overflow-hidden px-4 py-8 pb-28 sm:px-8 sm:py-12 sm:pb-24 lg:px-12">
       
-      {/* Ambient background glows */}
-      <div className="pointer-events-none absolute -right-24 top-10 -z-10 h-80 w-80 rounded-full bg-brand-accent/6 blur-3xl sm:h-[420px] sm:w-[420px]" />
-      <div className="pointer-events-none absolute -bottom-24 -left-24 -z-10 h-80 w-80 rounded-full bg-emerald-100/40 blur-3xl sm:h-[420px] sm:w-[420px]" />
-      <div className="pointer-events-none absolute inset-x-6 top-1/2 -z-10 h-px bg-gradient-to-r from-transparent via-brand-gray-200/70 to-transparent" />
+      {/* Soft halos stay close to the access card and fade before the canvas edge. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[76%] w-[min(920px,88%)] -translate-x-1/2 -translate-y-1/2 rounded-[50%] bg-[radial-gradient(ellipse_at_28%_64%,rgba(16,185,129,0.13),transparent_48%),radial-gradient(ellipse_at_72%_36%,rgba(14,165,233,0.11),transparent_46%)] blur-3xl"
+      />
 
       <React.Suspense fallback={<div className="w-8 h-8 rounded-full border-4 border-brand-gray-205 border-t-brand-accent animate-spin mx-auto" />}>
         <LoginForm />

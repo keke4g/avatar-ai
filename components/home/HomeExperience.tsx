@@ -31,17 +31,6 @@ export default function HomeExperience() {
     };
   }, []);
 
-  // Force scroll viewport to top on load and mount to prevent viewport jumps on home page loading
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.scrollTo(0, 0);
-      const timer = setTimeout(() => {
-        window.scrollTo(0, 0);
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
   useEffect(() => {
     setHideHeader(true);
     setHideFooter(true);
@@ -74,15 +63,6 @@ export default function HomeExperience() {
       resizeObserver.observe(navbarElement);
     }
 
-    // MutationObserver to watch if header is added/rendered
-    let mutationObserver: MutationObserver | null = null;
-    if (typeof window !== "undefined" && window.MutationObserver) {
-      mutationObserver = new MutationObserver(() => {
-        updateNavbarHeight();
-      });
-      mutationObserver.observe(document.body, { childList: true, subtree: true });
-    }
-
     window.addEventListener("resize", updateNavbarHeight);
     const timer = setTimeout(updateNavbarHeight, 150);
 
@@ -90,14 +70,13 @@ export default function HomeExperience() {
       window.removeEventListener("resize", updateNavbarHeight);
       clearTimeout(timer);
       if (resizeObserver) resizeObserver.disconnect();
-      if (mutationObserver) mutationObserver.disconnect();
     };
   }, []);
 
   return (
     <div
       data-theme={theme}
-      className={`${styles.homeShell} ${isDark ? styles.darkTheme : styles.lightTheme} home-experience-shell relative w-full min-h-dvh lg:fixed lg:inset-0 lg:h-dvh flex flex-col justify-start overflow-x-hidden lg:overflow-hidden pb-6 lg:pb-0 transition-colors duration-300 ${
+      className={`${styles.homeShell} ${isDark ? styles.darkTheme : styles.lightTheme} home-experience-shell relative w-full min-h-[100svh] lg:fixed lg:inset-0 lg:h-dvh flex flex-col justify-start overflow-x-hidden lg:overflow-hidden pb-6 lg:pb-0 transition-colors duration-300 ${
         isDark ? "bg-[#030303] text-white" : "bg-[#fafafa] text-[#18181b]"
       }`}
       style={{

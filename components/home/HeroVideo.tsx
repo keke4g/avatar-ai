@@ -63,43 +63,6 @@ export default function HeroVideo({ avatarState, isDark = false }: HeroVideoProp
     addDebugLog("[ACTIVATE] finished");
   }, [startVoice, addDebugLog]);
 
-  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const touchCancelledRef = useRef<boolean>(false);
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
-    touchCancelledRef.current = false;
-    addDebugLog("TouchStart: saved initial X,Y");
-  }, [addDebugLog]);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchStartPosRef.current || touchCancelledRef.current) return;
-    const touch = e.touches[0];
-    const dx = touch.clientX - touchStartPosRef.current.x;
-    const dy = touch.clientY - touchStartPosRef.current.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    if (distance > 12) {
-      touchCancelledRef.current = true;
-      addDebugLog(`TouchMove: gesture cancelled (moved ${distance.toFixed(1)}px > 12px)`);
-    }
-  }, [addDebugLog]);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent, source: string) => {
-    if (!touchStartPosRef.current) return;
-    touchStartPosRef.current = null;
-    
-    if (touchCancelledRef.current) {
-      addDebugLog("TouchEnd: ignored (scroll or drag detected)");
-      return;
-    }
-
-    addDebugLog(`TouchEnd: confirmed TAP via ${source}`);
-    e.stopPropagation();
-    activateConversation(`TAP (${source})`);
-  }, [activateConversation, addDebugLog]);
-
-
   // Border & Glow configuration based on avatarState
   let frameBg = isDark ? "rgba(216, 183, 119, 0.42)" : "rgba(120, 170, 255, 0.25)";
   let glowShadow = isDark ? "0 0 32px rgba(216, 183, 119, 0.18)" : "0 0 25px rgba(120, 170, 255, 0.12)";
@@ -129,12 +92,8 @@ export default function HeroVideo({ avatarState, isDark = false }: HeroVideoProp
         addDebugLog(`PointerDown fired (Outer). pointerType: ${(e.nativeEvent as any).pointerType || 'n/a'}`);
         console.log("[MOBILE TAP] HeroVideo onPointerDown");
       }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={(e) => handleTouchEnd(e, "Outer")}
-      className={`home-hero-video ${isDark ? "home-hero-video-dark" : ""} relative flex items-center justify-center select-none w-full max-w-[340px] sm:max-w-[360px] mx-auto rounded-[32px] p-[3px] transition-all duration-300 ease-in-out mt-2 lg:mt-1 cursor-pointer`}
+      className={`home-hero-video ${isDark ? "home-hero-video-dark" : ""} relative flex touch-pan-y items-center justify-center select-none w-full max-w-[340px] sm:max-w-[360px] mx-auto rounded-[32px] p-[3px] transition-all duration-300 ease-in-out mt-2 lg:mt-1 cursor-pointer`}
       style={{
-        height: "min(calc(var(--useful-height, 760px) - var(--home-hero-height-offset, 20px)), 760px)",
         aspectRatio: "9/16",
         background: frameBg
       }}
@@ -176,21 +135,7 @@ export default function HeroVideo({ avatarState, isDark = false }: HeroVideoProp
             console.log("[MOBILE TAP] HeroVideo onPointerDown (Overlay)");
             e.stopPropagation();
           }}
-          onTouchStart={(e) => {
-            addDebugLog("TouchStart fired (Overlay)");
-            console.log("[MOBILE TAP] HeroVideo onTouchStart (Overlay)");
-            e.stopPropagation();
-            handleTouchStart(e);
-          }}
-          onTouchMove={(e) => {
-            e.stopPropagation();
-            handleTouchMove(e);
-          }}
-          onTouchEnd={(e) => {
-            e.stopPropagation();
-            handleTouchEnd(e, "Overlay");
-          }}
-          className="absolute inset-0 z-20 cursor-pointer bg-transparent"
+          className="absolute inset-0 z-20 touch-pan-y cursor-pointer bg-transparent"
         />
 
         {/* Main Double Buffered Video Element */}
