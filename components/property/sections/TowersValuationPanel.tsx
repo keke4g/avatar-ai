@@ -1,11 +1,12 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import {
   ArrowRight,
   Building2,
   Calculator,
   CalendarClock,
+  ChevronDown,
   Gauge,
   Info,
   Minus,
@@ -59,6 +60,7 @@ interface TowersValuationPanelProps {
   language: 'es' | 'en';
   onAskEterna?: () => void;
   className?: string;
+  defaultExpanded?: boolean;
 }
 
 const FINITE_POSITIVE = (value: unknown): value is number => (
@@ -160,8 +162,11 @@ export function TowersValuationPanel({
   language,
   onAskEterna,
   className = '',
+  defaultExpanded = false,
 }: TowersValuationPanelProps) {
   const headingId = useId();
+  const contentId = useId();
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   if (!valuation) return null;
 
   const mode = getPrimaryMode(property, valuation);
@@ -250,34 +255,66 @@ export function TowersValuationPanel({
   return (
     <section
       aria-labelledby={headingId}
-      className={`scroll-mt-28 overflow-hidden rounded-[28px] border border-slate-200 bg-[#f5f6f8] shadow-[0_28px_70px_-50px_rgba(15,23,42,0.72)] ${className}`}
+      className={`scroll-mt-28 overflow-hidden rounded-[24px] border border-slate-200 bg-white text-slate-950 shadow-[0_24px_64px_-48px_rgba(15,23,42,0.72)] dark:border-white/10 dark:bg-[#11161d] dark:text-[#f3f0e9] dark:shadow-[0_28px_70px_-46px_rgba(0,0,0,0.9)] ${className}`}
     >
-      <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-sm">
+      <button
+        type="button"
+        aria-expanded={isExpanded}
+        aria-controls={contentId}
+        onClick={() => setIsExpanded((expanded) => !expanded)}
+        className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-600 dark:hover:bg-white/[0.035] sm:px-6 sm:py-5"
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-sm dark:bg-[#ecd29a] dark:text-[#19140c]">
             <Calculator aria-hidden="true" className="h-4.5 w-4.5" />
           </span>
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-sky-700">
+          <span className="min-w-0">
+            <span className="block text-[9px] font-black uppercase tracking-[0.18em] text-sky-700 dark:text-[#d8b777]">
               {language === 'es' ? 'Guía de mercado Towers' : 'Towers market guide'}
-            </p>
-            <h2 id={headingId} className="mt-0.5 text-lg font-black tracking-[-0.03em] text-slate-950 sm:text-xl">
+            </span>
+            <span
+              id={headingId}
+              role="heading"
+              aria-level={2}
+              className="mt-0.5 block truncate text-base font-black tracking-[-0.03em] text-slate-950 dark:text-[#f3f0e9] sm:text-lg"
+            >
               {language === 'es' ? '¿Cómo está posicionado este precio?' : 'How is this listing priced?'}
-            </h2>
-          </div>
-        </div>
-        {onAskEterna && (
-          <button
-            type="button"
-            onClick={onAskEterna}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 text-[10px] font-black text-slate-800 transition hover:-translate-y-0.5 hover:border-sky-300 hover:text-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"
-          >
-            <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
-            {language === 'es' ? 'Explícamelo con Eterna' : 'Ask Eterna'}
-            <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
+            </span>
+          </span>
+        </span>
+        <span className="flex shrink-0 items-center gap-3">
+          <span className="hidden text-right sm:block">
+            <span className="block text-[8px] font-black uppercase tracking-[0.14em] text-slate-400 dark:text-white/40">
+              {language === 'es' ? 'Estimado' : 'Estimate'}
+            </span>
+            <span className="mt-0.5 block text-sm font-black text-slate-900 dark:text-[#ecd29a]">
+              {formatCompactMoney(referenceEstimate, currency, language)}
+            </span>
+          </span>
+          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-white/[0.045] dark:text-white/70">
+            <ChevronDown
+              aria-hidden="true"
+              className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+            />
+          </span>
+        </span>
+      </button>
+
+      {isExpanded && (
+        <div id={contentId} className="animate-in fade-in slide-in-from-top-1 border-t border-slate-200 duration-200 dark:border-white/10">
+          {onAskEterna && (
+            <div className="flex justify-end px-3 pt-3 sm:px-5 sm:pt-4">
+              <button
+                type="button"
+                onClick={onAskEterna}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 text-[10px] font-black text-slate-800 transition hover:-translate-y-0.5 hover:border-sky-300 hover:text-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2 dark:border-white/12 dark:bg-white/[0.045] dark:text-[#f3f0e9] dark:hover:border-[#d8b777]/50 dark:hover:text-[#ecd29a]"
+              >
+                <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
+                {language === 'es' ? 'Explícamelo con Eterna' : 'Ask Eterna'}
+                <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
 
       <div className="px-3 pb-3 sm:px-5 sm:pb-5">
         <div className="overflow-hidden rounded-[24px] bg-[#111315] text-white shadow-[0_24px_55px_-38px_rgba(15,23,42,0.9)]">
@@ -378,9 +415,9 @@ export function TowersValuationPanel({
         </div>
       </div>
 
-      <div className="border-t border-slate-200 bg-white px-5 py-4 sm:px-7">
+      <div className="border-t border-slate-200 bg-white px-5 py-4 dark:border-white/10 dark:bg-[#0d1117] sm:px-7">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-bold text-slate-500">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-bold text-slate-500 dark:text-white/45">
             {typeof valuation.comparableCount === 'number' && valuation.comparableCount > 0 && (
               <span className="inline-flex items-center gap-1.5">
                 <Gauge aria-hidden="true" className="h-3.5 w-3.5 text-sky-700" />
@@ -396,12 +433,12 @@ export function TowersValuationPanel({
             )}
           </div>
 
-          <details className="group text-[10px] text-slate-500 sm:max-w-md">
-            <summary className="flex cursor-pointer list-none items-center gap-1.5 font-black text-sky-800 outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2 sm:justify-end">
+          <details className="group text-[10px] text-slate-500 dark:text-white/50 sm:max-w-md">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 font-black text-sky-800 outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2 dark:text-[#d8b777] sm:justify-end">
               <Info aria-hidden="true" className="h-3.5 w-3.5" />
               {language === 'es' ? 'Cómo se calculó' : 'How it was calculated'}
             </summary>
-            <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left leading-relaxed">
+            <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left leading-relaxed dark:border-white/10 dark:bg-white/[0.035]">
               {valuation.methodology && <p>{valuation.methodology}</p>}
               {valuation.sourceLabels && valuation.sourceLabels.length > 0 && (
                 <p className={valuation.methodology ? 'mt-2' : ''}>
@@ -409,7 +446,7 @@ export function TowersValuationPanel({
                   {valuation.sourceLabels.join(', ')}.
                 </p>
               )}
-              <p className="mt-2 font-semibold text-slate-600">
+              <p className="mt-2 font-semibold text-slate-600 dark:text-white/60">
                 {language === 'es'
                   ? 'Es una estimación comercial aproximada basada principalmente en precios anunciados; no sustituye un avalúo profesional.'
                   : 'This is an approximate commercial estimate based mainly on asking prices; it does not replace a professional appraisal.'}
@@ -418,6 +455,8 @@ export function TowersValuationPanel({
           </details>
         </div>
       </div>
+        </div>
+      )}
     </section>
   );
 }

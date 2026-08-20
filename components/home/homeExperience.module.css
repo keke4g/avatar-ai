@@ -312,6 +312,31 @@
   }
 }
 
+@media (max-width: 1023px) {
+  .homeShell {
+    overflow-x: clip;
+    overflow-y: visible;
+    scroll-behavior: auto;
+    scroll-snap-type: none;
+    overscroll-behavior-y: auto;
+  }
+
+  .homeShell :global(.home-hero-video) {
+    width: auto;
+    height: min(
+      604px,
+      calc(100svh - var(--navbar-height) - 140px - env(safe-area-inset-bottom, 0px))
+    );
+    max-width: calc(100vw - 32px);
+    pointer-events: none;
+    touch-action: pan-y;
+  }
+
+  .homeShell :global(.home-hero-action) {
+    touch-action: pan-y;
+  }
+}
+
 @media (min-width: 1024px) {
   .homeShell :global(.home-hero-video) {
     height: min(calc(var(--useful-height, 760px) - var(--home-hero-height-offset, 20px)), 760px);

@@ -42,7 +42,7 @@ export default function HomeHero({ isDark = false }: HomeHeroProps) {
         onClick={startVoice}
         aria-label={actionAriaLabel}
         disabled={isVoiceStarting}
-        className={`home-hero-action relative z-30 -mt-16 inline-flex min-h-11 min-w-[190px] items-center justify-center gap-2 rounded-full border px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-white shadow-[0_14px_38px_rgba(0,0,0,0.34)] backdrop-blur-xl transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] disabled:cursor-wait disabled:hover:translate-y-0 ${
+        className={`home-hero-action relative z-30 -mt-16 inline-flex min-h-11 min-w-[190px] touch-pan-y items-center justify-center gap-2 rounded-full border px-5 py-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-white shadow-[0_14px_38px_rgba(0,0,0,0.34)] backdrop-blur-xl transition-[background-color,border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] disabled:cursor-wait disabled:hover:translate-y-0 ${
           isSpeaking
             ? "border-rose-300/35 bg-rose-500/90 hover:bg-rose-500"
             : isVoiceStarting

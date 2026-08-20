@@ -490,7 +490,7 @@ export const PropertyEternaVisualPanel = memo(function PropertyEternaVisualPanel
           : activeSection === 'technical' ? <TechnicalVisual language={language} property={property} />
             : activeSection === 'media' ? (hasMultimedia ? <PropertyMultimediaSection language={language} property={property} /> : <EmptyVisual language={language} />)
               : activeSection === 'location' ? (property.latitude !== null && property.longitude !== null ? <GooglePropertyLocation property={property} places={places || EMPTY_NEARBY_PLACES} loading={loading} error={error} language={language === 'es' ? 'es' : 'en'} /> : <EmptyVisual language={language} />)
-                : activeSection === 'valuation' ? <TowersValuationPanel property={property} valuation={valuation} language={language === 'es' ? 'es' : 'en'} />
+                : activeSection === 'valuation' ? <TowersValuationPanel property={property} valuation={valuation} language={language === 'es' ? 'es' : 'en'} defaultExpanded />
                   : activeSection === 'mortgage' ? <MortgageSimulatorVisual language={language} property={property} scenario={mortgageScenario} onScenarioChange={onMortgageScenarioChange} />
                   : activeSection === 'financing' ? <FinancingCompatibility property={property} language={language} />
                     : activeSection === 'legal' ? <LegalDossierSection property={property} language={language} />

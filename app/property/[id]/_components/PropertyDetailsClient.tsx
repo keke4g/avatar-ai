@@ -475,17 +475,6 @@ export default function PropertyDetailsClient({ id, initialContent }: PropertyDe
 
       {/* 2. Premium Image Grid (Apple/Airbnb Inspired) */}
       <PropertyGalleryHero controller={gallery} language={language} property={property} />
-      <TowersValuationPanel
-        property={property}
-        valuation={presentationValuation}
-        language={language === 'es' ? 'es' : 'en'}
-        onAskEterna={() => openChat(
-          language === 'es'
-            ? 'Explícame la estimación Towers de esta propiedad, su rango, confianza y comparables.'
-            : 'Explain the Towers estimate for this property, including its range, confidence and comparables.',
-        )}
-        className="mb-10"
-      />
 
       {/* 3. Main Split-Pane Content */}
       <div className="flex flex-col lg:flex-row gap-12 items-start">
@@ -523,6 +512,17 @@ export default function PropertyDetailsClient({ id, initialContent }: PropertyDe
               </div>
             );
           })()}
+
+          <TowersValuationPanel
+            property={property}
+            valuation={presentationValuation}
+            language={language === 'es' ? 'es' : 'en'}
+            onAskEterna={() => openChat(
+              language === 'es'
+                ? 'Explícame la estimación Towers de esta propiedad, su rango, confianza y comparables.'
+                : 'Explain the Towers estimate for this property, including its range, confidence and comparables.',
+            )}
+          />
 
           {/* Core specs: one consistent grid so every value is easy to scan. */}
           {(() => {
