@@ -59,6 +59,31 @@ import {
   requestInstantTopNavigation,
 } from '../../../lib/navigation/instantTopNavigation';
 import { AMENITY_OPTIONS } from '../../../lib/propertyFeatures';
+import {
+  calculateGrowthPercent,
+  calculateSharePercent,
+  detectTerritorialDomains,
+  isTerritorialIntelligenceQuery,
+  requestsNationalRanking,
+} from '../../../lib/territory/queryPlanning';
+
+test('activa inteligencia territorial solo para preguntas socioeconómicas pertinentes', () => {
+  assert.deepEqual(
+    detectTerritorialDomains('Compara empleo informal, salarios y necesidad de vivienda en Culiacán'),
+    ['employment', 'income', 'informality', 'housing_need', 'demographics'],
+  );
+  assert.equal(isTerritorialIntelligenceQuery('¿Cuáles son los sectores económicos de Sinaloa?'), true);
+  assert.equal(isTerritorialIntelligenceQuery('Muéstrame casas abajo de 3 millones'), false);
+  assert.equal(isTerritorialIntelligenceQuery('¿Qué amenidades tiene esta casa?'), false);
+  assert.equal(requestsNationalRanking('¿Dónde hay más crecimiento poblacional y necesidad de vivienda?'), true);
+});
+
+test('calcula indicadores territoriales derivados sin divisiones inválidas', () => {
+  assert.equal(calculateGrowthPercent(1_000, 1_125), 12.5);
+  assert.equal(calculateGrowthPercent(0, 1_125), null);
+  assert.equal(calculateSharePercent(275, 1_000), 27.5);
+  assert.equal(calculateSharePercent(100, 0), null);
+});
 
 test('normaliza transcripciones y detecta ecos por tokens', () => {
   assert.equal(normalizeVoiceText('¡Casa en MÉXICO, por favor!'), 'casa en mexico por favor');

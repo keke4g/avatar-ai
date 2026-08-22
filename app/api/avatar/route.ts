@@ -5,6 +5,12 @@ import {
   getGeminiErrorStatus,
   isRetryableGeminiError,
 } from "../../../lib/services/GeminiService";
+import { isTerritorialIntelligenceQuery } from '@/lib/territory/queryPlanning';
+import {
+  buildTerritorialTrustedContext,
+  extractTerritorialPropertyContext,
+  getTerritorialIntelligenceContext,
+} from '@/lib/territory/TerritorialIntelligenceService';
 
 export async function POST(request: Request) {
   const startedAt = Date.now();
@@ -84,6 +90,27 @@ export async function POST(request: Request) {
       );
     }
 
+    let trustedContext: string | undefined;
+    if (isTerritorialIntelligenceQuery(message)) {
+      try {
+        const territorialContext = await getTerritorialIntelligenceContext({
+          query: message.trim(),
+          propertyContext: extractTerritorialPropertyContext(pageContext),
+        });
+        trustedContext = buildTerritorialTrustedContext(territorialContext);
+      } catch (territorialError) {
+        console.warn('[TerritorialIntelligence] Context enrichment failed.', {
+          requestId,
+          error: territorialError instanceof Error ? territorialError.message : String(territorialError),
+        });
+        trustedContext = [
+          'No hay resultados territoriales verificables disponibles para esta consulta.',
+          'No inventes cifras socioeconomicas o demograficas.',
+          'Explica brevemente la falta de cobertura y pide una geografia concreta.',
+        ].join(' ');
+      }
+    }
+
     if (responseMode === "page_agent") {
       if (
         pageContext !== undefined
@@ -100,6 +127,7 @@ export async function POST(request: Request) {
         conversationHistory: typedHistory,
         systemPrompt: typeof systemPrompt === "string" ? systemPrompt : undefined,
         pageContext,
+        trustedContext,
       });
 
       console.info(JSON.stringify({
@@ -125,6 +153,7 @@ export async function POST(request: Request) {
         message: message.trim(),
         conversationHistory: typedHistory,
         systemPrompt: typeof systemPrompt === "string" ? systemPrompt : undefined,
+        trustedContext,
       });
 
       return NextResponse.json({
@@ -150,6 +179,7 @@ export async function POST(request: Request) {
         conversationHistory: typedHistory,
         systemPrompt: typeof systemPrompt === "string" ? systemPrompt : undefined,
         currentSearchState,
+        trustedContext,
       });
 
       return NextResponse.json({
@@ -165,6 +195,7 @@ export async function POST(request: Request) {
       userId: typeof userId === "string" ? userId.slice(0, 128) : undefined,
       conversationHistory: typedHistory,
       systemPrompt: typeof systemPrompt === "string" ? systemPrompt : undefined,
+      trustedContext,
     });
 
     return NextResponse.json({

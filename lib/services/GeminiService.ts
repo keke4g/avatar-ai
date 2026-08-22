@@ -349,6 +349,7 @@ export class GeminiService {
     conversationHistory?: ConversationMessage[];
     systemPrompt?: string;
     pageContext?: unknown;
+    trustedContext?: string;
   }): Promise<GeminiModelResult<PageAgentResponse>> {
     const pageContext = JSON.stringify(params.pageContext || {});
     const generation = await generateContentWithResilience({
@@ -357,7 +358,7 @@ export class GeminiService {
         params.conversationHistory,
       ),
       config: {
-        systemInstruction: `${params.systemPrompt || DEFAULT_SYSTEM_PROMPT}\n\n${PAGE_AGENT_INSTRUCTION}`,
+        systemInstruction: `${params.systemPrompt || DEFAULT_SYSTEM_PROMPT}\n\n${PAGE_AGENT_INSTRUCTION}${params.trustedContext ? `\n\n${params.trustedContext}` : ''}`,
         temperature: 0.42,
         maxOutputTokens: 1_000,
         thinkingConfig: { thinkingBudget: 0 },
@@ -390,11 +391,12 @@ export class GeminiService {
     userId?: string;
     conversationHistory?: ConversationMessage[];
     systemPrompt?: string;
+    trustedContext?: string;
   }): Promise<GeminiModelResult<string>> {
     const generation = await generateContentWithResilience({
         contents: buildContents(params.message, params.conversationHistory),
         config: {
-          systemInstruction: params.systemPrompt || DEFAULT_SYSTEM_PROMPT,
+          systemInstruction: `${params.systemPrompt || DEFAULT_SYSTEM_PROMPT}${params.trustedContext ? `\n\n${params.trustedContext}` : ''}`,
           temperature: 0.55,
           maxOutputTokens: 700,
           thinkingConfig: { thinkingBudget: 0 },
@@ -412,11 +414,12 @@ export class GeminiService {
     message: string;
     conversationHistory?: ConversationMessage[];
     systemPrompt?: string;
+    trustedContext?: string;
   }): Promise<GeminiModelResult<PropertySalesResponse>> {
     const generation = await generateContentWithResilience({
         contents: buildContents(params.message, params.conversationHistory),
         config: {
-          systemInstruction: `${params.systemPrompt || DEFAULT_SYSTEM_PROMPT}\n\n${PROPERTY_SALES_INSTRUCTION}`,
+          systemInstruction: `${params.systemPrompt || DEFAULT_SYSTEM_PROMPT}\n\n${PROPERTY_SALES_INSTRUCTION}${params.trustedContext ? `\n\n${params.trustedContext}` : ''}`,
           temperature: 0.45,
           maxOutputTokens: 1_000,
           thinkingConfig: { thinkingBudget: 0 },
@@ -449,6 +452,7 @@ export class GeminiService {
     conversationHistory?: ConversationMessage[];
     systemPrompt?: string;
     currentSearchState?: unknown;
+    trustedContext?: string;
   }): Promise<GeminiModelResult<SearchConciergeResponse>> {
     const searchState = JSON.stringify(params.currentSearchState || {});
     const generation = await generateContentWithResilience({
@@ -457,7 +461,7 @@ export class GeminiService {
           params.conversationHistory,
         ),
         config: {
-          systemInstruction: `${params.systemPrompt || DEFAULT_SYSTEM_PROMPT}\n\n${SEARCH_CONCIERGE_INSTRUCTION}`,
+          systemInstruction: `${params.systemPrompt || DEFAULT_SYSTEM_PROMPT}\n\n${SEARCH_CONCIERGE_INSTRUCTION}${params.trustedContext ? `\n\n${params.trustedContext}` : ''}`,
           temperature: 0.2,
           maxOutputTokens: 800,
           thinkingConfig: { thinkingBudget: 0 },
