@@ -1763,7 +1763,7 @@ export default function PropertyWizardModal({
           role="dialog"
           aria-modal="true"
           aria-labelledby="property-wizard-title"
-          className="relative z-10 grid h-[94dvh] max-h-[94dvh] w-full max-w-6xl grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden rounded-t-[32px] bg-[#f8f7f3] shadow-2xl sm:h-[calc(100dvh-3rem)] sm:max-h-[900px] sm:rounded-[34px] lg:grid-cols-[330px_minmax(0,1fr)]"
+          className={`${styles.wizardShell} relative z-10 grid h-[94dvh] max-h-[94dvh] w-full max-w-6xl grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden rounded-t-[32px] bg-[#f8f7f3] shadow-2xl sm:h-[calc(100dvh-3rem)] sm:max-h-[900px] sm:rounded-[34px] lg:grid-cols-[330px_minmax(0,1fr)]`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* DELETE CONFIRMATION SCREEN OVERLAY inside the modal */}

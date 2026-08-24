@@ -164,7 +164,7 @@ function WizardScrollControlsComponent({ scrollAreaRef, step }: WizardScrollCont
             transition={{ duration: 0.25 }}
             className="pointer-events-none absolute bottom-0 left-0 right-7 h-20 flex flex-col items-center justify-end pb-1"
             style={{
-              background: 'linear-gradient(to bottom, transparent 0%, rgba(248,247,243,0.92) 60%, rgba(248,247,243,1) 100%)',
+              background: 'linear-gradient(to bottom, transparent 0%, var(--property-wizard-fade-mid, rgba(248,247,243,0.92)) 60%, var(--property-wizard-fade-end, rgba(248,247,243,1)) 100%)',
             }}
           >
             <span className="text-[10px] font-bold text-brand-gray-400 tracking-wide flex flex-col items-center gap-0.5">
